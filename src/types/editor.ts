@@ -35,9 +35,12 @@ export interface DerivedSlice extends SliceModel {
 export interface ExportSettings {
   format: OutputFormat;
   width: number;
-  fps: number;
+  height: number;
+  keepAspectRatio: boolean;
+  gifFps: number;
   paletteMode: PaletteMode;
   dither: DitherMode;
+  mp4Fps: number;
   speedOverlay: boolean;
 }
 

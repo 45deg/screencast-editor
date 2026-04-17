@@ -408,15 +408,32 @@ export default function SliceEditorTimeline({
     (clientX: number) => {
       const element = timelineRef.current;
       if (!element) {
-        return;
+        return currentTime;
       }
 
       const rect = element.getBoundingClientRect();
       const x = clientX - rect.left;
       const nextTime = Math.max(0, Math.min(totalDuration, x / pixelsPerSecond));
       onCurrentTimeChange(nextTime);
+      return nextTime;
     },
-    [onCurrentTimeChange, pixelsPerSecond, totalDuration],
+    [currentTime, onCurrentTimeChange, pixelsPerSecond, totalDuration],
+  );
+
+  const getSliceIdAtTime = useCallback(
+    (time: number): string | null => {
+      const hit = slicesWithPos.find((slice) => time >= slice.start && time < slice.end);
+      if (hit) {
+        return hit.id;
+      }
+
+      if (slicesWithPos.length && time >= totalDuration) {
+        return slicesWithPos[slicesWithPos.length - 1].id;
+      }
+
+      return null;
+    },
+    [slicesWithPos, totalDuration],
   );
 
   const handleCut = useCallback(() => {
@@ -514,13 +531,13 @@ export default function SliceEditorTimeline({
   const handleTimelinePointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       const target = event.target as Element;
-      if (event.target === event.currentTarget || target.id === 'ruler') {
-        onSelectedSliceIdChange(null);
-      }
+      const nextTime = updateTimeFromClientX(event.clientX);
 
-      updateTimeFromClientX(event.clientX);
+      if (event.target === event.currentTarget || target.id === 'ruler') {
+        onSelectedSliceIdChange(getSliceIdAtTime(nextTime));
+      }
     },
-    [onSelectedSliceIdChange, updateTimeFromClientX],
+    [getSliceIdAtTime, onSelectedSliceIdChange, updateTimeFromClientX],
   );
 
   const handleTimelinePan = useCallback(

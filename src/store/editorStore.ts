@@ -18,9 +18,12 @@ const MIN_SLICE_DURATION = 0.5;
 const DEFAULT_EXPORT_SETTINGS: ExportSettings = {
   format: 'gif',
   width: 640,
-  fps: 10,
+  height: 360,
+  keepAspectRatio: true,
+  gifFps: 10,
   paletteMode: 'global',
   dither: 'none',
+  mp4Fps: 30,
   speedOverlay: true,
 };
 
@@ -87,6 +90,9 @@ export const useEditorStore = create<EditorStoreState>((set, get) => ({
   future: [],
 
   setVideo: (video) => {
+    const initialWidth = Math.min(DEFAULT_EXPORT_SETTINGS.width, video.width);
+    const initialHeight = Math.max(16, Math.round((initialWidth * video.height) / Math.max(1, video.width)));
+
     const initialSlice: SliceModel = {
       id: crypto.randomUUID(),
       sourceStart: 0,
@@ -108,7 +114,8 @@ export const useEditorStore = create<EditorStoreState>((set, get) => ({
       },
       exportSettings: {
         ...DEFAULT_EXPORT_SETTINGS,
-        width: Math.min(DEFAULT_EXPORT_SETTINGS.width, video.width),
+        width: initialWidth,
+        height: initialHeight,
       },
       commandPreview: '',
       ffmpegStatus: 'idle',

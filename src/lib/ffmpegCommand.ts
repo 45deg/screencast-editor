@@ -18,6 +18,9 @@ export interface BuildFfmpegCommandInput {
 export interface BuildFfmpegCommandResult {
   filterComplex: string;
   command: string;
+  execArgs: string[];
+  inputFileName: string;
+  outputFileName: string;
 }
 
 function clampCrop(crop: CropRect, video: VideoMeta): CropRect {
@@ -102,38 +105,43 @@ export function buildFfmpegCommand(input: BuildFfmpegCommandInput): BuildFfmpegC
   ];
 
   const outputWidth = Math.max(16, Math.round(exportSettings.width));
+  const outputHeight = Math.max(16, Math.round(exportSettings.height));
 
   if (exportSettings.format === 'gif') {
     const palettegen = exportSettings.paletteMode === 'single' ? 'palettegen=stats_mode=single' : 'palettegen';
     graphParts.push(
-      `[concat_v]fps=${Math.max(1, Math.round(exportSettings.fps))},scale=${outputWidth}:-1:flags=lanczos,split[gif_a][gif_b]`,
+      `[concat_v]fps=${Math.max(1, Math.round(exportSettings.gifFps))},scale=${outputWidth}:${outputHeight}:flags=lanczos,split[gif_a][gif_b]`,
       `[gif_a]${palettegen}[gif_p]`,
       `[gif_b][gif_p]paletteuse=dither=${exportSettings.dither}[out_v]`,
     );
   } else {
-    graphParts.push(`[concat_v]scale=${outputWidth}:-2:flags=lanczos[out_v]`);
+    graphParts.push(`[concat_v]scale=${outputWidth}:${outputHeight}:flags=lanczos[out_v]`);
   }
 
   const filterComplex = graphParts.join('; ');
-  const args: string[] = [
-    'ffmpeg',
+  const execArgs: string[] = [
     '-i',
     inputFileName,
     '-filter_complex',
-    `"${filterComplex}"`,
+    filterComplex,
     '-map',
-    '"[out_v]"',
+    '[out_v]',
     '-an',
   ];
 
   if (exportSettings.format === 'gif') {
-    args.push('-r', String(Math.max(1, Math.round(exportSettings.fps))), outputFileName);
+    execArgs.push('-r', String(Math.max(1, Math.round(exportSettings.gifFps))), '-loop', '0', outputFileName);
   } else {
-    args.push('-pix_fmt', 'yuv420p', '-movflags', '+faststart', outputFileName);
+    execArgs.push('-r', String(Math.max(1, Math.round(exportSettings.mp4Fps))), '-pix_fmt', 'yuv420p', '-movflags', '+faststart', outputFileName);
   }
+
+  const command = ['ffmpeg', ...execArgs.map((arg) => (arg.includes(' ') ? `"${arg}"` : arg))].join(' ');
 
   return {
     filterComplex,
-    command: args.join(' '),
+    command,
+    execArgs,
+    inputFileName,
+    outputFileName,
   };
 }

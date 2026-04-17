@@ -9,6 +9,7 @@ interface FfmpegInstance {
   exec: (args: string[]) => Promise<number>;
   writeFile: (path: string, data: Uint8Array) => Promise<void>;
   readFile: (path: string) => Promise<Uint8Array>;
+  deleteFile?: (path: string) => Promise<void>;
 }
 
 export interface FfmpegRuntime {

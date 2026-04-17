@@ -31,6 +31,7 @@ interface DragState {
 }
 
 const MIN_CROP_SIZE = 24;
+const MAX_PREVIEW_HEIGHT_PX = 560;
 
 function clampRectToVideo(rect: CropRect, video: VideoMeta): CropRect {
   const x = Math.max(0, Math.min(video.width - 1, Math.round(rect.x)));
@@ -272,96 +273,105 @@ export default function CanvasPreview({
         </div>
       </div>
 
-      <div ref={viewportRef} className="relative flex-1 overflow-hidden rounded-xl border border-slate-800 bg-black">
-        <video
-          ref={videoRef}
-          src={video.objectUrl}
-          muted
-          controls={false}
-          preload="auto"
-          className="h-full w-full object-contain"
-          onLoadedMetadata={() => {
-            const host = viewportRef.current;
-            if (host) {
-              setViewport(measureViewport(host, video));
-            }
-          }}
-        />
-
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,transparent_45%,rgba(2,6,23,0.5)_100%)]" />
-
+      <div className="flex flex-1 items-center justify-center overflow-hidden rounded-xl border border-slate-800 bg-black/90 p-2">
         <div
-          className="absolute border-2 border-cyan-300/90 bg-cyan-200/10 shadow-[0_0_0_9999px_rgba(2,6,23,0.58)]"
+          ref={viewportRef}
+          className="relative w-full max-w-[980px] overflow-hidden rounded-lg border border-slate-800 bg-black"
           style={{
-            left: `${displayCrop.left}px`,
-            top: `${displayCrop.top}px`,
-            width: `${displayCrop.width}px`,
-            height: `${displayCrop.height}px`,
+            aspectRatio: `${video.width} / ${video.height}`,
+            maxHeight: `${MAX_PREVIEW_HEIGHT_PX}px`,
           }}
         >
-          <button
-            type="button"
-            onPointerDown={(event) => beginDrag(event, 'move')}
-            className="absolute inset-0 cursor-move"
-            aria-label="Move crop"
+          <video
+            ref={videoRef}
+            src={video.objectUrl}
+            muted
+            controls={false}
+            preload="auto"
+            className="h-full w-full object-contain"
+            onLoadedMetadata={() => {
+              const host = viewportRef.current;
+              if (host) {
+                setViewport(measureViewport(host, video));
+              }
+            }}
           />
 
-          <div className="pointer-events-none absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-cyan-100/60" />
-          <div className="pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-cyan-100/60" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,transparent_45%,rgba(2,6,23,0.5)_100%)]" />
 
-          <button
-            type="button"
-            aria-label="Resize north-west"
-            onPointerDown={(event) => beginDrag(event, 'nw')}
-            className="absolute -left-2 -top-2 h-4 w-4 cursor-nwse-resize rounded-full border border-cyan-200 bg-slate-950"
-          />
-          <button
-            type="button"
-            aria-label="Resize north-east"
-            onPointerDown={(event) => beginDrag(event, 'ne')}
-            className="absolute -right-2 -top-2 h-4 w-4 cursor-nesw-resize rounded-full border border-cyan-200 bg-slate-950"
-          />
-          <button
-            type="button"
-            aria-label="Resize south-west"
-            onPointerDown={(event) => beginDrag(event, 'sw')}
-            className="absolute -bottom-2 -left-2 h-4 w-4 cursor-nesw-resize rounded-full border border-cyan-200 bg-slate-950"
-          />
-          <button
-            type="button"
-            aria-label="Resize south-east"
-            onPointerDown={(event) => beginDrag(event, 'se')}
-            className="absolute -bottom-2 -right-2 h-4 w-4 cursor-nwse-resize rounded-full border border-cyan-200 bg-slate-950"
-          />
+          <div
+            className="absolute border-2 border-cyan-300/90 bg-cyan-200/10 shadow-[0_0_0_9999px_rgba(2,6,23,0.58)]"
+            style={{
+              left: `${displayCrop.left}px`,
+              top: `${displayCrop.top}px`,
+              width: `${displayCrop.width}px`,
+              height: `${displayCrop.height}px`,
+            }}
+          >
+            <button
+              type="button"
+              onPointerDown={(event) => beginDrag(event, 'move')}
+              className="absolute inset-0 cursor-move"
+              aria-label="Move crop"
+            />
 
-          <button
-            type="button"
-            aria-label="Resize north"
-            onPointerDown={(event) => beginDrag(event, 'n')}
-            className="absolute left-1/2 top-0 h-4 w-8 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize rounded-full border border-cyan-200 bg-slate-950"
-          />
-          <button
-            type="button"
-            aria-label="Resize south"
-            onPointerDown={(event) => beginDrag(event, 's')}
-            className="absolute bottom-0 left-1/2 h-4 w-8 -translate-x-1/2 translate-y-1/2 cursor-ns-resize rounded-full border border-cyan-200 bg-slate-950"
-          />
-          <button
-            type="button"
-            aria-label="Resize west"
-            onPointerDown={(event) => beginDrag(event, 'w')}
-            className="absolute left-0 top-1/2 h-8 w-4 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full border border-cyan-200 bg-slate-950"
-          />
-          <button
-            type="button"
-            aria-label="Resize east"
-            onPointerDown={(event) => beginDrag(event, 'e')}
-            className="absolute right-0 top-1/2 h-8 w-4 translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full border border-cyan-200 bg-slate-950"
-          />
+            <div className="pointer-events-none absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-cyan-100/60" />
+            <div className="pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-cyan-100/60" />
 
-          <div className="pointer-events-none absolute left-2 top-2 inline-flex items-center gap-1 rounded bg-slate-950/75 px-2 py-1 font-mono text-[10px] text-cyan-100">
-            <Focus size={11} />
-            {activeCrop.w}x{activeCrop.h} @ {activeCrop.x},{activeCrop.y}
+            <button
+              type="button"
+              aria-label="Resize north-west"
+              onPointerDown={(event) => beginDrag(event, 'nw')}
+              className="absolute -left-2 -top-2 h-4 w-4 cursor-nwse-resize rounded-full border border-cyan-200 bg-slate-950"
+            />
+            <button
+              type="button"
+              aria-label="Resize north-east"
+              onPointerDown={(event) => beginDrag(event, 'ne')}
+              className="absolute -right-2 -top-2 h-4 w-4 cursor-nesw-resize rounded-full border border-cyan-200 bg-slate-950"
+            />
+            <button
+              type="button"
+              aria-label="Resize south-west"
+              onPointerDown={(event) => beginDrag(event, 'sw')}
+              className="absolute -bottom-2 -left-2 h-4 w-4 cursor-nesw-resize rounded-full border border-cyan-200 bg-slate-950"
+            />
+            <button
+              type="button"
+              aria-label="Resize south-east"
+              onPointerDown={(event) => beginDrag(event, 'se')}
+              className="absolute -bottom-2 -right-2 h-4 w-4 cursor-nwse-resize rounded-full border border-cyan-200 bg-slate-950"
+            />
+
+            <button
+              type="button"
+              aria-label="Resize north"
+              onPointerDown={(event) => beginDrag(event, 'n')}
+              className="absolute left-1/2 top-0 h-4 w-8 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize rounded-full border border-cyan-200 bg-slate-950"
+            />
+            <button
+              type="button"
+              aria-label="Resize south"
+              onPointerDown={(event) => beginDrag(event, 's')}
+              className="absolute bottom-0 left-1/2 h-4 w-8 -translate-x-1/2 translate-y-1/2 cursor-ns-resize rounded-full border border-cyan-200 bg-slate-950"
+            />
+            <button
+              type="button"
+              aria-label="Resize west"
+              onPointerDown={(event) => beginDrag(event, 'w')}
+              className="absolute left-0 top-1/2 h-8 w-4 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full border border-cyan-200 bg-slate-950"
+            />
+            <button
+              type="button"
+              aria-label="Resize east"
+              onPointerDown={(event) => beginDrag(event, 'e')}
+              className="absolute right-0 top-1/2 h-8 w-4 translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full border border-cyan-200 bg-slate-950"
+            />
+
+            <div className="pointer-events-none absolute left-2 top-2 inline-flex items-center gap-1 rounded bg-slate-950/75 px-2 py-1 font-mono text-[10px] text-cyan-100">
+              <Focus size={11} />
+              {activeCrop.w}x{activeCrop.h} @ {activeCrop.x},{activeCrop.y}
+            </div>
           </div>
         </div>
       </div>

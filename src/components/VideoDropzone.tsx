@@ -5,11 +5,13 @@ interface VideoDropzoneProps {
   onFileSelected: (file: File) => void;
   isLoading: boolean;
   error: string | null;
+  mode?: 'fullscreen' | 'embedded';
 }
 
-export default function VideoDropzone({ onFileSelected, isLoading, error }: VideoDropzoneProps) {
+export default function VideoDropzone({ onFileSelected, isLoading, error, mode = 'fullscreen' }: VideoDropzoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const isEmbedded = mode === 'embedded';
 
   const pickFile = useCallback(() => {
     inputRef.current?.click();
@@ -32,11 +34,19 @@ export default function VideoDropzone({ onFileSelected, isLoading, error }: Vide
   );
 
   return (
-    <section className="relative flex min-h-screen items-center justify-center overflow-hidden px-6 py-10">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(34,211,238,0.25),transparent_45%),radial-gradient(circle_at_80%_10%,rgba(14,116,144,0.35),transparent_40%),linear-gradient(160deg,#020617_0%,#0b1120_45%,#111827_100%)]" />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-[size:44px_44px] opacity-25" />
+    <section
+      className={`relative flex items-center justify-center overflow-hidden ${
+        isEmbedded ? 'min-h-[360px] rounded-2xl border border-slate-800/80 bg-slate-950/70 p-6 shadow-xl' : 'min-h-screen px-6 py-10'
+      }`}
+    >
+      {isEmbedded ? null : (
+        <>
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(34,211,238,0.25),transparent_45%),radial-gradient(circle_at_80%_10%,rgba(14,116,144,0.35),transparent_40%),linear-gradient(160deg,#020617_0%,#0b1120_45%,#111827_100%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-[size:44px_44px] opacity-25" />
+        </>
+      )}
 
-      <div className="relative mx-auto w-full max-w-3xl">
+      <div className={`relative w-full ${isEmbedded ? 'max-w-none' : 'mx-auto max-w-3xl'}`}>
         <button
           type="button"
           onClick={pickFile}
@@ -62,7 +72,7 @@ export default function VideoDropzone({ onFileSelected, isLoading, error }: Vide
             isDragging
               ? 'border-cyan-300 bg-cyan-300/10 shadow-[0_0_0_2px_rgba(103,232,249,0.35)]'
               : 'border-slate-700/80 bg-slate-900/70 hover:border-cyan-400/60'
-          } ${isLoading ? 'cursor-wait opacity-80' : 'cursor-pointer'}`}
+          } ${isLoading ? 'cursor-wait opacity-80' : 'cursor-pointer'} ${isEmbedded ? 'rounded-2xl' : 'rounded-3xl'}`}
         >
           <div className="absolute -right-10 -top-10 h-44 w-44 rounded-full bg-cyan-500/20 blur-3xl" />
           <div className="absolute -bottom-12 -left-8 h-36 w-36 rounded-full bg-emerald-500/20 blur-3xl" />
@@ -75,7 +85,7 @@ export default function VideoDropzone({ onFileSelected, isLoading, error }: Vide
 
             <div>
               <h1 className="font-['Space_Grotesk',sans-serif] text-3xl font-bold leading-tight text-white sm:text-4xl">
-                Click to open or Drag and Drop a video file
+                {isEmbedded ? 'Preview Skeleton: 動画をドロップして開始' : 'Click to open or Drag and Drop a video file'}
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-300 sm:text-base">
                 ローカル動画をブラウザだけでカット、速度調整、クロップ、GIF/MP4エクスポートできます。
@@ -89,6 +99,14 @@ export default function VideoDropzone({ onFileSelected, isLoading, error }: Vide
 
             {error ? (
               <p className="rounded-lg border border-rose-300/30 bg-rose-400/10 px-3 py-2 text-sm text-rose-100">{error}</p>
+            ) : null}
+
+            {isEmbedded ? (
+              <div className="w-full rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+                <div className="h-3 w-40 animate-pulse rounded bg-slate-800" />
+                <div className="mt-2 h-3 w-64 animate-pulse rounded bg-slate-800/80" />
+                <div className="mt-4 h-24 w-full animate-pulse rounded-lg bg-slate-900" />
+              </div>
             ) : null}
           </div>
         </button>
