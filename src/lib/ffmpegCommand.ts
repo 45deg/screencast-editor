@@ -11,9 +11,13 @@ export interface BuildFfmpegCommandInput {
   slices: SliceModel[];
   globalCrop: CropRect | null;
   exportSettings: ExportSettings;
+  enableSpeedOverlay?: boolean;
+  speedOverlayFontFile?: string;
   inputFileName?: string;
   outputFileName?: string;
 }
+
+export const DEFAULT_SPEED_OVERLAY_FONT_FILE = '/fonts/SpaceGrotesk.ttf';
 
 export interface BuildFfmpegCommandResult {
   filterComplex: string;
@@ -41,6 +45,14 @@ function formatSpeed(speed: number): string {
   return `x${speed.toFixed(1)}`;
 }
 
+function escapeDrawtextValue(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/:/g, '\\:').replace(/'/g, "\\'");
+}
+
+function buildDrawtextFilter(text: string, fontFile: string): string {
+  return `drawtext=fontfile='${escapeDrawtextValue(fontFile)}':text='${escapeDrawtextValue(text)}':x=w-tw-20:y=h-th-20:fontsize=32:fontcolor=white:box=1:boxcolor=black@0.55`;
+}
+
 function getBaseCrop(video: VideoMeta, globalCrop: CropRect | null): CropRect {
   if (!globalCrop) {
     return {
@@ -60,6 +72,8 @@ export function buildFfmpegCommand(input: BuildFfmpegCommandInput): BuildFfmpegC
     slices,
     globalCrop,
     exportSettings,
+    enableSpeedOverlay = exportSettings.speedOverlay,
+    speedOverlayFontFile = DEFAULT_SPEED_OVERLAY_FONT_FILE,
     inputFileName = video.file.name,
     outputFileName = exportSettings.format === 'gif' ? 'output.gif' : 'output.mp4',
   } = input;
@@ -88,14 +102,11 @@ export function buildFfmpegCommand(input: BuildFfmpegCommandInput): BuildFfmpegC
       );
     }
 
-    if (exportSettings.speedOverlay && Math.abs(slice.speed - 1) >= 0.05) {
-      chain.push(
-        `drawtext=text='${formatSpeed(slice.speed)}':x=w-tw-20:y=h-th-20:fontsize=32:fontcolor=white:box=1:boxcolor=black@0.55`,
-      );
+    if (enableSpeedOverlay && Math.abs(slice.speed - 1) >= 0.05) {
+      chain.push(buildDrawtextFilter(formatSpeed(slice.speed), speedOverlayFontFile));
     }
 
-    chain.push(`[seg_${index}]`);
-    segmentFilters.push(chain.join(','));
+    segmentFilters.push(`${chain.join(',')}[seg_${index}]`);
   });
 
   const concatInputs = derived.map((_, index) => `[seg_${index}]`).join('');
@@ -132,7 +143,17 @@ export function buildFfmpegCommand(input: BuildFfmpegCommandInput): BuildFfmpegC
   if (exportSettings.format === 'gif') {
     execArgs.push('-r', String(Math.max(1, Math.round(exportSettings.gifFps))), '-loop', '0', outputFileName);
   } else {
-    execArgs.push('-r', String(Math.max(1, Math.round(exportSettings.mp4Fps))), '-pix_fmt', 'yuv420p', '-movflags', '+faststart', outputFileName);
+    execArgs.push(
+      '-r',
+      String(Math.max(1, Math.round(exportSettings.mp4Fps))),
+      '-preset',
+      exportSettings.mp4Preset,
+      '-pix_fmt',
+      'yuv420p',
+      '-movflags',
+      '+faststart',
+      outputFileName,
+    );
   }
 
   const command = ['ffmpeg', ...execArgs.map((arg) => (arg.includes(' ') ? `"${arg}"` : arg))].join(' ');

@@ -1,6 +1,7 @@
 export type OutputFormat = 'gif' | 'mp4';
 export type PaletteMode = 'global' | 'single';
 export type DitherMode = 'none' | 'bayer' | 'floyd_steinberg' | 'sierra2';
+export type Mp4Preset = 'ultrafast' | 'superfast' | 'veryfast' | 'faster' | 'fast' | 'medium' | 'slow' | 'slower' | 'veryslow';
 
 export interface CropRect {
   x: number;
@@ -41,6 +42,7 @@ export interface ExportSettings {
   paletteMode: PaletteMode;
   dither: DitherMode;
   mp4Fps: number;
+  mp4Preset: Mp4Preset;
   speedOverlay: boolean;
 }
 

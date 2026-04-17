@@ -24,6 +24,7 @@ const DEFAULT_EXPORT_SETTINGS: ExportSettings = {
   paletteMode: 'global',
   dither: 'none',
   mp4Fps: 30,
+  mp4Preset: 'medium',
   speedOverlay: true,
 };
 

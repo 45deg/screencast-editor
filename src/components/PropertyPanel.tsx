@@ -215,25 +215,46 @@ export default function PropertyPanel({
             </label>
           </>
         ) : (
-          <label className="block text-xs text-slate-300">
-            <span className="mb-1 inline-flex items-center gap-1 text-slate-400">
-              <Gauge size={13} />
-              FPS (MP4)
-            </span>
-            <input
-              type="number"
-              min={1}
-              max={120}
-              value={exportSettings.mp4Fps}
-              onChange={(event) => {
-                const fps = Number.parseInt(event.target.value, 10);
-                if (Number.isFinite(fps)) {
-                  onChangeExportSettings({ mp4Fps: clampInt(fps, 1, 120) });
-                }
-              }}
-              className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-500"
-            />
-          </label>
+          <>
+            <label className="block text-xs text-slate-300">
+              <span className="mb-1 inline-flex items-center gap-1 text-slate-400">
+                <Gauge size={13} />
+                FPS (MP4)
+              </span>
+              <input
+                type="number"
+                min={1}
+                max={120}
+                value={exportSettings.mp4Fps}
+                onChange={(event) => {
+                  const fps = Number.parseInt(event.target.value, 10);
+                  if (Number.isFinite(fps)) {
+                    onChangeExportSettings({ mp4Fps: clampInt(fps, 1, 120) });
+                  }
+                }}
+                className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-500"
+              />
+            </label>
+
+            <label className="block text-xs text-slate-300">
+              <span className="mb-1 inline-flex items-center gap-1 text-slate-400">Preset (MP4)</span>
+              <select
+                value={exportSettings.mp4Preset}
+                onChange={(event) => onChangeExportSettings({ mp4Preset: event.target.value as ExportSettings['mp4Preset'] })}
+                className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-500"
+              >
+                <option value="ultrafast">ultrafast</option>
+                <option value="superfast">superfast</option>
+                <option value="veryfast">veryfast</option>
+                <option value="faster">faster</option>
+                <option value="fast">fast</option>
+                <option value="medium">medium</option>
+                <option value="slow">slow</option>
+                <option value="slower">slower</option>
+                <option value="veryslow">veryslow</option>
+              </select>
+            </label>
+          </>
         )}
 
         <label className="flex items-center gap-2 rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-300">

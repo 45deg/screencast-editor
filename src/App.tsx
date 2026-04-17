@@ -5,11 +5,13 @@ import CanvasPreview from './components/CanvasPreview';
 import PropertyPanel from './components/PropertyPanel';
 import SliceEditorTimeline from './components/SliceEditor';
 import VideoDropzone from './components/VideoDropzone';
-import { buildFfmpegCommand } from './lib/ffmpegCommand';
+import { DEFAULT_SPEED_OVERLAY_FONT_FILE, buildFfmpegCommand } from './lib/ffmpegCommand';
 import { loadFfmpegRuntimeFromCDN } from './lib/ffmpegClient';
 import { readVideoMetadata, revokeVideoObjectUrl } from './lib/video';
 import { useEditorStore } from './store/editorStore';
 import { deriveSlices, type CropRect } from './types/editor';
+
+const SPEED_OVERLAY_FONT_ASSET_URL = `${import.meta.env.BASE_URL}fonts/SpaceGrotesk.ttf`;
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -44,6 +46,9 @@ function getSafeDownloadName(fileName: string, format: 'gif' | 'mp4'): string {
 
 export default function App() {
   const replaceInputRef = useRef<HTMLInputElement>(null);
+  const drawtextSupportRef = useRef<boolean | null>(null);
+  const speedOverlayFontLoadedRef = useRef(false);
+  const speedOverlayFontLoadPromiseRef = useRef<Promise<void> | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -161,6 +166,9 @@ export default function App() {
   const handleLoadFfmpeg = useCallback(async () => {
     setFfmpegStatus('loading', null);
     try {
+      drawtextSupportRef.current = null;
+      speedOverlayFontLoadedRef.current = false;
+      speedOverlayFontLoadPromiseRef.current = null;
       await loadFfmpegRuntimeFromCDN();
       setFfmpegStatus('ready', null);
     } catch (error) {
@@ -168,8 +176,73 @@ export default function App() {
     }
   }, [setFfmpegStatus]);
 
+  const ensureSpeedOverlayFont = useCallback(
+    async (ffmpeg: Awaited<ReturnType<typeof loadFfmpegRuntimeFromCDN>>['ffmpeg']): Promise<void> => {
+      if (speedOverlayFontLoadedRef.current) {
+        return;
+      }
+
+      if (speedOverlayFontLoadPromiseRef.current) {
+        return speedOverlayFontLoadPromiseRef.current;
+      }
+
+      speedOverlayFontLoadPromiseRef.current = (async () => {
+        try {
+          await ffmpeg.createDir('/fonts');
+        } catch {
+          // Directory may already exist in the virtual FS.
+        }
+
+        const response = await fetch(SPEED_OVERLAY_FONT_ASSET_URL);
+        if (!response.ok) {
+          throw new Error('Google Fonts の描画用フォントを読み込めませんでした。');
+        }
+
+        const fontBytes = new Uint8Array(await response.arrayBuffer());
+        await ffmpeg.writeFile(DEFAULT_SPEED_OVERLAY_FONT_FILE, fontBytes);
+        speedOverlayFontLoadedRef.current = true;
+      })().finally(() => {
+        speedOverlayFontLoadPromiseRef.current = null;
+      });
+
+      return speedOverlayFontLoadPromiseRef.current;
+    },
+    [],
+  );
+
+  const detectDrawtextSupport = useCallback(
+    async (ffmpeg: Awaited<ReturnType<typeof loadFfmpegRuntimeFromCDN>>['ffmpeg']): Promise<boolean> => {
+      if (drawtextSupportRef.current !== null) {
+        return drawtextSupportRef.current;
+      }
+
+      const logLines: string[] = [];
+      const onLog = (event: { message: string }) => {
+        logLines.push(event.message);
+      };
+
+      ffmpeg.on('log', onLog);
+      try {
+        const exitCode = await ffmpeg.exec(['-hide_banner', '-filters']);
+        const supportsDrawtext = exitCode === 0 && logLines.some((line) => /\bdrawtext\b/.test(line));
+        drawtextSupportRef.current = supportsDrawtext;
+        return supportsDrawtext;
+      } catch {
+        drawtextSupportRef.current = false;
+        return false;
+      } finally {
+        ffmpeg.off('log', onLog);
+      }
+    },
+    [],
+  );
+
   const createCommandPreview = useCallback(
-    (inputFileName?: string, outputFileName?: string) => {
+    (
+      inputFileName?: string,
+      outputFileName?: string,
+      options?: { enableSpeedOverlay?: boolean; speedOverlayFontFile?: string },
+    ) => {
       if (!video || !slices.length || !baseCrop) {
         return null;
       }
@@ -179,6 +252,8 @@ export default function App() {
         slices,
         globalCrop: baseCrop,
         exportSettings,
+        enableSpeedOverlay: options?.enableSpeedOverlay,
+        speedOverlayFontFile: options?.speedOverlayFontFile,
         inputFileName,
         outputFileName,
       });
@@ -215,12 +290,26 @@ export default function App() {
       runtime = await loadFfmpegRuntimeFromCDN();
       setFfmpegStatus('ready', null);
 
-      const built = createCommandPreview(inputFileName, outputFileName);
+      const canUseSpeedOverlay = exportSettings.speedOverlay ? await detectDrawtextSupport(runtime.ffmpeg) : false;
+      const enableSpeedOverlay = exportSettings.speedOverlay && canUseSpeedOverlay;
+
+      if (enableSpeedOverlay) {
+        await ensureSpeedOverlayFont(runtime.ffmpeg);
+      }
+
+      const built = createCommandPreview(inputFileName, outputFileName, {
+        enableSpeedOverlay,
+        speedOverlayFontFile: DEFAULT_SPEED_OVERLAY_FONT_FILE,
+      });
       if (!built) {
         throw new Error('エクスポート対象がありません。');
       }
 
-      setCommandPreview(`${built.command}\n\n# filter_complex\n${built.filterComplex}`);
+      const previewLines = [`${built.command}`, '', '# filter_complex', built.filterComplex];
+      if (exportSettings.speedOverlay && !enableSpeedOverlay) {
+        previewLines.push('', '# note', 'drawtext filter is unavailable in this FFmpeg runtime; exported without speed overlay');
+      }
+      setCommandPreview(previewLines.join('\n'));
 
       const source = await runtime.fetchFile(video.file);
       await runtime.ffmpeg.writeFile(inputFileName, source);
@@ -231,7 +320,7 @@ export default function App() {
       }
 
       const output = await runtime.ffmpeg.readFile(outputFileName);
-      const outputBytes = new Uint8Array(output);
+      const outputBytes = typeof output === 'string' ? new TextEncoder().encode(output) : new Uint8Array(output);
       const mimeType = exportSettings.format === 'gif' ? 'image/gif' : 'video/mp4';
       const blob = new Blob([outputBytes], { type: mimeType });
       const blobUrl = URL.createObjectURL(blob);
@@ -256,7 +345,18 @@ export default function App() {
 
       setIsExporting(false);
     }
-  }, [baseCrop, createCommandPreview, exportSettings.format, setCommandPreview, setFfmpegStatus, slices.length, video]);
+  }, [
+    baseCrop,
+    createCommandPreview,
+    detectDrawtextSupport,
+    ensureSpeedOverlayFont,
+    exportSettings.format,
+    exportSettings.speedOverlay,
+    setCommandPreview,
+    setFfmpegStatus,
+    slices.length,
+    video,
+  ]);
 
   useEffect(() => {
     if (!baseCrop || !exportSettings.keepAspectRatio) {
