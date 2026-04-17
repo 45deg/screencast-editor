@@ -7,7 +7,8 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import { Check, Clapperboard, Crop, Focus, RotateCcw, X } from 'lucide-react';
+import { Button } from '@base-ui/react/button';
+import { Check, Clapperboard, Crop, Focus, FolderOpen, RotateCcw, X } from 'lucide-react';
 
 import type { CropRect, VideoMeta } from '../types/editor';
 
@@ -15,12 +16,14 @@ type DragMode = 'move' | 'n' | 's' | 'w' | 'e' | 'nw' | 'ne' | 'sw' | 'se';
 
 interface CanvasPreviewProps {
   video: VideoMeta;
+  fileName: string;
   currentTime: number;
   baseCrop: CropRect;
   activeSceneCrop: CropRect | null;
   editMode: 'idle' | 'crop' | 'scene';
   editCrop: CropRect | null;
   canStartSceneCrop: boolean;
+  onOpenVideo: () => void;
   onStartCrop: () => void;
   onStartSceneCrop: () => void;
   onEditCropPreview: (crop: CropRect) => void;
@@ -214,12 +217,14 @@ function measureViewport(container: HTMLDivElement, video: VideoMeta): ViewportI
 
 export default function CanvasPreview({
   video,
+  fileName,
   currentTime,
   baseCrop,
   activeSceneCrop,
   editMode,
   editCrop,
   canStartSceneCrop,
+  onOpenVideo,
   onStartCrop,
   onStartSceneCrop,
   onEditCropPreview,
@@ -349,46 +354,61 @@ export default function CanvasPreview({
 
   return (
     <section className="flex min-h-[320px] flex-1 flex-col rounded-2xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-xl">
-      <div className="mb-3 flex items-center justify-end gap-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
         <h2 className="sr-only">Canvas Preview</h2>
+
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <Button
+            type="button"
+            onClick={onOpenVideo}
+            className="inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-slate-100 transition hover:border-cyan-400/60 hover:text-cyan-100"
+          >
+            <FolderOpen size={13} />
+            開く
+          </Button>
+          <p className="min-w-0 max-w-[52vw] truncate text-xs text-slate-400 sm:max-w-[360px]" title={fileName}>
+            {fileName}
+          </p>
+        </div>
+
         {isEditing ? (
           <div className="inline-flex items-center gap-2">
-            <button
+            <Button
               type="button"
               onClick={onConfirmEdit}
               className="inline-flex items-center gap-1 rounded-md border border-emerald-300/40 bg-emerald-400/10 px-2.5 py-1.5 text-xs font-medium text-emerald-100 transition hover:bg-emerald-400/20"
             >
               <Check size={13} />
               OK
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={onCancelEdit}
               className="inline-flex items-center gap-1 rounded-md border border-rose-300/40 bg-rose-400/10 px-2.5 py-1.5 text-xs font-medium text-rose-100 transition hover:bg-rose-400/20"
             >
               <X size={13} />
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={onResetEdit}
               className="inline-flex items-center gap-1 rounded-md border border-slate-600 bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-slate-100 transition hover:border-cyan-400/60 hover:text-cyan-100"
             >
               <RotateCcw size={13} />
               Reset
-            </button>
+            </Button>
           </div>
         ) : (
           <div className="inline-flex items-center gap-2">
-            <button
+            <Button
               type="button"
               onClick={onStartCrop}
               className="inline-flex items-center gap-1 rounded-md border border-cyan-300/40 bg-cyan-400/10 px-2.5 py-1.5 text-xs font-medium text-cyan-100 transition hover:bg-cyan-400/20"
             >
               <Crop size={13} />
               Crop
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={onStartSceneCrop}
               disabled={!canStartSceneCrop}
@@ -396,7 +416,7 @@ export default function CanvasPreview({
             >
               <Clapperboard size={13} />
               Scene Crop
-            </button>
+            </Button>
           </div>
         )}
       </div>

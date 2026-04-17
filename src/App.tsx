@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Replace } from 'lucide-react';
+import { Drawer } from '@base-ui/react/drawer';
+import { Settings2, X } from 'lucide-react';
 
 import CanvasPreview from './components/CanvasPreview';
 import PropertyPanel from './components/PropertyPanel';
@@ -96,6 +97,8 @@ export default function App() {
   const [cropEditMode, setCropEditMode] = useState<'idle' | 'crop' | 'scene'>('idle');
   const [cropEditDraft, setCropEditDraft] = useState<CropRect | null>(null);
   const [sceneCropTargetSliceId, setSceneCropTargetSliceId] = useState<string | null>(null);
+  const [isMobileSettingsDrawerOpen, setIsMobileSettingsDrawerOpen] = useState(false);
+  const [isDesktopViewport, setIsDesktopViewport] = useState(false);
 
   const {
     video,
@@ -203,6 +206,32 @@ export default function App() {
     setCropEditDraft(null);
     setSceneCropTargetSliceId(null);
   }, [video?.objectUrl]);
+
+  useEffect(() => {
+    if (!hasVideo) {
+      setIsMobileSettingsDrawerOpen(false);
+    }
+  }, [hasVideo]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(min-width: 1024px)');
+
+    const handleChange = () => {
+      setIsDesktopViewport(mediaQuery.matches);
+    };
+
+    handleChange();
+    mediaQuery.addEventListener('change', handleChange);
+    return () => {
+      mediaQuery.removeEventListener('change', handleChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isDesktopViewport && isMobileSettingsDrawerOpen) {
+      setIsMobileSettingsDrawerOpen(false);
+    }
+  }, [isDesktopViewport, isMobileSettingsDrawerOpen]);
 
   const handleImportVideo = useCallback(
     async (file: File) => {
@@ -526,120 +555,171 @@ export default function App() {
   }, []);
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[linear-gradient(160deg,#020617_0%,#0b1120_42%,#111827_100%)] text-slate-100">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_10%_8%,rgba(34,211,238,0.2),transparent_38%),radial-gradient(circle_at_92%_4%,rgba(16,185,129,0.2),transparent_30%)]" />
+    <Drawer.Root open={isMobileSettingsDrawerOpen} onOpenChange={setIsMobileSettingsDrawerOpen}>
+      <div className="min-h-screen overflow-x-hidden bg-[linear-gradient(160deg,#020617_0%,#0b1120_42%,#111827_100%)] text-slate-100">
+        <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_10%_8%,rgba(34,211,238,0.2),transparent_38%),radial-gradient(circle_at_92%_4%,rgba(16,185,129,0.2),transparent_30%)]" />
 
-      <header className="relative z-10 border-b border-slate-800/70 bg-slate-950/70 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-[1500px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <div>
-            <h1 className="font-['Space_Grotesk',sans-serif] text-xl font-bold">Screencast Editor</h1>
-            <p className="text-xs text-slate-400">
-              {video
-                ? `${video.file.name} | ${video.width}x${video.height} | ${video.duration.toFixed(2)}s`
-                : '動画を読み込むとここにメタデータを表示します'}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleReplaceVideo}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-medium text-slate-200 transition hover:border-cyan-400/60 hover:text-cyan-100"
-          >
-            <Replace size={14} />
-            {video ? '動画を差し替え' : '動画を読み込む'}
-          </button>
-        </div>
-      </header>
-
-      <main className="relative z-10 mx-auto flex w-full max-w-[1500px] flex-col gap-4 px-4 py-4 sm:px-6">
-        <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-          {hasVideo && video && baseCrop ? (
-            <CanvasPreview
-              video={video}
-              currentTime={currentTime}
-              baseCrop={baseCrop}
-              activeSceneCrop={activeSceneCrop}
-              editMode={cropEditMode}
-              editCrop={effectiveEditCrop}
-              canStartSceneCrop={slices.length > 0}
-              onStartCrop={handleStartCropEdit}
-              onStartSceneCrop={handleStartSceneCropEdit}
-              onEditCropPreview={handleEditCropPreview}
-              onConfirmEdit={handleConfirmCropEdit}
-              onCancelEdit={handleCancelCropEdit}
-              onResetEdit={handleResetCropEdit}
-            />
-          ) : (
-            <VideoDropzone onFileSelected={handleImportVideo} isLoading={isImporting} error={importError} mode="embedded" />
-          )}
-
-          {hasVideo && baseCrop ? (
-            <PropertyPanel
-              baseCrop={baseCrop}
-              exportSettings={exportSettings}
-              ffmpegStatus={ffmpegStatus}
-              ffmpegError={ffmpegError}
-              isExporting={isExporting}
-              exportError={exportError}
-              onChangeExportSettings={updateExportSettings}
-              onExport={handleExport}
-            />
-          ) : (
-            <aside className="w-full rounded-2xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-xl lg:w-[360px]">
-              <h2 className="sr-only">Property Panel</h2>
-              <p className="mt-1 text-xs text-slate-400">動画を読み込むと出力設定を編集できます。</p>
-              <div className="mt-4 space-y-2">
-                <div className="h-10 animate-pulse rounded-md bg-slate-900" />
-                <div className="h-10 animate-pulse rounded-md bg-slate-900/90" />
-                <div className="h-10 animate-pulse rounded-md bg-slate-900/80" />
-                <div className="h-28 animate-pulse rounded-lg bg-slate-900/70" />
-              </div>
-            </aside>
-          )}
-        </section>
-
-        {hasVideo ? (
-          <SliceEditorTimeline
-            video={video!}
-            slices={slices}
-            currentTime={currentTime}
-            selectedSliceId={selectedSliceId}
-            canUndo={past.length > 0}
-            canRedo={future.length > 0}
-            onCurrentTimeChange={setCurrentTime}
-            onSelectedSliceIdChange={setSelectedSliceId}
-            onSlicesPreview={replaceSlicesPreview}
-            onSlicesCommit={replaceSlicesCommit}
-            baseCrop={baseCrop!}
-            outputAspectRatio={outputAspectRatio}
-            onUndo={undo}
-            onRedo={redo}
-          />
-        ) : (
-          <section className="relative z-10 flex h-[280px] w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-950 shadow-xl">
-            <div className="h-14 border-b border-slate-800/80 bg-slate-950/95 px-4" />
-            <div className="flex-1 px-4 py-6">
-              <div className="h-6 w-28 animate-pulse rounded bg-slate-900" />
-              <div className="mt-3 h-20 w-full animate-pulse rounded bg-slate-900/90" />
-              <div className="mt-3 h-20 w-3/4 animate-pulse rounded bg-slate-900/80" />
+        <header className="relative z-10 border-b border-slate-800/70 bg-slate-950/70 backdrop-blur">
+          <div className="mx-auto flex w-full max-w-[1500px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
+            <div>
+              <h1 className="font-['Space_Grotesk',sans-serif] text-xl font-bold">Screencast Editor</h1>
+              <p className="text-xs text-slate-400">
+                {video ? `${video.width}x${video.height} | ${video.duration.toFixed(2)}s` : '動画を読み込むとここにメタデータを表示します'}
+              </p>
             </div>
-          </section>
-        )}
-      </main>
 
-      <input
-        ref={replaceInputRef}
-        type="file"
-        className="hidden"
-        accept="video/*"
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (file) {
-            void handleImportVideo(file);
-          }
-          event.currentTarget.value = '';
-        }}
-      />
-    </div>
+            <div className="flex items-center gap-2">
+              {hasVideo && baseCrop ? (
+                <Drawer.Trigger
+                  className="inline-flex items-center gap-1 rounded-lg border border-cyan-400/40 bg-cyan-500/15 px-3 py-2 text-xs font-medium text-cyan-100 transition hover:bg-cyan-500/25 lg:hidden"
+                >
+                  <Settings2 size={14} />
+                  設定
+                </Drawer.Trigger>
+              ) : null}
+            </div>
+          </div>
+        </header>
+
+        <main
+          className={`relative z-10 mx-auto flex w-full max-w-[1500px] flex-col gap-4 px-4 py-4 sm:px-6 ${
+            hasVideo ? 'pb-[260px] sm:pb-[300px] lg:pb-4' : ''
+          }`}
+        >
+          <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+            {hasVideo && video && baseCrop ? (
+              <CanvasPreview
+                video={video}
+                fileName={video.file.name}
+                currentTime={currentTime}
+                baseCrop={baseCrop}
+                activeSceneCrop={activeSceneCrop}
+                editMode={cropEditMode}
+                editCrop={effectiveEditCrop}
+                canStartSceneCrop={slices.length > 0}
+                onOpenVideo={handleReplaceVideo}
+                onStartCrop={handleStartCropEdit}
+                onStartSceneCrop={handleStartSceneCropEdit}
+                onEditCropPreview={handleEditCropPreview}
+                onConfirmEdit={handleConfirmCropEdit}
+                onCancelEdit={handleCancelCropEdit}
+                onResetEdit={handleResetCropEdit}
+              />
+            ) : (
+              <VideoDropzone onFileSelected={handleImportVideo} isLoading={isImporting} error={importError} mode="embedded" />
+            )}
+
+            {hasVideo && baseCrop ? (
+              <>
+                <div className="hidden lg:block">
+                  <PropertyPanel
+                    baseCrop={baseCrop}
+                    exportSettings={exportSettings}
+                    ffmpegStatus={ffmpegStatus}
+                    ffmpegError={ffmpegError}
+                    isExporting={isExporting}
+                    exportError={exportError}
+                    onChangeExportSettings={updateExportSettings}
+                    onExport={handleExport}
+                  />
+                </div>
+              </>
+            ) : (
+              <aside className="w-full rounded-2xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-xl lg:w-[360px]">
+                <h2 className="sr-only">Property Panel</h2>
+                <p className="mt-1 text-xs text-slate-400">動画を読み込むと出力設定を編集できます。</p>
+                <div className="mt-4 space-y-2">
+                  <div className="h-10 animate-pulse rounded-md bg-slate-900" />
+                  <div className="h-10 animate-pulse rounded-md bg-slate-900/90" />
+                  <div className="h-10 animate-pulse rounded-md bg-slate-900/80" />
+                  <div className="h-28 animate-pulse rounded-lg bg-slate-900/70" />
+                </div>
+              </aside>
+            )}
+          </section>
+
+          {hasVideo ? null : (
+            <section className="relative z-10 flex h-[280px] w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-950 shadow-xl">
+              <div className="h-14 border-b border-slate-800/80 bg-slate-950/95 px-4" />
+              <div className="flex-1 px-4 py-6">
+                <div className="h-6 w-28 animate-pulse rounded bg-slate-900" />
+                <div className="mt-3 h-20 w-full animate-pulse rounded bg-slate-900/90" />
+                <div className="mt-3 h-20 w-3/4 animate-pulse rounded bg-slate-900/80" />
+              </div>
+            </section>
+          )}
+        </main>
+
+        {hasVideo && video && baseCrop ? (
+          <div className="fixed inset-x-0 bottom-0 z-20 px-2 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2 lg:static lg:mx-auto lg:w-full lg:max-w-[1500px] lg:px-6 lg:pb-0 lg:pt-0">
+            <SliceEditorTimeline
+              video={video}
+              slices={slices}
+              currentTime={currentTime}
+              selectedSliceId={selectedSliceId}
+              canUndo={past.length > 0}
+              canRedo={future.length > 0}
+              onCurrentTimeChange={setCurrentTime}
+              onSelectedSliceIdChange={setSelectedSliceId}
+              onSlicesPreview={replaceSlicesPreview}
+              onSlicesCommit={replaceSlicesCommit}
+              baseCrop={baseCrop}
+              outputAspectRatio={outputAspectRatio}
+              onUndo={undo}
+              onRedo={redo}
+            />
+          </div>
+        ) : null}
+
+        <input
+          ref={replaceInputRef}
+          type="file"
+          className="hidden"
+          accept="video/*"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) {
+              void handleImportVideo(file);
+            }
+            event.currentTarget.value = '';
+          }}
+        />
+      </div>
+
+      {hasVideo && baseCrop && !isDesktopViewport ? (
+        <Drawer.Portal>
+          <Drawer.Backdrop className="fixed inset-0 z-30 bg-slate-950/70 backdrop-blur-sm data-[starting-style]:opacity-0 data-[ending-style]:opacity-0" />
+          <Drawer.Popup className="fixed inset-x-0 bottom-0 z-40 max-h-[88vh] rounded-t-2xl border border-slate-800/90 bg-slate-950 outline-none data-[starting-style]:translate-y-6 data-[ending-style]:translate-y-6 data-[starting-style]:opacity-0 data-[ending-style]:opacity-0">
+            <Drawer.Content className="flex h-full max-h-[88vh] flex-col overflow-hidden">
+              <div className="flex items-center justify-between border-b border-slate-800/80 px-4 py-3">
+                <div>
+                  <Drawer.Title className="text-sm font-semibold text-slate-100">出力設定</Drawer.Title>
+                  <p className="text-[11px] text-slate-400">エクスポート条件と詳細パラメータ</p>
+                </div>
+
+                <Drawer.Close className="inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200 transition hover:border-cyan-400/60 hover:text-cyan-100">
+                  <X size={13} />
+                  閉じる
+                </Drawer.Close>
+              </div>
+
+              <div className="timeline-scrollbar flex-1 overflow-y-auto p-3 pb-[calc(env(safe-area-inset-bottom)+14px)]">
+                <PropertyPanel
+                  baseCrop={baseCrop}
+                  exportSettings={exportSettings}
+                  ffmpegStatus={ffmpegStatus}
+                  ffmpegError={ffmpegError}
+                  isExporting={isExporting}
+                  exportError={exportError}
+                  onChangeExportSettings={updateExportSettings}
+                  onExport={handleExport}
+                  className="border-none bg-transparent p-0 shadow-none lg:w-full"
+                />
+              </div>
+            </Drawer.Content>
+          </Drawer.Popup>
+        </Drawer.Portal>
+      ) : null}
+    </Drawer.Root>
   );
 }

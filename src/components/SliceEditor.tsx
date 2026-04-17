@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
+import { Slider } from '@base-ui/react/slider';
 import { motion, type PanInfo } from 'framer-motion';
-import { Redo2, Scissors, Trash2, Undo2, ZoomIn } from 'lucide-react';
+import { FastForward, Redo2, Scissors, Trash2, Undo2, ZoomIn } from 'lucide-react';
 
 import { captureVideoThumbnail } from '../lib/videoThumbnail';
 import {
@@ -71,9 +72,9 @@ function Toolbar({
   totalDuration,
 }: ToolbarProps) {
   return (
-    <div className="h-14 border-b border-slate-800/80 bg-slate-950/95 px-4 shadow-sm">
-      <div className="flex h-full items-center justify-between">
-        <div className="flex items-center gap-2">
+    <div className="h-14 border-b border-slate-800/80 bg-slate-950/95 px-2 shadow-sm sm:px-4">
+      <div className="timeline-scrollbar flex h-full items-center gap-2 overflow-x-auto overflow-y-hidden">
+        <div className="flex min-w-max items-center gap-1.5 sm:gap-2">
           <div className="flex items-center gap-1 rounded-md border border-slate-800 bg-slate-950 p-1">
             <button
               type="button"
@@ -101,11 +102,10 @@ function Toolbar({
             type="button"
             onClick={onCut}
             disabled={!canCut}
-            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-cyan-200 transition-colors hover:bg-cyan-500/15 hover:text-white disabled:opacity-30"
+            className="flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium text-cyan-200 transition-colors hover:bg-cyan-500/15 hover:text-white disabled:opacity-30 sm:gap-1.5 sm:px-2.5 sm:text-xs"
             title="Cut at playhead"
           >
             <Scissors size={16} />
-            Cut
           </button>
 
           <button
@@ -120,9 +120,9 @@ function Toolbar({
 
           <div className="h-5 w-px bg-slate-700" />
 
-          <div className="flex items-center gap-2 rounded-md border border-slate-800 bg-slate-950 px-3 py-1">
-            <span className="text-[11px] font-semibold tracking-wide text-slate-400">Speed</span>
-            <span className="text-xs text-slate-500">x</span>
+          <div className="flex items-center gap-1.5 rounded-md border border-slate-800 bg-slate-950 px-2 py-1 sm:gap-2 sm:px-3">
+            <FastForward size={14} className="text-slate-400" />
+            <span className="text-[10px] text-slate-500 sm:text-xs">x</span>
             <input
               type="number"
               min="0.1"
@@ -136,27 +136,39 @@ function Toolbar({
                 }
               }}
               disabled={!selectedSlice}
-              className="w-16 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-white outline-none transition-colors focus:border-cyan-500 disabled:opacity-30"
+              className="w-12 rounded border border-slate-700 bg-slate-900 px-1.5 py-0.5 text-sm text-white outline-none transition-colors focus:border-cyan-500 disabled:opacity-30 sm:w-16 sm:px-2 sm:py-1 sm:text-xs"
               placeholder="1.0"
             />
           </div>
 
-          <div className="hidden items-center gap-2 rounded-md border border-slate-800 bg-slate-950 px-3 py-1 sm:flex">
+          <div className="flex items-center gap-1.5 rounded-md border border-slate-800 bg-slate-950 px-2 py-1 sm:gap-2 sm:px-3">
             <ZoomIn size={14} className="text-slate-400" />
-            <input
-              type="range"
-              min="-6"
-              max="3"
-              step="0.1"
+            <Slider.Root
+              min={-6}
+              max={3}
+              step={0.1}
               value={zoomSlider}
-              onChange={(event) => setZoomSlider(Number.parseFloat(event.target.value))}
-              className="h-1.5 w-20 cursor-pointer accent-cyan-500"
-              title={`Timeline zoom (${zoom.toFixed(2)}x)`}
-            />
+              onValueChange={(value) => {
+                if (typeof value === 'number') {
+                  setZoomSlider(value);
+                }
+              }}
+              className="w-14 sm:w-20"
+            >
+              <Slider.Control className="relative flex h-4 w-full items-center">
+                <Slider.Track className="relative h-1.5 w-full rounded-full bg-slate-700">
+                  <Slider.Indicator className="absolute h-full rounded-full bg-cyan-500" />
+                </Slider.Track>
+                <Slider.Thumb
+                  className="block h-3 w-3 rounded-full border border-cyan-100 bg-cyan-400 shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300"
+                  title={`Timeline zoom (${zoom.toFixed(2)}x)`}
+                />
+              </Slider.Control>
+            </Slider.Root>
           </div>
         </div>
 
-        <div className="flex flex-col items-end">
+        <div className="ml-auto flex min-w-max shrink-0 flex-col items-end">
           <div className="rounded border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 font-mono text-[11px] text-cyan-200">
             frame={Math.floor(currentTime * 30)
               .toString()
@@ -675,7 +687,7 @@ export default function SliceEditorTimeline({
   }, [handleDeleteSelected, onRedo, onUndo, selectedSliceId]);
 
   return (
-    <section className="relative z-10 flex h-[280px] w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-950 shadow-xl">
+    <section className="relative z-10 flex h-[240px] w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-950 shadow-xl sm:h-[280px]">
       <Toolbar
         undo={onUndo}
         redo={onRedo}

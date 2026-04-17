@@ -1,4 +1,9 @@
-import { Film, Gauge, Layers3, Sparkles } from 'lucide-react';
+import { type ReactNode } from 'react';
+import { Accordion } from '@base-ui/react/accordion';
+import { Button } from '@base-ui/react/button';
+import { Select } from '@base-ui/react/select';
+import { Switch } from '@base-ui/react/switch';
+import { Check, ChevronDown, Film, Gauge, Layers3, Sparkles } from 'lucide-react';
 
 import type { CropRect, ExportSettings } from '../types/editor';
 
@@ -9,12 +14,42 @@ interface PropertyPanelProps {
   ffmpegError: string | null;
   isExporting: boolean;
   exportError: string | null;
+  className?: string;
   onChangeExportSettings: (next: Partial<ExportSettings>) => void;
   onExport: () => void;
 }
 
 const INPUT_SIZE_MIN = 64;
 const INPUT_SIZE_MAX = 4096;
+
+const FORMAT_OPTIONS: Array<{ value: ExportSettings['format']; label: string }> = [
+  { value: 'gif', label: 'GIF' },
+  { value: 'mp4', label: 'MP4' },
+];
+
+const GIF_PALETTE_OPTIONS: Array<{ value: ExportSettings['paletteMode']; label: string }> = [
+  { value: 'global', label: 'Global Palette' },
+  { value: 'single', label: 'Per-frame Palette (stats_mode=single)' },
+];
+
+const GIF_DITHER_OPTIONS: Array<{ value: ExportSettings['dither']; label: string }> = [
+  { value: 'none', label: 'none' },
+  { value: 'bayer', label: 'bayer' },
+  { value: 'floyd_steinberg', label: 'floyd_steinberg' },
+  { value: 'sierra2', label: 'sierra2' },
+];
+
+const MP4_PRESET_OPTIONS: Array<{ value: ExportSettings['mp4Preset']; label: string }> = [
+  { value: 'ultrafast', label: 'ultrafast' },
+  { value: 'superfast', label: 'superfast' },
+  { value: 'veryfast', label: 'veryfast' },
+  { value: 'faster', label: 'faster' },
+  { value: 'fast', label: 'fast' },
+  { value: 'medium', label: 'medium' },
+  { value: 'slow', label: 'slow' },
+  { value: 'slower', label: 'slower' },
+  { value: 'veryslow', label: 'veryslow' },
+];
 
 function clampInt(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, Math.round(value)));
@@ -28,6 +63,107 @@ function computeWidthFromHeight(height: number, crop: CropRect): number {
   return clampInt((height * crop.w) / Math.max(1, crop.h), INPUT_SIZE_MIN, INPUT_SIZE_MAX);
 }
 
+interface PropertySectionProps {
+  value: string;
+  title: string;
+  icon: ReactNode;
+  children: ReactNode;
+}
+
+function PropertySection({ value, title, icon, children }: PropertySectionProps) {
+  return (
+    <Accordion.Item value={value} className="overflow-hidden rounded-lg border border-slate-800/90 bg-slate-950/70">
+      <Accordion.Header className="m-0">
+        <Accordion.Trigger className="group flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs font-semibold text-slate-100 transition hover:bg-slate-900">
+          <span className="inline-flex items-center gap-1.5 text-slate-200">
+            {icon}
+            {title}
+          </span>
+          <ChevronDown size={14} className="text-slate-500 transition-transform duration-200 group-data-[panel-open]:rotate-180" />
+        </Accordion.Trigger>
+      </Accordion.Header>
+
+      <Accordion.Panel className="border-t border-slate-800/80 px-3 py-3">
+        <div className="space-y-3">{children}</div>
+      </Accordion.Panel>
+    </Accordion.Item>
+  );
+}
+
+interface ToggleRowProps {
+  label: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}
+
+function ToggleRow({ label, checked, onCheckedChange }: ToggleRowProps) {
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-300">
+      <span>{label}</span>
+      <Switch.Root
+        aria-label={label}
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+        className="group inline-flex h-5 w-10 items-center rounded-full border border-slate-700 bg-slate-800 px-0.5 transition-colors data-[checked]:border-cyan-400 data-[checked]:bg-cyan-500/30"
+      >
+        <Switch.Thumb className="h-4 w-4 rounded-full bg-white transition-transform duration-200 group-data-[checked]:translate-x-5" />
+      </Switch.Root>
+    </div>
+  );
+}
+
+interface SelectOption<T extends string> {
+  value: T;
+  label: string;
+}
+
+interface SelectFieldProps<T extends string> {
+  value: T;
+  options: Array<SelectOption<T>>;
+  onChange: (value: T) => void;
+}
+
+function SelectField<T extends string>({ value, options, onChange }: SelectFieldProps<T>) {
+  return (
+    <Select.Root
+      value={value}
+      onValueChange={(next) => {
+        if (next !== null) {
+          onChange(next as T);
+        }
+      }}
+    >
+      <Select.Trigger className="flex w-full items-center justify-between gap-2 rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-left text-sm text-slate-100 outline-none transition focus:border-cyan-500">
+        <Select.Value />
+        <Select.Icon className="text-slate-500">
+          <ChevronDown size={14} />
+        </Select.Icon>
+      </Select.Trigger>
+
+      <Select.Portal>
+        <Select.Positioner sideOffset={6} className="z-50">
+          <Select.Popup className="z-50 max-h-64 overflow-y-auto rounded-md border border-slate-700 bg-slate-950 p-1 shadow-2xl">
+            <Select.List className="space-y-0.5">
+              {options.map((option) => (
+                <Select.Item
+                  key={option.value}
+                  value={option.value}
+                  className="flex cursor-pointer items-center justify-between gap-2 rounded px-2.5 py-1.5 text-sm text-slate-100 outline-none transition hover:bg-slate-800 data-[highlighted]:bg-slate-800"
+                >
+                  <Select.ItemText>{option.label}</Select.ItemText>
+                  <Select.ItemIndicator>
+                    <Check size={13} className="text-cyan-300" />
+                  </Select.ItemIndicator>
+                </Select.Item>
+              ))}
+            </Select.List>
+          </Select.Popup>
+        </Select.Positioner>
+      </Select.Portal>
+    </Select.Root>
+  );
+}
+
 export default function PropertyPanel({
   baseCrop,
   exportSettings,
@@ -35,228 +171,206 @@ export default function PropertyPanel({
   ffmpegError,
   isExporting,
   exportError,
+  className,
   onChangeExportSettings,
   onExport,
 }: PropertyPanelProps) {
   return (
-    <aside className="w-full rounded-2xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-xl lg:w-[360px]">
+    <aside
+      className={`w-full rounded-2xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-xl lg:w-[360px] ${className ?? ''}`}
+    >
       <h2 className="sr-only">Property Panel</h2>
 
-      <div className="mt-4 space-y-3">
-        <label className="block text-xs text-slate-300">
-          <span className="mb-1 inline-flex items-center gap-1 text-slate-400">
-            <Film size={13} />
-            Format
-          </span>
-          <select
-            value={exportSettings.format}
-            onChange={(event) => onChangeExportSettings({ format: event.target.value as ExportSettings['format'] })}
-            className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-500"
-          >
-            <option value="gif">GIF</option>
-            <option value="mp4">MP4</option>
-          </select>
-        </label>
-
-        <div className="block text-xs text-slate-300">
-          <span className="mb-1 inline-flex items-center gap-1 text-slate-400">
-            <Layers3 size={13} />
-            Output Size (px)
-          </span>
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-            <input
-              type="number"
-              min={INPUT_SIZE_MIN}
-              max={INPUT_SIZE_MAX}
-              value={exportSettings.width}
-              onChange={(event) => {
-                const width = Number.parseInt(event.target.value, 10);
-                if (!Number.isFinite(width)) {
-                  return;
-                }
-
-                const safeWidth = clampInt(width, INPUT_SIZE_MIN, INPUT_SIZE_MAX);
-                if (exportSettings.keepAspectRatio) {
-                  onChangeExportSettings({
-                    width: safeWidth,
-                    height: computeHeightFromWidth(safeWidth, baseCrop),
-                  });
-                  return;
-                }
-
-                onChangeExportSettings({ width: safeWidth });
-              }}
-              className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-500"
+      <Accordion.Root multiple defaultValue={['basic', 'format']} className="mt-4 space-y-2">
+        <PropertySection value="basic" title="基本設定" icon={<Layers3 size={13} />}>
+          <label className="block text-xs text-slate-300">
+            <span className="mb-1 inline-flex items-center gap-1 text-slate-400">
+              <Film size={13} />
+              Format
+            </span>
+            <SelectField
+              value={exportSettings.format}
+              options={FORMAT_OPTIONS}
+              onChange={(format) => onChangeExportSettings({ format })}
             />
-            <span className="text-center font-mono text-xs text-slate-500">x</span>
-            <input
-              type="number"
-              min={INPUT_SIZE_MIN}
-              max={INPUT_SIZE_MAX}
-              value={exportSettings.height}
-              onChange={(event) => {
-                const height = Number.parseInt(event.target.value, 10);
-                if (!Number.isFinite(height)) {
-                  return;
-                }
-
-                const safeHeight = clampInt(height, INPUT_SIZE_MIN, INPUT_SIZE_MAX);
-                if (exportSettings.keepAspectRatio) {
-                  onChangeExportSettings({
-                    width: computeWidthFromHeight(safeHeight, baseCrop),
-                    height: safeHeight,
-                  });
-                  return;
-                }
-
-                onChangeExportSettings({ height: safeHeight });
-              }}
-              className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-500"
-            />
-          </div>
-          <label className="mt-2 flex items-center gap-2 rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-300">
-            <input
-              type="checkbox"
-              checked={exportSettings.keepAspectRatio}
-              onChange={(event) => {
-                if (event.target.checked) {
-                  onChangeExportSettings({
-                    keepAspectRatio: true,
-                    height: computeHeightFromWidth(exportSettings.width, baseCrop),
-                  });
-                } else {
-                  onChangeExportSettings({ keepAspectRatio: false });
-                }
-              }}
-              className="h-4 w-4 accent-cyan-400"
-            />
-            アスペクト比を保持
           </label>
-        </div>
 
-        {exportSettings.format === 'gif' ? (
-          <>
-            <label className="block text-xs text-slate-300">
-              <span className="mb-1 inline-flex items-center gap-1 text-slate-400">
-                <Gauge size={13} />
-                FPS (GIF)
-              </span>
+          <div className="block text-xs text-slate-300">
+            <span className="mb-1 inline-flex items-center gap-1 text-slate-400">
+              <Layers3 size={13} />
+              Output Size (px)
+            </span>
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
               <input
                 type="number"
-                min={1}
-                max={60}
-                value={exportSettings.gifFps}
+                min={INPUT_SIZE_MIN}
+                max={INPUT_SIZE_MAX}
+                value={exportSettings.width}
                 onChange={(event) => {
-                  const fps = Number.parseInt(event.target.value, 10);
-                  if (Number.isFinite(fps)) {
-                    onChangeExportSettings({ gifFps: clampInt(fps, 1, 60) });
+                  const width = Number.parseInt(event.target.value, 10);
+                  if (!Number.isFinite(width)) {
+                    return;
                   }
+
+                  const safeWidth = clampInt(width, INPUT_SIZE_MIN, INPUT_SIZE_MAX);
+                  if (exportSettings.keepAspectRatio) {
+                    onChangeExportSettings({
+                      width: safeWidth,
+                      height: computeHeightFromWidth(safeWidth, baseCrop),
+                    });
+                    return;
+                  }
+
+                  onChangeExportSettings({ width: safeWidth });
                 }}
-                className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-500"
+                className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-500"
               />
-            </label>
-
-            <label className="block text-xs text-slate-300">
-              <span className="mb-1 inline-flex items-center gap-1 text-slate-400">
-                <Sparkles size={13} />
-                Palette Mode (GIF)
-              </span>
-              <select
-                value={exportSettings.paletteMode}
-                onChange={(event) =>
-                  onChangeExportSettings({ paletteMode: event.target.value as ExportSettings['paletteMode'] })
-                }
-                className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-500"
-              >
-                <option value="global">Global Palette</option>
-                <option value="single">Per-frame Palette (stats_mode=single)</option>
-              </select>
-            </label>
-
-            <label className="block text-xs text-slate-300">
-              <span className="mb-1 inline-flex items-center gap-1 text-slate-400">Dither (GIF)</span>
-              <select
-                value={exportSettings.dither}
-                onChange={(event) => onChangeExportSettings({ dither: event.target.value as ExportSettings['dither'] })}
-                className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-500"
-              >
-                <option value="none">none</option>
-                <option value="bayer">bayer</option>
-                <option value="floyd_steinberg">floyd_steinberg</option>
-                <option value="sierra2">sierra2</option>
-              </select>
-            </label>
-          </>
-        ) : (
-          <>
-            <label className="block text-xs text-slate-300">
-              <span className="mb-1 inline-flex items-center gap-1 text-slate-400">
-                <Gauge size={13} />
-                FPS (MP4)
-              </span>
+              <span className="text-center font-mono text-xs text-slate-500">x</span>
               <input
                 type="number"
-                min={1}
-                max={120}
-                value={exportSettings.mp4Fps}
+                min={INPUT_SIZE_MIN}
+                max={INPUT_SIZE_MAX}
+                value={exportSettings.height}
                 onChange={(event) => {
-                  const fps = Number.parseInt(event.target.value, 10);
-                  if (Number.isFinite(fps)) {
-                    onChangeExportSettings({ mp4Fps: clampInt(fps, 1, 120) });
+                  const height = Number.parseInt(event.target.value, 10);
+                  if (!Number.isFinite(height)) {
+                    return;
                   }
+
+                  const safeHeight = clampInt(height, INPUT_SIZE_MIN, INPUT_SIZE_MAX);
+                  if (exportSettings.keepAspectRatio) {
+                    onChangeExportSettings({
+                      width: computeWidthFromHeight(safeHeight, baseCrop),
+                      height: safeHeight,
+                    });
+                    return;
+                  }
+
+                  onChangeExportSettings({ height: safeHeight });
                 }}
-                className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-500"
+                className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-500"
               />
-            </label>
+            </div>
+            <div className="mt-2">
+              <ToggleRow
+                label="アスペクト比を保持"
+                checked={exportSettings.keepAspectRatio}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    onChangeExportSettings({
+                      keepAspectRatio: true,
+                      height: computeHeightFromWidth(exportSettings.width, baseCrop),
+                    });
+                    return;
+                  }
 
-            <label className="block text-xs text-slate-300">
-              <span className="mb-1 inline-flex items-center gap-1 text-slate-400">Preset (MP4)</span>
-              <select
-                value={exportSettings.mp4Preset}
-                onChange={(event) => onChangeExportSettings({ mp4Preset: event.target.value as ExportSettings['mp4Preset'] })}
-                className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-500"
-              >
-                <option value="ultrafast">ultrafast</option>
-                <option value="superfast">superfast</option>
-                <option value="veryfast">veryfast</option>
-                <option value="faster">faster</option>
-                <option value="fast">fast</option>
-                <option value="medium">medium</option>
-                <option value="slow">slow</option>
-                <option value="slower">slower</option>
-                <option value="veryslow">veryslow</option>
-              </select>
-            </label>
-          </>
-        )}
-
-        <details className="rounded-md border border-slate-800 bg-slate-950/70 px-3 py-2 text-xs text-slate-300">
-          <summary className="cursor-pointer list-none select-none font-medium text-slate-200">
-            速度倍率オーバーレイ
-          </summary>
-          <div className="mt-3 space-y-2">
-            <label className="flex items-center gap-2 rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-300">
-              <input
-                type="checkbox"
-                checked={exportSettings.speedOverlay}
-                onChange={(event) => onChangeExportSettings({ speedOverlay: event.target.checked })}
-                className="h-4 w-4 accent-cyan-400"
+                  onChangeExportSettings({ keepAspectRatio: false });
+                }}
               />
-              右下に倍率を重ねる
-            </label>
+            </div>
           </div>
-        </details>
-      </div>
+        </PropertySection>
+
+        <PropertySection
+          value="format"
+          title={exportSettings.format === 'gif' ? 'GIF 詳細' : 'MP4 詳細'}
+          icon={<Gauge size={13} />}
+        >
+          {exportSettings.format === 'gif' ? (
+            <>
+              <label className="block text-xs text-slate-300">
+                <span className="mb-1 inline-flex items-center gap-1 text-slate-400">
+                  <Gauge size={13} />
+                  FPS (GIF)
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={exportSettings.gifFps}
+                  onChange={(event) => {
+                    const fps = Number.parseInt(event.target.value, 10);
+                    if (Number.isFinite(fps)) {
+                      onChangeExportSettings({ gifFps: clampInt(fps, 1, 60) });
+                    }
+                  }}
+                  className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-500"
+                />
+              </label>
+
+              <label className="block text-xs text-slate-300">
+                <span className="mb-1 inline-flex items-center gap-1 text-slate-400">
+                  <Sparkles size={13} />
+                  Palette Mode (GIF)
+                </span>
+                <SelectField
+                  value={exportSettings.paletteMode}
+                  options={GIF_PALETTE_OPTIONS}
+                  onChange={(paletteMode) => onChangeExportSettings({ paletteMode })}
+                />
+              </label>
+
+              <label className="block text-xs text-slate-300">
+                <span className="mb-1 inline-flex items-center gap-1 text-slate-400">Dither (GIF)</span>
+                <SelectField
+                  value={exportSettings.dither}
+                  options={GIF_DITHER_OPTIONS}
+                  onChange={(dither) => onChangeExportSettings({ dither })}
+                />
+              </label>
+            </>
+          ) : (
+            <>
+              <label className="block text-xs text-slate-300">
+                <span className="mb-1 inline-flex items-center gap-1 text-slate-400">
+                  <Gauge size={13} />
+                  FPS (MP4)
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  max={120}
+                  value={exportSettings.mp4Fps}
+                  onChange={(event) => {
+                    const fps = Number.parseInt(event.target.value, 10);
+                    if (Number.isFinite(fps)) {
+                      onChangeExportSettings({ mp4Fps: clampInt(fps, 1, 120) });
+                    }
+                  }}
+                  className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-500"
+                />
+              </label>
+
+              <label className="block text-xs text-slate-300">
+                <span className="mb-1 inline-flex items-center gap-1 text-slate-400">Preset (MP4)</span>
+                <SelectField
+                  value={exportSettings.mp4Preset}
+                  options={MP4_PRESET_OPTIONS}
+                  onChange={(mp4Preset) => onChangeExportSettings({ mp4Preset })}
+                />
+              </label>
+            </>
+          )}
+        </PropertySection>
+
+        <PropertySection value="overlay" title="速度倍率オーバーレイ" icon={<Sparkles size={13} />}>
+          <ToggleRow
+            label="右下に倍率を重ねる"
+            checked={exportSettings.speedOverlay}
+            onCheckedChange={(checked) => onChangeExportSettings({ speedOverlay: checked })}
+          />
+        </PropertySection>
+      </Accordion.Root>
 
       <div className="mt-4">
-        <button
+        <Button
           type="button"
           onClick={onExport}
           disabled={isExporting}
           className="rounded-lg border border-amber-300/30 bg-amber-400/10 px-3 py-2 text-sm font-semibold text-amber-100 transition hover:bg-amber-400/20 disabled:cursor-wait disabled:opacity-70"
         >
           {isExporting ? 'エクスポート中...' : `${exportSettings.format.toUpperCase()} をエクスポート`}
-        </button>
+        </Button>
       </div>
 
       <p className="mt-2 text-[11px] text-slate-500">
