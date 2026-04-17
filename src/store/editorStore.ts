@@ -50,10 +50,10 @@ interface EditorStoreState {
   cutAtCurrentTime: () => void;
   deleteSelectedSlice: () => void;
   setSliceSpeedCommit: (sliceId: string, speed: number) => void;
-  setGlobalCropPreview: (crop: CropRect) => void;
-  setGlobalCropCommit: (crop: CropRect) => void;
-  setSelectedSliceCropPreview: (crop: CropRect) => void;
-  setSelectedSliceCropCommit: (crop: CropRect) => void;
+  setGlobalCropPreview: (crop: CropRect | null) => void;
+  setGlobalCropCommit: (crop: CropRect | null) => void;
+  setSliceCropPreview: (sliceId: string, crop: CropRect | null) => void;
+  setSliceCropCommit: (sliceId: string, crop: CropRect | null) => void;
   updateExportSettings: (next: Partial<ExportSettings>) => void;
   setFfmpegStatus: (status: FfmpegStatus, error?: string | null) => void;
   undo: () => void;
@@ -104,12 +104,7 @@ export const useEditorStore = create<EditorStoreState>((set, get) => ({
       slices: [initialSlice],
       currentTime: 0,
       selectedSliceId: null,
-      globalCrop: {
-        x: 0,
-        y: 0,
-        w: video.width,
-        h: video.height,
-      },
+      globalCrop: null,
       exportSettings: {
         ...DEFAULT_EXPORT_SETTINGS,
         width: initialWidth,
@@ -267,7 +262,7 @@ export const useEditorStore = create<EditorStoreState>((set, get) => ({
   },
 
   setGlobalCropPreview: (crop) => {
-    set({ globalCrop: { ...crop } });
+    set({ globalCrop: cloneCrop(crop) });
   },
 
   setGlobalCropCommit: (crop) => {
@@ -279,25 +274,26 @@ export const useEditorStore = create<EditorStoreState>((set, get) => ({
       return {
         past: [...state.past, snapshotFromState(state)],
         future: [],
-        globalCrop: { ...crop },
+        globalCrop: cloneCrop(crop),
       };
     });
   },
 
-  setSelectedSliceCropPreview: (crop) => {
+  setSliceCropPreview: (sliceId, crop) => {
     set((state) => {
-      if (!state.selectedSliceId) {
+      const targetSlice = state.slices.find((slice) => slice.id === sliceId);
+      if (!targetSlice || cropEquals(targetSlice.crop, crop)) {
         return state;
       }
 
       const nextSlices = cloneSlices(state.slices).map((slice) => {
-        if (slice.id !== state.selectedSliceId) {
+        if (slice.id !== sliceId) {
           return slice;
         }
 
         return {
           ...slice,
-          crop: { ...crop },
+          crop: cloneCrop(crop),
         };
       });
 
@@ -305,25 +301,21 @@ export const useEditorStore = create<EditorStoreState>((set, get) => ({
     });
   },
 
-  setSelectedSliceCropCommit: (crop) => {
+  setSliceCropCommit: (sliceId, crop) => {
     set((state) => {
-      if (!state.selectedSliceId) {
-        return state;
-      }
-
-      const currentSlice = state.slices.find((slice) => slice.id === state.selectedSliceId);
+      const currentSlice = state.slices.find((slice) => slice.id === sliceId);
       if (!currentSlice || cropEquals(currentSlice.crop, crop)) {
         return state;
       }
 
       const nextSlices = cloneSlices(state.slices).map((slice) => {
-        if (slice.id !== state.selectedSliceId) {
+        if (slice.id !== sliceId) {
           return slice;
         }
 
         return {
           ...slice,
-          crop: { ...crop },
+          crop: cloneCrop(crop),
         };
       });
 

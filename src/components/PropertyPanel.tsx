@@ -1,9 +1,8 @@
-import { Clapperboard, Film, Gauge, Layers3, Sparkles } from 'lucide-react';
+import { Film, Gauge, Layers3, Sparkles } from 'lucide-react';
 
-import type { CropRect, ExportSettings, SliceModel } from '../types/editor';
+import type { CropRect, ExportSettings } from '../types/editor';
 
 interface PropertyPanelProps {
-  selectedSlice: SliceModel | null;
   baseCrop: CropRect;
   exportSettings: ExportSettings;
   ffmpegStatus: 'idle' | 'loading' | 'ready' | 'error';
@@ -11,7 +10,6 @@ interface PropertyPanelProps {
   isExporting: boolean;
   exportError: string | null;
   onChangeExportSettings: (next: Partial<ExportSettings>) => void;
-  onSelectGlobalCrop: () => void;
   onExport: () => void;
 }
 
@@ -31,7 +29,6 @@ function computeWidthFromHeight(height: number, crop: CropRect): number {
 }
 
 export default function PropertyPanel({
-  selectedSlice,
   baseCrop,
   exportSettings,
   ffmpegStatus,
@@ -39,23 +36,11 @@ export default function PropertyPanel({
   isExporting,
   exportError,
   onChangeExportSettings,
-  onSelectGlobalCrop,
   onExport,
 }: PropertyPanelProps) {
   return (
     <aside className="w-full rounded-2xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-xl lg:w-[360px]">
       <h2 className="sr-only">Property Panel</h2>
-
-      {selectedSlice ? (
-        <button
-          type="button"
-          onClick={onSelectGlobalCrop}
-          className="mt-3 inline-flex items-center gap-1 rounded-md border border-cyan-300/30 bg-cyan-400/10 px-2.5 py-1.5 text-xs font-medium text-cyan-100 transition hover:bg-cyan-400/20"
-        >
-          <Clapperboard size={13} />
-          全体クロップ編集モードへ
-        </button>
-      ) : null}
 
       <div className="mt-4 space-y-3">
         <label className="block text-xs text-slate-300">

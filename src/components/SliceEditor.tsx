@@ -4,6 +4,7 @@ import { Redo2, Scissors, Trash2, Undo2, ZoomIn } from 'lucide-react';
 
 import { captureVideoThumbnail } from '../lib/videoThumbnail';
 import {
+  type CropRect,
   deriveSlices,
   getTotalDuration,
   type DerivedSlice,
@@ -18,6 +19,8 @@ const MIN_SLICE_DURATION = 0.5;
 interface SliceEditorProps {
   video: VideoMeta;
   slices: SliceModel[];
+  baseCrop: CropRect;
+  outputAspectRatio: number;
   currentTime: number;
   selectedSliceId: string | null;
   canUndo: boolean;
@@ -226,6 +229,7 @@ interface SliceTrackProps {
   pixelsPerSecond: number;
   scrollInfo: TimelineScrollInfo;
   thumbnailUrls: Record<string, string>;
+  outputAspectRatio: number;
   onResize: (sliceId: string, newDuration: number) => void;
   onResizeEnd: () => void;
 }
@@ -237,10 +241,12 @@ function SliceTrack({
   pixelsPerSecond,
   scrollInfo,
   thumbnailUrls,
+  outputAspectRatio,
   onResize,
   onResizeEnd,
 }: SliceTrackProps) {
   const initialDurationRef = useRef<number>(0);
+  const safeOutputAspectRatio = Number.isFinite(outputAspectRatio) && outputAspectRatio > 0 ? outputAspectRatio : 16 / 9;
 
   return (
     <div className="absolute inset-x-0 bottom-10 top-10 border-y border-slate-800/70 bg-slate-900/40 shadow-inner">
@@ -293,11 +299,12 @@ function SliceTrack({
                     className={`w-[118px] max-w-[calc(100%-4px)] overflow-hidden rounded-md border border-slate-700 bg-slate-950/85 shadow-lg ${
                       isOpeningScene ? 'self-start' : ''
                     }`}
+                    style={{ aspectRatio: `${safeOutputAspectRatio} / 1` }}
                   >
                     {thumbnailUrl ? (
-                      <img src={thumbnailUrl} alt="" className="h-[66px] w-full object-cover" loading="lazy" />
+                      <img src={thumbnailUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
                     ) : (
-                      <div className="h-[66px] animate-pulse bg-slate-800/70" />
+                      <div className="h-full w-full animate-pulse bg-slate-800/70" />
                     )}
                   </div>
                   <div
@@ -376,6 +383,8 @@ function updateSliceDuration(slices: SliceModel[], sliceId: string, duration: nu
 export default function SliceEditorTimeline({
   video,
   slices,
+  baseCrop,
+  outputAspectRatio,
   currentTime,
   selectedSliceId,
   canUndo,
@@ -395,6 +404,15 @@ export default function SliceEditorTimeline({
   const selectedSlice = useMemo(
     () => slicesWithPos.find((slice) => slice.id === selectedSliceId),
     [slicesWithPos, selectedSliceId],
+  );
+  const safeOutputAspectRatio = useMemo(
+    () => (Number.isFinite(outputAspectRatio) && outputAspectRatio > 0 ? outputAspectRatio : 16 / 9),
+    [outputAspectRatio],
+  );
+  const thumbnailWidth = 240;
+  const thumbnailHeight = useMemo(
+    () => Math.max(1, Math.round(thumbnailWidth / safeOutputAspectRatio)),
+    [safeOutputAspectRatio],
   );
 
   const [thumbnailUrls, setThumbnailUrls] = useState<Record<string, string>>({});
@@ -417,8 +435,10 @@ export default function SliceEditorTimeline({
           const thumbnailUrl = await captureVideoThumbnail({
             videoUrl: video.objectUrl,
             time: slice.sourceStart,
-            width: 240,
-            height: 135,
+            width: thumbnailWidth,
+            height: thumbnailHeight,
+            baseCrop,
+            sceneCrop: slice.crop,
           });
 
           if (cancelled) {
@@ -443,7 +463,7 @@ export default function SliceEditorTimeline({
     return () => {
       cancelled = true;
     };
-  }, [slicesWithPos, video.objectUrl]);
+  }, [baseCrop, slicesWithPos, thumbnailHeight, video.objectUrl]);
 
   const timelineRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -696,6 +716,7 @@ export default function SliceEditorTimeline({
             pixelsPerSecond={pixelsPerSecond}
             scrollInfo={scrollInfo}
             thumbnailUrls={thumbnailUrls}
+            outputAspectRatio={safeOutputAspectRatio}
             onResize={handleResize}
             onResizeEnd={handleResizeEnd}
           />

@@ -1,17 +1,32 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { Crop, Focus } from 'lucide-react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
+import { Check, Clapperboard, Crop, Focus, RotateCcw, X } from 'lucide-react';
 
-import type { CropRect, SliceModel, VideoMeta } from '../types/editor';
+import type { CropRect, VideoMeta } from '../types/editor';
 
 type DragMode = 'move' | 'n' | 's' | 'w' | 'e' | 'nw' | 'ne' | 'sw' | 'se';
 
 interface CanvasPreviewProps {
   video: VideoMeta;
   currentTime: number;
-  selectedSlice: SliceModel | null;
-  activeCrop: CropRect;
-  onCropPreview: (crop: CropRect) => void;
-  onCropCommit: (crop: CropRect) => void;
+  baseCrop: CropRect;
+  activeSceneCrop: CropRect | null;
+  editMode: 'idle' | 'crop' | 'scene';
+  editCrop: CropRect | null;
+  canStartSceneCrop: boolean;
+  onStartCrop: () => void;
+  onStartSceneCrop: () => void;
+  onEditCropPreview: (crop: CropRect) => void;
+  onConfirmEdit: () => void;
+  onCancelEdit: () => void;
+  onResetEdit: () => void;
 }
 
 interface ViewportInfo {
@@ -30,6 +45,19 @@ interface DragState {
   latestCrop: CropRect;
 }
 
+interface PadBox {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+interface DisplayLayout {
+  frameCrop: CropRect;
+  contentCrop: CropRect;
+  padBox: PadBox | null;
+}
+
 const MIN_CROP_SIZE = 24;
 const MAX_PREVIEW_HEIGHT_PX = 560;
 
@@ -44,6 +72,49 @@ function clampRectToVideo(rect: CropRect, video: VideoMeta): CropRect {
     y,
     w: Math.max(1, Math.min(maxW, Math.round(rect.w))),
     h: Math.max(1, Math.min(maxH, Math.round(rect.h))),
+  };
+}
+
+function createCropVideoStyle(video: VideoMeta, crop: CropRect): CSSProperties {
+  const safeW = Math.max(1, crop.w);
+  const safeH = Math.max(1, crop.h);
+
+  return {
+    position: 'absolute',
+    width: `${(video.width / safeW) * 100}%`,
+    height: `${(video.height / safeH) * 100}%`,
+    left: `${-(crop.x / safeW) * 100}%`,
+    top: `${-(crop.y / safeH) * 100}%`,
+    maxWidth: 'none',
+    maxHeight: 'none',
+  };
+}
+
+function computeDisplayLayout(video: VideoMeta, baseCrop: CropRect, sceneCrop: CropRect | null): DisplayLayout {
+  const safeBase = clampRectToVideo(baseCrop, video);
+  const safeScene = sceneCrop ? clampRectToVideo(sceneCrop, video) : safeBase;
+
+  if (safeScene.w === safeBase.w && safeScene.h === safeBase.h) {
+    return {
+      frameCrop: safeBase,
+      contentCrop: safeScene,
+      padBox: null,
+    };
+  }
+
+  const scale = Math.min(safeBase.w / safeScene.w, safeBase.h / safeScene.h);
+  const scaledWidth = safeScene.w * scale;
+  const scaledHeight = safeScene.h * scale;
+
+  return {
+    frameCrop: safeBase,
+    contentCrop: safeScene,
+    padBox: {
+      left: ((safeBase.w - scaledWidth) / 2 / safeBase.w) * 100,
+      top: ((safeBase.h - scaledHeight) / 2 / safeBase.h) * 100,
+      width: (scaledWidth / safeBase.w) * 100,
+      height: (scaledHeight / safeBase.h) * 100,
+    },
   };
 }
 
@@ -144,10 +215,17 @@ function measureViewport(container: HTMLDivElement, video: VideoMeta): ViewportI
 export default function CanvasPreview({
   video,
   currentTime,
-  selectedSlice,
-  activeCrop,
-  onCropPreview,
-  onCropCommit,
+  baseCrop,
+  activeSceneCrop,
+  editMode,
+  editCrop,
+  canStartSceneCrop,
+  onStartCrop,
+  onStartSceneCrop,
+  onEditCropPreview,
+  onConfirmEdit,
+  onCancelEdit,
+  onResetEdit,
 }: CanvasPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -160,8 +238,22 @@ export default function CanvasPreview({
     width: video.width,
     height: video.height,
   });
+  const isEditing = editMode !== 'idle';
 
-  const modeLabel = selectedSlice ? '✂️ スライス個別クロップ中' : '🌐 全体クロップ中';
+  const displayLayout = useMemo(() => {
+    return computeDisplayLayout(video, baseCrop, activeSceneCrop);
+  }, [activeSceneCrop, baseCrop, video]);
+
+  const safeEditCrop = useMemo(() => {
+    const initial = editCrop ?? {
+      x: 0,
+      y: 0,
+      w: video.width,
+      h: video.height,
+    };
+
+    return clampRectToVideo(initial, video);
+  }, [editCrop, video]);
 
   useEffect(() => {
     const element = viewportRef.current;
@@ -194,7 +286,7 @@ export default function CanvasPreview({
   }, [currentTime, video.duration]);
 
   const displayCrop = useMemo(() => {
-    const safeCrop = clampRectToVideo(activeCrop, video);
+    const safeCrop = safeEditCrop;
 
     return {
       left: viewport.offsetX + safeCrop.x * viewport.scale,
@@ -202,10 +294,10 @@ export default function CanvasPreview({
       width: safeCrop.w * viewport.scale,
       height: safeCrop.h * viewport.scale,
     };
-  }, [activeCrop, video, viewport]);
+  }, [safeEditCrop, viewport]);
 
   useEffect(() => {
-    if (!dragging) {
+    if (!dragging || !isEditing) {
       return;
     }
 
@@ -220,15 +312,10 @@ export default function CanvasPreview({
       const next = resizeCrop(current.initialCrop, current.mode, dx, dy, video);
 
       current.latestCrop = next;
-      onCropPreview(next);
+      onEditCropPreview(next);
     };
 
     const handlePointerUp = () => {
-      const current = dragRef.current;
-      if (current) {
-        onCropCommit(clampRectToVideo(current.latestCrop, video));
-      }
-
       dragRef.current = null;
       setDragging(false);
     };
@@ -240,7 +327,7 @@ export default function CanvasPreview({
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
     };
-  }, [dragging, onCropCommit, onCropPreview, video, viewport.scale]);
+  }, [dragging, isEditing, onEditCropPreview, video, viewport.scale]);
 
   const beginDrag = useCallback(
     (event: ReactPointerEvent, mode: DragMode) => {
@@ -251,23 +338,67 @@ export default function CanvasPreview({
         mode,
         startX: event.clientX,
         startY: event.clientY,
-        initialCrop: clampRectToVideo(activeCrop, video),
-        latestCrop: clampRectToVideo(activeCrop, video),
+        initialCrop: safeEditCrop,
+        latestCrop: safeEditCrop,
       };
 
       setDragging(true);
     },
-    [activeCrop, video],
+    [safeEditCrop],
   );
 
   return (
     <section className="flex min-h-[320px] flex-1 flex-col rounded-2xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-xl">
       <div className="mb-3 flex items-center justify-end gap-4">
         <h2 className="sr-only">Canvas Preview</h2>
-        <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/30 bg-cyan-400/10 px-3 py-1 text-xs font-medium text-cyan-100">
-          <Crop size={13} />
-          {modeLabel}
-        </div>
+        {isEditing ? (
+          <div className="inline-flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onConfirmEdit}
+              className="inline-flex items-center gap-1 rounded-md border border-emerald-300/40 bg-emerald-400/10 px-2.5 py-1.5 text-xs font-medium text-emerald-100 transition hover:bg-emerald-400/20"
+            >
+              <Check size={13} />
+              OK
+            </button>
+            <button
+              type="button"
+              onClick={onCancelEdit}
+              className="inline-flex items-center gap-1 rounded-md border border-rose-300/40 bg-rose-400/10 px-2.5 py-1.5 text-xs font-medium text-rose-100 transition hover:bg-rose-400/20"
+            >
+              <X size={13} />
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onResetEdit}
+              className="inline-flex items-center gap-1 rounded-md border border-slate-600 bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-slate-100 transition hover:border-cyan-400/60 hover:text-cyan-100"
+            >
+              <RotateCcw size={13} />
+              Reset
+            </button>
+          </div>
+        ) : (
+          <div className="inline-flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onStartCrop}
+              className="inline-flex items-center gap-1 rounded-md border border-cyan-300/40 bg-cyan-400/10 px-2.5 py-1.5 text-xs font-medium text-cyan-100 transition hover:bg-cyan-400/20"
+            >
+              <Crop size={13} />
+              Crop
+            </button>
+            <button
+              type="button"
+              onClick={onStartSceneCrop}
+              disabled={!canStartSceneCrop}
+              className="inline-flex items-center gap-1 rounded-md border border-amber-300/40 bg-amber-400/10 px-2.5 py-1.5 text-xs font-medium text-amber-100 transition hover:bg-amber-400/20 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Clapperboard size={13} />
+              Scene Crop
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-1 items-center justify-center overflow-hidden rounded-xl border border-slate-800 bg-black/90 p-2">
@@ -275,101 +406,145 @@ export default function CanvasPreview({
           ref={viewportRef}
           className="relative w-full max-w-[980px] overflow-hidden rounded-lg border border-slate-800 bg-black"
           style={{
-            aspectRatio: `${video.width} / ${video.height}`,
+            aspectRatio: isEditing
+              ? `${video.width} / ${video.height}`
+              : `${displayLayout.frameCrop.w} / ${displayLayout.frameCrop.h}`,
             maxHeight: `${MAX_PREVIEW_HEIGHT_PX}px`,
           }}
         >
-          <video
-            ref={videoRef}
-            src={video.objectUrl}
-            muted
-            controls={false}
-            preload="auto"
-            className="h-full w-full object-contain"
-            onLoadedMetadata={() => {
-              const host = viewportRef.current;
-              if (host) {
-                setViewport(measureViewport(host, video));
-              }
-            }}
-          />
+          {isEditing ? (
+            <>
+              <video
+                ref={videoRef}
+                src={video.objectUrl}
+                muted
+                controls={false}
+                preload="auto"
+                className="h-full w-full object-contain"
+                onLoadedMetadata={() => {
+                  const host = viewportRef.current;
+                  if (host) {
+                    setViewport(measureViewport(host, video));
+                  }
+                }}
+              />
 
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,transparent_45%,rgba(2,6,23,0.5)_100%)]" />
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,transparent_45%,rgba(2,6,23,0.5)_100%)]" />
 
-          <div
-            className="absolute border-2 border-cyan-300/90 bg-cyan-200/10 shadow-[0_0_0_9999px_rgba(2,6,23,0.58)]"
-            style={{
-              left: `${displayCrop.left}px`,
-              top: `${displayCrop.top}px`,
-              width: `${displayCrop.width}px`,
-              height: `${displayCrop.height}px`,
-            }}
-          >
-            <button
-              type="button"
-              onPointerDown={(event) => beginDrag(event, 'move')}
-              className="absolute inset-0 cursor-move"
-              aria-label="Move crop"
-            />
+              <div
+                className="absolute border-2 border-cyan-300/90 bg-cyan-200/10 shadow-[0_0_0_9999px_rgba(2,6,23,0.58)]"
+                style={{
+                  left: `${displayCrop.left}px`,
+                  top: `${displayCrop.top}px`,
+                  width: `${displayCrop.width}px`,
+                  height: `${displayCrop.height}px`,
+                }}
+              >
+                <button
+                  type="button"
+                  onPointerDown={(event) => beginDrag(event, 'move')}
+                  className="absolute inset-0 cursor-move"
+                  aria-label="Move crop"
+                />
 
-            <div className="pointer-events-none absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-cyan-100/60" />
-            <div className="pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-cyan-100/60" />
+                <div className="pointer-events-none absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-cyan-100/60" />
+                <div className="pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-cyan-100/60" />
 
-            <button
-              type="button"
-              aria-label="Resize north-west"
-              onPointerDown={(event) => beginDrag(event, 'nw')}
-              className="absolute -left-2 -top-2 h-4 w-4 cursor-nwse-resize rounded-full border border-cyan-200 bg-slate-950"
-            />
-            <button
-              type="button"
-              aria-label="Resize north-east"
-              onPointerDown={(event) => beginDrag(event, 'ne')}
-              className="absolute -right-2 -top-2 h-4 w-4 cursor-nesw-resize rounded-full border border-cyan-200 bg-slate-950"
-            />
-            <button
-              type="button"
-              aria-label="Resize south-west"
-              onPointerDown={(event) => beginDrag(event, 'sw')}
-              className="absolute -bottom-2 -left-2 h-4 w-4 cursor-nesw-resize rounded-full border border-cyan-200 bg-slate-950"
-            />
-            <button
-              type="button"
-              aria-label="Resize south-east"
-              onPointerDown={(event) => beginDrag(event, 'se')}
-              className="absolute -bottom-2 -right-2 h-4 w-4 cursor-nwse-resize rounded-full border border-cyan-200 bg-slate-950"
-            />
+                <button
+                  type="button"
+                  aria-label="Resize north-west"
+                  onPointerDown={(event) => beginDrag(event, 'nw')}
+                  className="absolute -left-2 -top-2 h-4 w-4 cursor-nwse-resize rounded-full border border-cyan-200 bg-slate-950"
+                />
+                <button
+                  type="button"
+                  aria-label="Resize north-east"
+                  onPointerDown={(event) => beginDrag(event, 'ne')}
+                  className="absolute -right-2 -top-2 h-4 w-4 cursor-nesw-resize rounded-full border border-cyan-200 bg-slate-950"
+                />
+                <button
+                  type="button"
+                  aria-label="Resize south-west"
+                  onPointerDown={(event) => beginDrag(event, 'sw')}
+                  className="absolute -bottom-2 -left-2 h-4 w-4 cursor-nesw-resize rounded-full border border-cyan-200 bg-slate-950"
+                />
+                <button
+                  type="button"
+                  aria-label="Resize south-east"
+                  onPointerDown={(event) => beginDrag(event, 'se')}
+                  className="absolute -bottom-2 -right-2 h-4 w-4 cursor-nwse-resize rounded-full border border-cyan-200 bg-slate-950"
+                />
 
-            <button
-              type="button"
-              aria-label="Resize north"
-              onPointerDown={(event) => beginDrag(event, 'n')}
-              className="absolute left-1/2 top-0 h-4 w-8 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize rounded-full border border-cyan-200 bg-slate-950"
-            />
-            <button
-              type="button"
-              aria-label="Resize south"
-              onPointerDown={(event) => beginDrag(event, 's')}
-              className="absolute bottom-0 left-1/2 h-4 w-8 -translate-x-1/2 translate-y-1/2 cursor-ns-resize rounded-full border border-cyan-200 bg-slate-950"
-            />
-            <button
-              type="button"
-              aria-label="Resize west"
-              onPointerDown={(event) => beginDrag(event, 'w')}
-              className="absolute left-0 top-1/2 h-8 w-4 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full border border-cyan-200 bg-slate-950"
-            />
-            <button
-              type="button"
-              aria-label="Resize east"
-              onPointerDown={(event) => beginDrag(event, 'e')}
-              className="absolute right-0 top-1/2 h-8 w-4 translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full border border-cyan-200 bg-slate-950"
-            />
+                <button
+                  type="button"
+                  aria-label="Resize north"
+                  onPointerDown={(event) => beginDrag(event, 'n')}
+                  className="absolute left-1/2 top-0 h-4 w-8 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize rounded-full border border-cyan-200 bg-slate-950"
+                />
+                <button
+                  type="button"
+                  aria-label="Resize south"
+                  onPointerDown={(event) => beginDrag(event, 's')}
+                  className="absolute bottom-0 left-1/2 h-4 w-8 -translate-x-1/2 translate-y-1/2 cursor-ns-resize rounded-full border border-cyan-200 bg-slate-950"
+                />
+                <button
+                  type="button"
+                  aria-label="Resize west"
+                  onPointerDown={(event) => beginDrag(event, 'w')}
+                  className="absolute left-0 top-1/2 h-8 w-4 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full border border-cyan-200 bg-slate-950"
+                />
+                <button
+                  type="button"
+                  aria-label="Resize east"
+                  onPointerDown={(event) => beginDrag(event, 'e')}
+                  className="absolute right-0 top-1/2 h-8 w-4 translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full border border-cyan-200 bg-slate-950"
+                />
 
-            <div className="pointer-events-none absolute left-2 top-2 inline-flex items-center gap-1 rounded bg-slate-950/75 px-2 py-1 font-mono text-[10px] text-cyan-100">
-              <Focus size={11} />
-              {activeCrop.w}x{activeCrop.h} @ {activeCrop.x},{activeCrop.y}
-            </div>
-          </div>
+                <div className="pointer-events-none absolute left-2 top-2 inline-flex items-center gap-1 rounded bg-slate-950/75 px-2 py-1 font-mono text-[10px] text-cyan-100">
+                  <Focus size={11} />
+                  {safeEditCrop.w}x{safeEditCrop.h} @ {safeEditCrop.x},{safeEditCrop.y}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="absolute inset-0 bg-black" />
+
+              {displayLayout.padBox ? (
+                <div
+                  className="absolute overflow-hidden"
+                  style={{
+                    left: `${displayLayout.padBox.left}%`,
+                    top: `${displayLayout.padBox.top}%`,
+                    width: `${displayLayout.padBox.width}%`,
+                    height: `${displayLayout.padBox.height}%`,
+                  }}
+                >
+                  <video
+                    ref={videoRef}
+                    src={video.objectUrl}
+                    muted
+                    controls={false}
+                    preload="auto"
+                    className="absolute"
+                    style={createCropVideoStyle(video, displayLayout.contentCrop)}
+                  />
+                </div>
+              ) : (
+                <div className="absolute inset-0 overflow-hidden">
+                  <video
+                    ref={videoRef}
+                    src={video.objectUrl}
+                    muted
+                    controls={false}
+                    preload="auto"
+                    className="absolute"
+                    style={createCropVideoStyle(video, displayLayout.contentCrop)}
+                  />
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
     </section>

@@ -9,7 +9,7 @@ import { DEFAULT_SPEED_OVERLAY_FONT_FILE, buildFfmpegCommand } from './lib/ffmpe
 import { loadFfmpegRuntimeFromCDN } from './lib/ffmpegClient';
 import { readVideoMetadata, revokeVideoObjectUrl } from './lib/video';
 import { useEditorStore } from './store/editorStore';
-import { type CropRect } from './types/editor';
+import { deriveSlices, type CropRect, type SliceModel, type VideoMeta } from './types/editor';
 
 const SPEED_OVERLAY_FONT_ASSET_URL = `${import.meta.env.BASE_URL}fonts/SpaceGrotesk.ttf`;
 
@@ -28,6 +28,45 @@ function getDefaultCrop(width: number, height: number): CropRect {
     w: width,
     h: height,
   };
+}
+
+function clampCropToVideo(crop: CropRect, video: VideoMeta): CropRect {
+  const x = Math.max(0, Math.min(video.width - 1, Math.round(crop.x)));
+  const y = Math.max(0, Math.min(video.height - 1, Math.round(crop.y)));
+  const maxW = Math.max(1, video.width - x);
+  const maxH = Math.max(1, video.height - y);
+
+  return {
+    x,
+    y,
+    w: Math.max(1, Math.min(maxW, Math.round(crop.w))),
+    h: Math.max(1, Math.min(maxH, Math.round(crop.h))),
+  };
+}
+
+function normalizeCropForStorage(crop: CropRect, video: VideoMeta): CropRect | null {
+  const safe = clampCropToVideo(crop, video);
+
+  if (safe.x === 0 && safe.y === 0 && safe.w === video.width && safe.h === video.height) {
+    return null;
+  }
+
+  return safe;
+}
+
+function findSliceIdAtTimelineTime(slices: SliceModel[], time: number): string | null {
+  const derived = deriveSlices(slices);
+  const hit = derived.find((slice) => time >= slice.start && time < slice.end);
+
+  if (hit) {
+    return hit.id;
+  }
+
+  if (derived.length && time >= derived[derived.length - 1].end) {
+    return derived[derived.length - 1].id;
+  }
+
+  return derived[0]?.id ?? null;
 }
 
 function getFileExtension(fileName: string, fallback: string): string {
@@ -54,6 +93,9 @@ export default function App() {
   const [isImporting, setIsImporting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [cropEditMode, setCropEditMode] = useState<'idle' | 'crop' | 'scene'>('idle');
+  const [cropEditDraft, setCropEditDraft] = useState<CropRect | null>(null);
+  const [sceneCropTargetSliceId, setSceneCropTargetSliceId] = useState<string | null>(null);
 
   const {
     video,
@@ -71,10 +113,8 @@ export default function App() {
     setSelectedSliceId,
     replaceSlicesPreview,
     replaceSlicesCommit,
-    setGlobalCropPreview,
     setGlobalCropCommit,
-    setSelectedSliceCropPreview,
-    setSelectedSliceCropCommit,
+    setSliceCropCommit,
     updateExportSettings,
     setFfmpegStatus,
     undo,
@@ -89,27 +129,47 @@ export default function App() {
     () => slices.find((slice) => slice.id === selectedSliceId) ?? null,
     [selectedSliceId, slices],
   );
+
+  const fullCrop = useMemo(() => {
+    if (!video) {
+      return null;
+    }
+
+    return getDefaultCrop(video.width, video.height);
+  }, [video]);
+
   const baseCrop = useMemo(() => {
-    if (!video) {
+    if (!video || !fullCrop) {
       return null;
     }
 
-    return globalCrop ?? getDefaultCrop(video.width, video.height);
-  }, [globalCrop, video]);
+    return globalCrop ?? fullCrop;
+  }, [fullCrop, globalCrop, video]);
 
-  const activeCrop = useMemo(() => {
-    if (!video) {
+  const activeSceneCrop = useMemo(() => {
+    if (!selectedSlice?.crop || !video) {
       return null;
     }
 
-    if (selectedSlice?.crop) {
-      return selectedSlice.crop;
+    return clampCropToVideo(selectedSlice.crop, video);
+  }, [selectedSlice, video]);
+
+  const hasVideo = Boolean(video && baseCrop);
+
+  const outputAspectRatio = useMemo(
+    () => exportSettings.width / Math.max(1, exportSettings.height),
+    [exportSettings.height, exportSettings.width],
+  );
+
+  const isCropEditing = cropEditMode !== 'idle';
+
+  const effectiveEditCrop = useMemo(() => {
+    if (!video || !isCropEditing || !fullCrop) {
+      return null;
     }
 
-    return baseCrop ?? getDefaultCrop(video.width, video.height);
-  }, [baseCrop, selectedSlice, video]);
-
-  const hasVideo = Boolean(video && baseCrop && activeCrop);
+    return clampCropToVideo(cropEditDraft ?? fullCrop, video);
+  }, [cropEditDraft, fullCrop, isCropEditing, video]);
 
   const ensureFfmpegRuntimeReady = useCallback(async () => {
     if (ffmpegStatusRef.current === 'ready') {
@@ -137,6 +197,12 @@ export default function App() {
   useEffect(() => {
     void ensureFfmpegRuntimeReady();
   }, [ensureFfmpegRuntimeReady]);
+
+  useEffect(() => {
+    setCropEditMode('idle');
+    setCropEditDraft(null);
+    setSceneCropTargetSliceId(null);
+  }, [video?.objectUrl]);
 
   const handleImportVideo = useCallback(
     async (file: File) => {
@@ -166,27 +232,95 @@ export default function App() {
     replaceInputRef.current?.click();
   }, []);
 
-  const handleCropPreview = useCallback(
+  const closeCropEditor = useCallback(() => {
+    setCropEditMode('idle');
+    setCropEditDraft(null);
+    setSceneCropTargetSliceId(null);
+  }, []);
+
+  const handleStartCropEdit = useCallback(() => {
+    if (!video || !fullCrop) {
+      return;
+    }
+
+    const initial = globalCrop ? clampCropToVideo(globalCrop, video) : fullCrop;
+    setCropEditMode('crop');
+    setSceneCropTargetSliceId(null);
+    setCropEditDraft(initial);
+  }, [fullCrop, globalCrop, video]);
+
+  const handleStartSceneCropEdit = useCallback(() => {
+    if (!video || !slices.length || !baseCrop) {
+      return;
+    }
+
+    const targetSliceId = selectedSliceId ?? findSliceIdAtTimelineTime(slices, currentTime);
+    if (!targetSliceId) {
+      return;
+    }
+
+    const targetSlice = slices.find((slice) => slice.id === targetSliceId);
+    if (!targetSlice) {
+      return;
+    }
+
+    setSelectedSliceId(targetSliceId);
+    setCropEditMode('scene');
+    setSceneCropTargetSliceId(targetSliceId);
+    setCropEditDraft(targetSlice.crop ? clampCropToVideo(targetSlice.crop, video) : baseCrop);
+  }, [baseCrop, currentTime, selectedSliceId, setSelectedSliceId, slices, video]);
+
+  const handleEditCropPreview = useCallback(
     (crop: CropRect) => {
-      if (selectedSliceId) {
-        setSelectedSliceCropPreview(crop);
-      } else {
-        setGlobalCropPreview(crop);
+      if (!video) {
+        return;
       }
+
+      setCropEditDraft(clampCropToVideo(crop, video));
     },
-    [selectedSliceId, setGlobalCropPreview, setSelectedSliceCropPreview],
+    [video],
   );
 
-  const handleCropCommit = useCallback(
-    (crop: CropRect) => {
-      if (selectedSliceId) {
-        setSelectedSliceCropCommit(crop);
-      } else {
-        setGlobalCropCommit(crop);
-      }
-    },
-    [selectedSliceId, setGlobalCropCommit, setSelectedSliceCropCommit],
-  );
+  const handleConfirmCropEdit = useCallback(() => {
+    if (!video || !effectiveEditCrop) {
+      closeCropEditor();
+      return;
+    }
+
+    const nextCrop = normalizeCropForStorage(effectiveEditCrop, video);
+
+    if (cropEditMode === 'crop') {
+      setGlobalCropCommit(nextCrop);
+      closeCropEditor();
+      return;
+    }
+
+    if (cropEditMode === 'scene' && sceneCropTargetSliceId) {
+      setSliceCropCommit(sceneCropTargetSliceId, nextCrop);
+    }
+
+    closeCropEditor();
+  }, [
+    closeCropEditor,
+    cropEditMode,
+    effectiveEditCrop,
+    sceneCropTargetSliceId,
+    setGlobalCropCommit,
+    setSliceCropCommit,
+    video,
+  ]);
+
+  const handleCancelCropEdit = useCallback(() => {
+    closeCropEditor();
+  }, [closeCropEditor]);
+
+  const handleResetCropEdit = useCallback(() => {
+    if (!fullCrop) {
+      return;
+    }
+
+    setCropEditDraft(fullCrop);
+  }, [fullCrop]);
 
   const ensureSpeedOverlayFont = useCallback(
     async (ffmpeg: Awaited<ReturnType<typeof loadFfmpegRuntimeFromCDN>>['ffmpeg']): Promise<void> => {
@@ -255,14 +389,14 @@ export default function App() {
       outputFileName?: string,
       options?: { enableSpeedOverlay?: boolean; speedOverlayFontFile?: string },
     ) => {
-      if (!video || !slices.length || !baseCrop) {
+      if (!video || !slices.length) {
         return null;
       }
 
       return buildFfmpegCommand({
         video,
         slices,
-        globalCrop: baseCrop,
+        globalCrop,
         exportSettings,
         enableSpeedOverlay: options?.enableSpeedOverlay,
         speedOverlayFontFile: options?.speedOverlayFontFile,
@@ -270,7 +404,7 @@ export default function App() {
         outputFileName,
       });
     },
-    [baseCrop, exportSettings, slices, video],
+    [exportSettings, globalCrop, slices, video],
   );
 
   const logFfmpegCommandPreview = useCallback(
@@ -287,7 +421,7 @@ export default function App() {
   );
 
   const handleExport = useCallback(async () => {
-    if (!video || !slices.length || !baseCrop) {
+    if (!video || !slices.length) {
       return;
     }
 
@@ -363,7 +497,6 @@ export default function App() {
       setIsExporting(false);
     }
   }, [
-    baseCrop,
     createCommandPreview,
     detectDrawtextSupport,
     ensureSpeedOverlayFont,
@@ -420,14 +553,21 @@ export default function App() {
 
       <main className="relative z-10 mx-auto flex w-full max-w-[1500px] flex-col gap-4 px-4 py-4 sm:px-6">
         <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-          {hasVideo && video && activeCrop ? (
+          {hasVideo && video && baseCrop ? (
             <CanvasPreview
               video={video}
               currentTime={currentTime}
-              selectedSlice={selectedSlice}
-              activeCrop={activeCrop}
-              onCropPreview={handleCropPreview}
-              onCropCommit={handleCropCommit}
+              baseCrop={baseCrop}
+              activeSceneCrop={activeSceneCrop}
+              editMode={cropEditMode}
+              editCrop={effectiveEditCrop}
+              canStartSceneCrop={slices.length > 0}
+              onStartCrop={handleStartCropEdit}
+              onStartSceneCrop={handleStartSceneCropEdit}
+              onEditCropPreview={handleEditCropPreview}
+              onConfirmEdit={handleConfirmCropEdit}
+              onCancelEdit={handleCancelCropEdit}
+              onResetEdit={handleResetCropEdit}
             />
           ) : (
             <VideoDropzone onFileSelected={handleImportVideo} isLoading={isImporting} error={importError} mode="embedded" />
@@ -435,7 +575,6 @@ export default function App() {
 
           {hasVideo && baseCrop ? (
             <PropertyPanel
-              selectedSlice={selectedSlice}
               baseCrop={baseCrop}
               exportSettings={exportSettings}
               ffmpegStatus={ffmpegStatus}
@@ -443,7 +582,6 @@ export default function App() {
               isExporting={isExporting}
               exportError={exportError}
               onChangeExportSettings={updateExportSettings}
-              onSelectGlobalCrop={() => setSelectedSliceId(null)}
               onExport={handleExport}
             />
           ) : (
@@ -472,6 +610,8 @@ export default function App() {
             onSelectedSliceIdChange={setSelectedSliceId}
             onSlicesPreview={replaceSlicesPreview}
             onSlicesCommit={replaceSlicesCommit}
+            baseCrop={baseCrop!}
+            outputAspectRatio={outputAspectRatio}
             onUndo={undo}
             onRedo={redo}
           />
