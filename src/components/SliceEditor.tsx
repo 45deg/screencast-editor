@@ -2,18 +2,21 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, ty
 import { motion, type PanInfo } from 'framer-motion';
 import { Redo2, Scissors, Trash2, Undo2, ZoomIn } from 'lucide-react';
 
+import { captureVideoThumbnail } from '../lib/videoThumbnail';
 import {
   deriveSlices,
   getTotalDuration,
   type DerivedSlice,
   type SliceModel,
   type TimelineScrollInfo,
+  type VideoMeta,
 } from '../types/editor';
 
 const BASE_PIXELS_PER_SECOND = 60;
 const MIN_SLICE_DURATION = 0.5;
 
 interface SliceEditorProps {
+  video: VideoMeta;
   slices: SliceModel[];
   currentTime: number;
   selectedSliceId: string | null;
@@ -222,6 +225,7 @@ interface SliceTrackProps {
   setSelectedSliceId: (id: string | null) => void;
   pixelsPerSecond: number;
   scrollInfo: TimelineScrollInfo;
+  thumbnailUrls: Record<string, string>;
   onResize: (sliceId: string, newDuration: number) => void;
   onResizeEnd: () => void;
 }
@@ -232,6 +236,7 @@ function SliceTrack({
   setSelectedSliceId,
   pixelsPerSecond,
   scrollInfo,
+  thumbnailUrls,
   onResize,
   onResizeEnd,
 }: SliceTrackProps) {
@@ -241,6 +246,8 @@ function SliceTrack({
     <div className="absolute inset-x-0 bottom-10 top-10 border-y border-slate-800/70 bg-slate-900/40 shadow-inner">
       {slicesWithPos.map((slice, index) => {
         const isSelected = slice.id === selectedSliceId;
+        const isOpeningScene = index === 0;
+        const thumbnailUrl = thumbnailUrls[slice.id];
         const startPx = slice.start * pixelsPerSecond;
         const endPx = slice.end * pixelsPerSecond;
 
@@ -277,11 +284,34 @@ function SliceTrack({
             >
               {isVisible ? (
                 <div
-                  className="pointer-events-none absolute inset-y-0 flex w-max -translate-x-1/2 flex-col items-center justify-center"
+                  className={`pointer-events-none absolute inset-y-0 flex w-max -translate-x-1/2 flex-col gap-1 px-1.5 py-2 ${
+                    isOpeningScene ? 'items-start' : 'items-center'
+                  }`}
                   style={{ left: `${labelOffset}px` }}
                 >
-                  <div className="px-2 text-sm font-bold tracking-wider text-white drop-shadow">Scene#{index + 1}</div>
-                  <div className="mt-0.5 px-1 text-center font-mono text-[10px] leading-tight text-cyan-100 drop-shadow">
+                  <div
+                    className={`w-[118px] max-w-[calc(100%-4px)] overflow-hidden rounded-md border border-slate-700 bg-slate-950/85 shadow-lg ${
+                      isOpeningScene ? 'self-start' : ''
+                    }`}
+                  >
+                    {thumbnailUrl ? (
+                      <img src={thumbnailUrl} alt="" className="h-[66px] w-full object-cover" loading="lazy" />
+                    ) : (
+                      <div className="h-[66px] animate-pulse bg-slate-800/70" />
+                    )}
+                  </div>
+                  <div
+                    className={`text-sm font-bold tracking-wider text-white drop-shadow ${
+                      isOpeningScene ? 'self-start text-left' : 'text-center'
+                    }`}
+                  >
+                    Scene#{index + 1}
+                  </div>
+                  <div
+                    className={`font-mono text-[10px] leading-tight text-cyan-100 drop-shadow ${
+                      isOpeningScene ? 'self-start text-left' : 'text-center'
+                    }`}
+                  >
                     <span className="text-white">{slice.duration.toFixed(1)}s</span>
                     <br />
                     <span className="text-amber-200">x{slice.speed.toFixed(2)}</span>
@@ -344,6 +374,7 @@ function updateSliceDuration(slices: SliceModel[], sliceId: string, duration: nu
 }
 
 export default function SliceEditorTimeline({
+  video,
   slices,
   currentTime,
   selectedSliceId,
@@ -365,6 +396,54 @@ export default function SliceEditorTimeline({
     () => slicesWithPos.find((slice) => slice.id === selectedSliceId),
     [slicesWithPos, selectedSliceId],
   );
+
+  const [thumbnailUrls, setThumbnailUrls] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const generateThumbnails = async () => {
+      await Promise.resolve();
+
+      if (cancelled) {
+        return;
+      }
+
+      setThumbnailUrls({});
+      const nextThumbnailUrls: Record<string, string> = {};
+
+      for (const slice of slicesWithPos) {
+        try {
+          const thumbnailUrl = await captureVideoThumbnail({
+            videoUrl: video.objectUrl,
+            time: slice.sourceStart,
+            width: 240,
+            height: 135,
+          });
+
+          if (cancelled) {
+            return;
+          }
+
+          nextThumbnailUrls[slice.id] = thumbnailUrl;
+          setThumbnailUrls({ ...nextThumbnailUrls });
+          await new Promise<void>((resolve) => {
+            window.requestAnimationFrame(() => resolve());
+          });
+        } catch {
+          if (cancelled) {
+            return;
+          }
+        }
+      }
+    };
+
+    void generateThumbnails();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [slicesWithPos, video.objectUrl]);
 
   const timelineRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -616,6 +695,7 @@ export default function SliceEditorTimeline({
             setSelectedSliceId={onSelectedSliceIdChange}
             pixelsPerSecond={pixelsPerSecond}
             scrollInfo={scrollInfo}
+            thumbnailUrls={thumbnailUrls}
             onResize={handleResize}
             onResizeEnd={handleResizeEnd}
           />

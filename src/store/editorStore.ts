@@ -37,7 +37,6 @@ interface EditorStoreState {
   selectedSliceId: string | null;
   globalCrop: CropRect | null;
   exportSettings: ExportSettings;
-  commandPreview: string;
   ffmpegStatus: FfmpegStatus;
   ffmpegError: string | null;
   past: EditorSnapshot[];
@@ -56,7 +55,6 @@ interface EditorStoreState {
   setSelectedSliceCropPreview: (crop: CropRect) => void;
   setSelectedSliceCropCommit: (crop: CropRect) => void;
   updateExportSettings: (next: Partial<ExportSettings>) => void;
-  setCommandPreview: (commandPreview: string) => void;
   setFfmpegStatus: (status: FfmpegStatus, error?: string | null) => void;
   undo: () => void;
   redo: () => void;
@@ -84,7 +82,6 @@ export const useEditorStore = create<EditorStoreState>((set, get) => ({
   selectedSliceId: null,
   globalCrop: null,
   exportSettings: DEFAULT_EXPORT_SETTINGS,
-  commandPreview: '',
   ffmpegStatus: 'idle',
   ffmpegError: null,
   past: [],
@@ -118,7 +115,6 @@ export const useEditorStore = create<EditorStoreState>((set, get) => ({
         width: initialWidth,
         height: initialHeight,
       },
-      commandPreview: '',
       ffmpegStatus: 'idle',
       ffmpegError: null,
       past: [],
@@ -134,7 +130,6 @@ export const useEditorStore = create<EditorStoreState>((set, get) => ({
       selectedSliceId: null,
       globalCrop: null,
       exportSettings: DEFAULT_EXPORT_SETTINGS,
-      commandPreview: '',
       ffmpegStatus: 'idle',
       ffmpegError: null,
       past: [],
@@ -347,10 +342,6 @@ export const useEditorStore = create<EditorStoreState>((set, get) => ({
         ...next,
       },
     }));
-  },
-
-  setCommandPreview: (commandPreview) => {
-    set({ commandPreview });
   },
 
   setFfmpegStatus: (status, error = null) => {

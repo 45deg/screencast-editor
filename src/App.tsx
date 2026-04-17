@@ -49,6 +49,7 @@ export default function App() {
   const drawtextSupportRef = useRef<boolean | null>(null);
   const speedOverlayFontLoadedRef = useRef(false);
   const speedOverlayFontLoadPromiseRef = useRef<Promise<void> | null>(null);
+  const ffmpegStatusRef = useRef<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [importError, setImportError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -61,7 +62,6 @@ export default function App() {
     selectedSliceId,
     globalCrop,
     exportSettings,
-    commandPreview,
     ffmpegStatus,
     ffmpegError,
     past,
@@ -76,11 +76,14 @@ export default function App() {
     setSelectedSliceCropPreview,
     setSelectedSliceCropCommit,
     updateExportSettings,
-    setCommandPreview,
     setFfmpegStatus,
     undo,
     redo,
   } = useEditorStore();
+
+  useEffect(() => {
+    ffmpegStatusRef.current = ffmpegStatus;
+  }, [ffmpegStatus]);
 
   const derivedSlices = useMemo(() => deriveSlices(slices), [slices]);
   const selectedSlice = useMemo(
@@ -114,6 +117,33 @@ export default function App() {
 
   const hasVideo = Boolean(video && baseCrop && activeCrop);
 
+  const ensureFfmpegRuntimeReady = useCallback(async () => {
+    if (ffmpegStatusRef.current === 'ready') {
+      return true;
+    }
+
+    if (ffmpegStatusRef.current !== 'loading') {
+      setFfmpegStatus('loading', null);
+      ffmpegStatusRef.current = 'loading';
+    }
+
+    try {
+      await loadFfmpegRuntimeFromCDN();
+      setFfmpegStatus('ready', null);
+      ffmpegStatusRef.current = 'ready';
+      return true;
+    } catch (error) {
+      const message = toErrorMessage(error);
+      setFfmpegStatus('error', message);
+      ffmpegStatusRef.current = 'error';
+      return false;
+    }
+  }, [setFfmpegStatus]);
+
+  useEffect(() => {
+    void ensureFfmpegRuntimeReady();
+  }, [ensureFfmpegRuntimeReady]);
+
   const handleImportVideo = useCallback(
     async (file: File) => {
       setIsImporting(true);
@@ -128,13 +158,14 @@ export default function App() {
         }
 
         setVideo(nextVideo);
+        void ensureFfmpegRuntimeReady();
       } catch (error) {
         setImportError(toErrorMessage(error));
       } finally {
         setIsImporting(false);
       }
     },
-    [setVideo, video],
+    [ensureFfmpegRuntimeReady, setVideo, video],
   );
 
   const handleReplaceVideo = useCallback(() => {
@@ -163,18 +194,9 @@ export default function App() {
     [selectedSliceId, setGlobalCropCommit, setSelectedSliceCropCommit],
   );
 
-  const handleLoadFfmpeg = useCallback(async () => {
-    setFfmpegStatus('loading', null);
-    try {
-      drawtextSupportRef.current = null;
-      speedOverlayFontLoadedRef.current = false;
-      speedOverlayFontLoadPromiseRef.current = null;
-      await loadFfmpegRuntimeFromCDN();
-      setFfmpegStatus('ready', null);
-    } catch (error) {
-      setFfmpegStatus('error', toErrorMessage(error));
-    }
-  }, [setFfmpegStatus]);
+  const handleLoadFfmpeg = useCallback(() => {
+    void ensureFfmpegRuntimeReady();
+  }, [ensureFfmpegRuntimeReady]);
 
   const ensureSpeedOverlayFont = useCallback(
     async (ffmpeg: Awaited<ReturnType<typeof loadFfmpegRuntimeFromCDN>>['ffmpeg']): Promise<void> => {
@@ -261,14 +283,27 @@ export default function App() {
     [baseCrop, exportSettings, slices, video],
   );
 
-  const handleGenerateCommandPreview = useCallback(() => {
+  const logFfmpegCommandPreview = useCallback(
+    (built: { command: string; filterComplex: string }, note?: string) => {
+      console.groupCollapsed('FFmpeg command preview');
+      console.log(built.command);
+      console.log(built.filterComplex);
+      if (note) {
+        console.log(note);
+      }
+      console.groupEnd();
+    },
+    [],
+  );
+
+  const handleLogCommandPreview = useCallback(() => {
     const built = createCommandPreview();
     if (!built) {
       return;
     }
 
-    setCommandPreview(`${built.command}\n\n# filter_complex\n${built.filterComplex}`);
-  }, [createCommandPreview, setCommandPreview]);
+    logFfmpegCommandPreview(built);
+  }, [createCommandPreview, logFfmpegCommandPreview]);
 
   const handleExport = useCallback(async () => {
     if (!video || !slices.length || !baseCrop) {
@@ -305,11 +340,12 @@ export default function App() {
         throw new Error('エクスポート対象がありません。');
       }
 
-      const previewLines = [`${built.command}`, '', '# filter_complex', built.filterComplex];
-      if (exportSettings.speedOverlay && !enableSpeedOverlay) {
-        previewLines.push('', '# note', 'drawtext filter is unavailable in this FFmpeg runtime; exported without speed overlay');
-      }
-      setCommandPreview(previewLines.join('\n'));
+      logFfmpegCommandPreview(
+        built,
+        exportSettings.speedOverlay && !enableSpeedOverlay
+          ? 'drawtext filter is unavailable in this FFmpeg runtime; exported without speed overlay'
+          : undefined,
+      );
 
       const source = await runtime.fetchFile(video.file);
       await runtime.ffmpeg.writeFile(inputFileName, source);
@@ -352,7 +388,7 @@ export default function App() {
     ensureSpeedOverlayFont,
     exportSettings.format,
     exportSettings.speedOverlay,
-    setCommandPreview,
+    logFfmpegCommandPreview,
     setFfmpegStatus,
     slices.length,
     video,
@@ -423,13 +459,12 @@ export default function App() {
               exportSettings={exportSettings}
               ffmpegStatus={ffmpegStatus}
               ffmpegError={ffmpegError}
-              commandPreview={commandPreview}
               isExporting={isExporting}
               exportError={exportError}
               onChangeExportSettings={updateExportSettings}
               onSelectGlobalCrop={() => setSelectedSliceId(null)}
               onLoadFfmpeg={handleLoadFfmpeg}
-              onGenerateCommandPreview={handleGenerateCommandPreview}
+              onLogCommandPreview={handleLogCommandPreview}
               onExport={handleExport}
             />
           ) : (
@@ -448,6 +483,7 @@ export default function App() {
 
         {hasVideo ? (
           <SliceEditorTimeline
+            video={video!}
             slices={slices}
             currentTime={currentTime}
             selectedSliceId={selectedSliceId}

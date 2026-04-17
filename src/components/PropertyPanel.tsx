@@ -8,13 +8,12 @@ interface PropertyPanelProps {
   exportSettings: ExportSettings;
   ffmpegStatus: 'idle' | 'loading' | 'ready' | 'error';
   ffmpegError: string | null;
-  commandPreview: string;
   isExporting: boolean;
   exportError: string | null;
   onChangeExportSettings: (next: Partial<ExportSettings>) => void;
   onSelectGlobalCrop: () => void;
   onLoadFfmpeg: () => void;
-  onGenerateCommandPreview: () => void;
+  onLogCommandPreview: () => void;
   onExport: () => void;
 }
 
@@ -39,13 +38,12 @@ export default function PropertyPanel({
   exportSettings,
   ffmpegStatus,
   ffmpegError,
-  commandPreview,
   isExporting,
   exportError,
   onChangeExportSettings,
   onSelectGlobalCrop,
   onLoadFfmpeg,
-  onGenerateCommandPreview,
+  onLogCommandPreview,
   onExport,
 }: PropertyPanelProps) {
   const aspectLabel = `${baseCrop.w}:${baseCrop.h}`;
@@ -257,15 +255,25 @@ export default function PropertyPanel({
           </>
         )}
 
-        <label className="flex items-center gap-2 rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-300">
-          <input
-            type="checkbox"
-            checked={exportSettings.speedOverlay}
-            onChange={(event) => onChangeExportSettings({ speedOverlay: event.target.checked })}
-            className="h-4 w-4 accent-cyan-400"
-          />
-          速度倍率オーバーレイを追加
-        </label>
+        <details className="rounded-md border border-slate-800 bg-slate-950/70 px-3 py-2 text-xs text-slate-300">
+          <summary className="cursor-pointer list-none select-none font-medium text-slate-200">
+            速度倍率オーバーレイ
+          </summary>
+          <div className="mt-3 space-y-2">
+            <label className="flex items-center gap-2 rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-300">
+              <input
+                type="checkbox"
+                checked={exportSettings.speedOverlay}
+                onChange={(event) => onChangeExportSettings({ speedOverlay: event.target.checked })}
+                className="h-4 w-4 accent-cyan-400"
+              />
+              右下に倍率を重ねる
+            </label>
+            <p className="px-1 text-[11px] leading-relaxed text-slate-500">
+              Google Fonts の Space Grotesk を使って、速度が変わったシーンだけに倍率を表示します。
+            </p>
+          </div>
+        </details>
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-2">
@@ -280,10 +288,10 @@ export default function PropertyPanel({
 
         <button
           type="button"
-          onClick={onGenerateCommandPreview}
+          onClick={onLogCommandPreview}
           className="rounded-lg border border-emerald-300/30 bg-emerald-400/10 px-3 py-2 text-sm font-medium text-emerald-100 transition hover:bg-emerald-400/20"
         >
-          コマンドプレビュー生成
+          コマンドを console.log
         </button>
 
         <button
@@ -307,15 +315,9 @@ export default function PropertyPanel({
         <p className="mt-2 rounded-md border border-rose-300/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-100">{exportError}</p>
       ) : null}
 
-      <div className="mt-4">
-        <p className="mb-1 text-[11px] uppercase tracking-[0.16em] text-slate-500">FFmpeg filter/command preview</p>
-        <textarea
-          value={commandPreview}
-          readOnly
-          className="h-48 w-full resize-none rounded-lg border border-slate-800 bg-slate-950 p-3 font-mono text-[11px] leading-relaxed text-cyan-100"
-          placeholder="ここに生成コマンドが表示されます"
-        />
-      </div>
+      <p className="mt-4 text-[11px] leading-relaxed text-slate-500">
+        フィルタとコマンドの詳細は DevTools の console に出します。
+      </p>
     </aside>
   );
 }
