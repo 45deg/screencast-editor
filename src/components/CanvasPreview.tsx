@@ -262,11 +262,8 @@ export default function CanvasPreview({
 
   return (
     <section className="flex min-h-[320px] flex-1 flex-col rounded-2xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-xl">
-      <div className="mb-3 flex items-center justify-between gap-4">
-        <div>
-          <p className="font-['Space_Grotesk',sans-serif] text-lg font-semibold text-slate-100">Canvas Preview</p>
-          <p className="text-xs text-slate-400">現在の再生位置フレームを表示し、クロップ範囲を直接編集します。</p>
-        </div>
+      <div className="mb-3 flex items-center justify-end gap-4">
+        <h2 className="sr-only">Canvas Preview</h2>
         <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/30 bg-cyan-400/10 px-3 py-1 text-xs font-medium text-cyan-100">
           <Crop size={13} />
           {modeLabel}

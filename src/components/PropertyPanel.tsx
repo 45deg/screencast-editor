@@ -12,8 +12,6 @@ interface PropertyPanelProps {
   exportError: string | null;
   onChangeExportSettings: (next: Partial<ExportSettings>) => void;
   onSelectGlobalCrop: () => void;
-  onLoadFfmpeg: () => void;
-  onLogCommandPreview: () => void;
   onExport: () => void;
 }
 
@@ -42,18 +40,11 @@ export default function PropertyPanel({
   exportError,
   onChangeExportSettings,
   onSelectGlobalCrop,
-  onLoadFfmpeg,
-  onLogCommandPreview,
   onExport,
 }: PropertyPanelProps) {
-  const aspectLabel = `${baseCrop.w}:${baseCrop.h}`;
-
   return (
     <aside className="w-full rounded-2xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-xl lg:w-[360px]">
-      <h2 className="font-['Space_Grotesk',sans-serif] text-lg font-semibold text-slate-100">Property Panel</h2>
-      <p className="mt-1 text-xs text-slate-400">
-        {selectedSlice ? '選択中スライスに個別クロップを適用中' : '全体クロップを適用中'}
-      </p>
+      <h2 className="sr-only">Property Panel</h2>
 
       {selectedSlice ? (
         <button
@@ -156,7 +147,6 @@ export default function PropertyPanel({
             />
             アスペクト比を保持
           </label>
-          <span className="mt-1 block font-mono text-[11px] text-slate-500">Base aspect: {aspectLabel}</span>
         </div>
 
         {exportSettings.format === 'gif' ? (
@@ -269,31 +259,11 @@ export default function PropertyPanel({
               />
               右下に倍率を重ねる
             </label>
-            <p className="px-1 text-[11px] leading-relaxed text-slate-500">
-              Google Fonts の Space Grotesk を使って、速度が変わったシーンだけに倍率を表示します。
-            </p>
           </div>
         </details>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-2">
-        <button
-          type="button"
-          onClick={onLoadFfmpeg}
-          disabled={ffmpegStatus === 'loading'}
-          className="rounded-lg border border-cyan-300/30 bg-cyan-400/10 px-3 py-2 text-sm font-medium text-cyan-100 transition hover:bg-cyan-400/20 disabled:cursor-wait disabled:opacity-70"
-        >
-          {ffmpegStatus === 'loading' ? 'FFmpeg CDN読込中...' : 'FFmpeg (CDN) を準備'}
-        </button>
-
-        <button
-          type="button"
-          onClick={onLogCommandPreview}
-          className="rounded-lg border border-emerald-300/30 bg-emerald-400/10 px-3 py-2 text-sm font-medium text-emerald-100 transition hover:bg-emerald-400/20"
-        >
-          コマンドを console.log
-        </button>
-
+      <div className="mt-4">
         <button
           type="button"
           onClick={onExport}
@@ -314,10 +284,6 @@ export default function PropertyPanel({
       {exportError ? (
         <p className="mt-2 rounded-md border border-rose-300/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-100">{exportError}</p>
       ) : null}
-
-      <p className="mt-4 text-[11px] leading-relaxed text-slate-500">
-        フィルタとコマンドの詳細は DevTools の console に出します。
-      </p>
     </aside>
   );
 }

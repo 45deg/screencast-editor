@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Download, Replace } from 'lucide-react';
+import { Replace } from 'lucide-react';
 
 import CanvasPreview from './components/CanvasPreview';
 import PropertyPanel from './components/PropertyPanel';
@@ -9,7 +9,7 @@ import { DEFAULT_SPEED_OVERLAY_FONT_FILE, buildFfmpegCommand } from './lib/ffmpe
 import { loadFfmpegRuntimeFromCDN } from './lib/ffmpegClient';
 import { readVideoMetadata, revokeVideoObjectUrl } from './lib/video';
 import { useEditorStore } from './store/editorStore';
-import { deriveSlices, type CropRect } from './types/editor';
+import { type CropRect } from './types/editor';
 
 const SPEED_OVERLAY_FONT_ASSET_URL = `${import.meta.env.BASE_URL}fonts/SpaceGrotesk.ttf`;
 
@@ -85,16 +85,10 @@ export default function App() {
     ffmpegStatusRef.current = ffmpegStatus;
   }, [ffmpegStatus]);
 
-  const derivedSlices = useMemo(() => deriveSlices(slices), [slices]);
   const selectedSlice = useMemo(
     () => slices.find((slice) => slice.id === selectedSliceId) ?? null,
     [selectedSliceId, slices],
   );
-  const selectedDerivedSlice = useMemo(
-    () => derivedSlices.find((slice) => slice.id === selectedSliceId) ?? null,
-    [derivedSlices, selectedSliceId],
-  );
-
   const baseCrop = useMemo(() => {
     if (!video) {
       return null;
@@ -194,10 +188,6 @@ export default function App() {
     [selectedSliceId, setGlobalCropCommit, setSelectedSliceCropCommit],
   );
 
-  const handleLoadFfmpeg = useCallback(() => {
-    void ensureFfmpegRuntimeReady();
-  }, [ensureFfmpegRuntimeReady]);
-
   const ensureSpeedOverlayFont = useCallback(
     async (ffmpeg: Awaited<ReturnType<typeof loadFfmpegRuntimeFromCDN>>['ffmpeg']): Promise<void> => {
       if (speedOverlayFontLoadedRef.current) {
@@ -295,15 +285,6 @@ export default function App() {
     },
     [],
   );
-
-  const handleLogCommandPreview = useCallback(() => {
-    const built = createCommandPreview();
-    if (!built) {
-      return;
-    }
-
-    logFfmpegCommandPreview(built);
-  }, [createCommandPreview, logFfmpegCommandPreview]);
 
   const handleExport = useCallback(async () => {
     if (!video || !slices.length || !baseCrop) {
@@ -463,13 +444,11 @@ export default function App() {
               exportError={exportError}
               onChangeExportSettings={updateExportSettings}
               onSelectGlobalCrop={() => setSelectedSliceId(null)}
-              onLoadFfmpeg={handleLoadFfmpeg}
-              onLogCommandPreview={handleLogCommandPreview}
               onExport={handleExport}
             />
           ) : (
             <aside className="w-full rounded-2xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-xl lg:w-[360px]">
-              <h2 className="font-['Space_Grotesk',sans-serif] text-lg font-semibold text-slate-100">Property Panel</h2>
+              <h2 className="sr-only">Property Panel</h2>
               <p className="mt-1 text-xs text-slate-400">動画を読み込むと出力設定を編集できます。</p>
               <div className="mt-4 space-y-2">
                 <div className="h-10 animate-pulse rounded-md bg-slate-900" />
@@ -506,23 +485,6 @@ export default function App() {
             </div>
           </section>
         )}
-
-        {hasVideo && baseCrop ? (
-          <div className="rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3 text-xs text-slate-300">
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-              <span className="inline-flex items-center gap-1 text-slate-400">
-                <Download size={13} />
-                Export Baseline
-              </span>
-              <span className="font-mono text-cyan-100">
-                base={baseCrop.w}x{baseCrop.h}
-              </span>
-              <span className="font-mono text-slate-400">
-                crop-mode={selectedDerivedSlice ? `slice:${selectedDerivedSlice.id.slice(0, 8)}` : 'global'}
-              </span>
-            </div>
-          </div>
-        ) : null}
       </main>
 
       <input
