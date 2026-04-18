@@ -1,93 +1,93 @@
 # AGENTS.md
 
-## 目的
-このファイルは、修正時に最初に参照するナビゲーションです。
-無駄なファイル探索を避け、対象範囲を最短で特定するために使います。
+## Purpose
+This file is the first navigation reference to consult when making changes.
+Use it to avoid unnecessary file exploration and to identify the target scope as quickly as possible.
 
-## 必須ルール
-1. 変更作業を始める前にこのファイルを読む。
-2. まず「タスク別ルーティング」で対象ファイルを特定する。
-3. 特定したファイルだけを先に読み、不要な横断探索をしない。
-4. 挙動変更禁止の修正では、既存の入力/出力/副作用を維持する。
-5. 影響範囲が広いときだけ、関連セクションを追加で読む。
+## Required Rules
+1. Read this file before starting any change work.
+2. First identify the target files through the "Task Routing" section.
+3. Read only the identified files first; do not perform unnecessary broad exploration.
+4. For fixes that must not change behavior, preserve the existing inputs, outputs, and side effects.
+5. Only read additional related sections when the impact scope is broad.
 
-## タスク別ルーティング
-- アプリ全体の画面構成を変える:
+## Task Routing
+- Change the overall app layout:
   - src/App.tsx
-- App の純関数ロジックを変える:
+- Change pure function logic in App:
   - src/app/appUtils.ts
-- 画面録画の開始/停止/取り込みを変える:
+- Change screen recording start/stop/capture behavior:
   - src/app/hooks/useScreenCapture.ts
-- キャンバス表示や注釈ドラッグを変える:
+- Change canvas rendering or annotation dragging:
   - src/components/CanvasPreview.tsx
   - src/components/canvas-preview/math.ts
-- タイムライン編集全体を変える:
+- Change the overall timeline editor:
   - src/components/SliceEditor.tsx
   - src/components/slice-editor/useSliceEditorHandlers.ts
   - src/components/slice-editor/useSliceEditorMutationHandlers.ts
   - src/components/slice-editor/useSliceEditorPointerHandlers.ts
-- タイムラインの個別 UI (トラック/ブロック/ルーラー/再生ヘッド):
+- Change individual timeline UI elements (tracks/blocks/ruler/playhead):
   - src/components/slice-editor/TimelineTracks.tsx
   - src/components/slice-editor/TimelineSliceBlock.tsx
   - src/components/slice-editor/AnnotationLayerBlock.tsx
   - src/components/slice-editor/TimelineRuler.tsx
   - src/components/slice-editor/TimelinePlayhead.tsx
-- 出力設定 UI を変える:
+- Change the output settings UI:
   - src/components/PropertyPanel.tsx
   - src/components/property-panel/*
-- 状態管理 (Zustand) を変える:
+- Change state management (Zustand):
   - src/store/editorStore.ts
   - src/store/editorStoreHelpers.ts
   - src/store/editorStoreActions.ts
   - src/store/editor-store-actions/*
-- FFmpeg コマンド生成を変える:
+- Change FFmpeg command generation:
   - src/lib/ffmpegCommand.ts
-- i18n を変える:
+- Change i18n:
   - src/i18n.ts
   - src/i18n/resources/en.ts
   - src/i18n/resources/ja.ts
 
-## ファイル構成概要
+## File Structure Overview
 - src/App.tsx:
-  - 画面全体のレイアウトと各機能コンポーネントの接続。
-  - Editor store と各 hook を束ねるエントリ。
+  - The overall screen layout and wiring between feature components.
+  - The entry point that ties together the editor store and each hook.
 - src/app/appUtils.ts:
-  - App で使う純関数群 (crop, annotation clamp, file/size format, DnD helper など)。
+  - Pure utility functions used by App, such as crop, annotation clamping, file/size formatting, and DnD helpers.
 - src/app/hooks/useScreenCapture.ts:
-  - getDisplayMedia + MediaRecorder のライフサイクルを管理。
+  - Manages the lifecycle of getDisplayMedia + MediaRecorder.
 - src/components/CanvasPreview.tsx:
-  - プレビュー再生、crop 編集 UI、注釈編集 UI の描画とイベント処理。
+  - Renders preview playback, crop editing UI, and annotation editing UI, and handles events.
 - src/components/canvas-preview/math.ts:
-  - CanvasPreview で使う表示計算/座標計算/スタイル計算の純関数。
+  - Pure functions for display calculations, coordinate calculations, and style calculations used by CanvasPreview.
 - src/components/SliceEditor.tsx:
-  - タイムライン編集画面のコンテナ。
+  - The container for the timeline editing screen.
 - src/components/slice-editor/*:
-  - タイムライン UI 部品と操作 hook の分割実装。
+  - Split implementations for timeline UI parts and operation hooks.
 - src/components/PropertyPanel.tsx:
-  - 出力設定パネルのコンテナ。
+  - The container for the output settings panel.
 - src/components/property-panel/*:
-  - 出力設定パネルのセクション単位 UI。
+  - Section-level UI for the output settings panel.
 - src/store/editorStore.ts:
-  - store の state 定義と action 合成。
+  - Store state definitions and action composition.
 - src/store/editor-store-actions/*:
-  - action を責務別に分割した実装。
+  - Implementations that split actions by responsibility.
 - src/lib/ffmpegCommand.ts:
-  - export 実行用 ffmpeg 引数/フィルタ組み立て。
+  - FFmpeg argument and filter construction for export execution.
 - src/i18n.ts, src/i18n/resources/*:
-  - i18next 初期化と言語別辞書。
+  - i18next initialization and language-specific dictionaries.
 
-## 修正時の最短手順
-1. このファイルの「タスク別ルーティング」で対象を決める。
-2. 対象ファイルのみ読んで変更する。
-3. 変更後は `pnpm -s tsc -p tsconfig.app.json --noEmit` を実行して型確認する。
-4. 必要なら `pnpm test` で回帰確認する。
+## Minimum Change Workflow
+1. Decide the target in the "Task Routing" section of this file.
+2. Read and modify only the relevant files.
+3. After changes, run `pnpm -s tsc -p tsconfig.app.json --noEmit` to verify types.
+4. If needed, run `pnpm test` for regression checks.
 
-## 挙動維持の注意点
-- FFmpeg 関連:
-  - コマンド組み立て順序と filter 入力順は変えない。
-- タイムライン関連:
-  - preview と commit の分離を崩さない。
-- 画面録画関連:
-  - `starting -> recording -> processing -> idle` の状態遷移を維持する。
-- i18n 関連:
-  - 既存キー名は変更しない。
+## Behavioral Preservation Notes
+- FFmpeg-related:
+  - Do not change the command assembly order or the filter input order.
+- Timeline-related:
+  - Do not break the separation between preview and commit.
+- Screen recording-related:
+  - Preserve the state transition `starting -> recording -> processing -> idle`.
+- i18n-related:
+  - Do not change existing key names.
