@@ -12,11 +12,13 @@ interface MobileSettingsDrawerProps {
   ffmpegStatus: 'idle' | 'loading' | 'ready' | 'error';
   ffmpegError: string | null;
   isExporting: boolean;
+  isCancelling: boolean;
   exportProgress: number | null;
   exportProgressLabel: string | null;
   exportError: string | null;
   onChangeExportSettings: (next: Partial<ExportSettings>) => void;
   onExport: () => void;
+  onCancelExport: () => void;
 }
 
 export default function MobileSettingsDrawer({
@@ -26,11 +28,13 @@ export default function MobileSettingsDrawer({
   ffmpegStatus,
   ffmpegError,
   isExporting,
+  isCancelling,
   exportProgress,
   exportProgressLabel,
   exportError,
   onChangeExportSettings,
   onExport,
+  onCancelExport,
 }: MobileSettingsDrawerProps) {
   const { t } = useTranslation();
 
@@ -62,11 +66,13 @@ export default function MobileSettingsDrawer({
               ffmpegStatus={ffmpegStatus}
               ffmpegError={ffmpegError}
               isExporting={isExporting}
+              isCancelling={isCancelling}
               exportProgress={exportProgress}
               exportProgressLabel={exportProgressLabel}
               exportError={exportError}
               onChangeExportSettings={onChangeExportSettings}
               onExport={onExport}
+              onCancelExport={onCancelExport}
               className="border-none bg-transparent p-0 shadow-none lg:w-full"
             />
           </div>

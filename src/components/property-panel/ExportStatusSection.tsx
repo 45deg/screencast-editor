@@ -9,10 +9,12 @@ interface ExportStatusSectionProps {
   ffmpegStatus: 'idle' | 'loading' | 'ready' | 'error';
   ffmpegError: string | null;
   isExporting: boolean;
+  isCancelling: boolean;
   exportProgress: number | null;
   exportProgressLabel: string | null;
   exportError: string | null;
   onExport: () => void;
+  onCancelExport: () => void;
 }
 
 export default function ExportStatusSection({
@@ -20,10 +22,12 @@ export default function ExportStatusSection({
   ffmpegStatus,
   ffmpegError,
   isExporting,
+  isCancelling,
   exportProgress,
   exportProgressLabel,
   exportError,
   onExport,
+  onCancelExport,
 }: ExportStatusSectionProps) {
   const { t } = useTranslation();
 
@@ -32,12 +36,19 @@ export default function ExportStatusSection({
       <div className="mt-4">
         <Button
           type="button"
-          onClick={onExport}
-          disabled={isExporting}
-          className="w-full rounded-lg border border-amber-300/30 bg-amber-400/10 px-3 py-2 text-sm font-semibold text-amber-100 transition hover:bg-amber-400/20 disabled:cursor-wait disabled:opacity-70"
+          onClick={isExporting ? onCancelExport : onExport}
+          disabled={isExporting && isCancelling}
+          aria-busy={isExporting}
+          className={`w-full rounded-lg border px-3 py-2 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-70 ${
+            isExporting
+              ? 'border-rose-300/30 bg-rose-400/10 text-rose-100 hover:bg-rose-400/20'
+              : 'border-amber-300/30 bg-amber-400/10 text-amber-100 hover:bg-amber-400/20'
+          }`}
         >
           {isExporting
-            ? t('propertyPanel.exporting')
+            ? isCancelling
+              ? t('propertyPanel.cancelling')
+              : t('propertyPanel.cancelExport')
             : t('propertyPanel.exportFormat', { format: exportSettings.format.toUpperCase() })}
         </Button>
 

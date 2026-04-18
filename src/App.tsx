@@ -95,11 +95,13 @@ export default function App() {
 
   const {
     isExporting,
+    isCancelling,
     exportProgress,
     exportProgressLabel,
     exportError,
     ensureFfmpegRuntimeReady,
     handleExport,
+    cancelExport,
     resetExportState,
     syncFfmpegStatusRef,
   } = useExportHandler({
@@ -254,11 +256,13 @@ export default function App() {
             ffmpegStatus={ffmpegStatus}
             ffmpegError={ffmpegError}
             isExporting={isExporting}
+            isCancelling={isCancelling}
             exportProgress={exportProgress}
             exportProgressLabel={exportProgressLabel}
             exportError={exportError}
             onChangeExportSettings={updateExportSettings}
             onExport={handleExport}
+            onCancelExport={cancelExport}
           />
         ) : (
           <LandingWorkspace
@@ -283,11 +287,13 @@ export default function App() {
           ffmpegStatus={ffmpegStatus}
           ffmpegError={ffmpegError}
           isExporting={isExporting}
+          isCancelling={isCancelling}
           exportProgress={exportProgress}
           exportProgressLabel={exportProgressLabel}
           exportError={exportError}
           onChangeExportSettings={updateExportSettings}
           onExport={handleExport}
+          onCancelExport={cancelExport}
         />
       ) : null}
     </Drawer.Root>

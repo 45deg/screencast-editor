@@ -12,12 +12,14 @@ interface PropertyPanelProps {
   ffmpegStatus: 'idle' | 'loading' | 'ready' | 'error';
   ffmpegError: string | null;
   isExporting: boolean;
+  isCancelling: boolean;
   exportProgress: number | null;
   exportProgressLabel: string | null;
   exportError: string | null;
   className?: string;
   onChangeExportSettings: (next: Partial<ExportSettings>) => void;
   onExport: () => void;
+  onCancelExport: () => void;
 }
 
 export default function PropertyPanel({
@@ -26,12 +28,14 @@ export default function PropertyPanel({
   ffmpegStatus,
   ffmpegError,
   isExporting,
+  isCancelling,
   exportProgress,
   exportProgressLabel,
   exportError,
   className,
   onChangeExportSettings,
   onExport,
+  onCancelExport,
 }: PropertyPanelProps) {
   const { t } = useTranslation();
 
@@ -59,10 +63,12 @@ export default function PropertyPanel({
         ffmpegStatus={ffmpegStatus}
         ffmpegError={ffmpegError}
         isExporting={isExporting}
+        isCancelling={isCancelling}
         exportProgress={exportProgress}
         exportProgressLabel={exportProgressLabel}
         exportError={exportError}
         onExport={onExport}
+        onCancelExport={onCancelExport}
       />
     </aside>
   );

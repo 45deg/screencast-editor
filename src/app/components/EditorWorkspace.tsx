@@ -64,11 +64,13 @@ interface EditorWorkspaceProps {
   ffmpegStatus: 'idle' | 'loading' | 'ready' | 'error';
   ffmpegError: string | null;
   isExporting: boolean;
+  isCancelling: boolean;
   exportProgress: number | null;
   exportProgressLabel: string | null;
   exportError: string | null;
   onChangeExportSettings: (next: Partial<ExportSettings>) => void;
   onExport: () => void;
+  onCancelExport: () => void;
 }
 
 export default function EditorWorkspace({
@@ -116,11 +118,13 @@ export default function EditorWorkspace({
   ffmpegStatus,
   ffmpegError,
   isExporting,
+  isCancelling,
   exportProgress,
   exportProgressLabel,
   exportError,
   onChangeExportSettings,
   onExport,
+  onCancelExport,
 }: EditorWorkspaceProps) {
   return (
     <>
@@ -207,11 +211,13 @@ export default function EditorWorkspace({
             ffmpegStatus={ffmpegStatus}
             ffmpegError={ffmpegError}
             isExporting={isExporting}
+            isCancelling={isCancelling}
             exportProgress={exportProgress}
             exportProgressLabel={exportProgressLabel}
             exportError={exportError}
             onChangeExportSettings={onChangeExportSettings}
             onExport={onExport}
+            onCancelExport={onCancelExport}
             className="min-h-full border-none bg-transparent p-0 shadow-none rounded-none lg:w-full"
           />
         </div>

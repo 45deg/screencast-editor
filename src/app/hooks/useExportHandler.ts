@@ -1,9 +1,16 @@
 import { useCallback, useRef, useState } from 'react';
 
 import { buildFfmpegCommand } from '../../lib/ffmpegCommand';
+import type { BuildFfmpegCommandResult } from '../../lib/ffmpegCommand';
 import { loadFfmpegRuntimeFromCDN } from '../../lib/ffmpegClient';
 import { rasterizeAnnotationsToOverlays } from '../../lib/overlayRasterizer';
-import type { AnnotationModel, CropRect, ExportSettings, SliceModel, VideoMeta } from '../../types/editor';
+import type {
+  AnnotationModel,
+  CropRect,
+  ExportSettings,
+  SliceModel,
+  VideoMeta,
+} from '../../types/editor';
 import { getFileExtension, getSafeDownloadName, toErrorMessage } from '../appUtils';
 
 interface UseExportHandlerArgs {
@@ -30,7 +37,9 @@ export function useExportHandler({
   setFfmpegStatus,
 }: UseExportHandlerArgs) {
   const ffmpegStatusRef = useRef<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const exportAbortControllerRef = useRef<AbortController | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   const [exportProgress, setExportProgress] = useState<number | null>(null);
   const [exportProgressLabel, setExportProgressLabel] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -44,6 +53,25 @@ export function useExportHandler({
     setExportProgress(null);
     setExportProgressLabel(null);
   }, []);
+
+  const isAbortError = useCallback((error: unknown) => {
+    if (!error || typeof error !== 'object') {
+      return false;
+    }
+
+    return 'name' in error && (error as { name?: unknown }).name === 'AbortError';
+  }, []);
+
+  const cancelExport = useCallback(() => {
+    const controller = exportAbortControllerRef.current;
+    if (!controller || controller.signal.aborted) {
+      return;
+    }
+
+    setIsCancelling(true);
+    setExportProgressLabel(t('app.exportStageCanceling'));
+    controller.abort();
+  }, [t]);
 
   const ensureFfmpegRuntimeReady = useCallback(async () => {
     if (ffmpegStatusRef.current === 'ready') {
@@ -110,11 +138,18 @@ export function useExportHandler({
       return;
     }
 
+    if (isExporting) {
+      return;
+    }
+
     const runId = crypto.randomUUID().slice(0, 8);
     const inputExt = getFileExtension(video.file.name, 'mp4');
     const inputFileName = `input-${runId}.${inputExt}`;
     const outputFileName = `output-${runId}.${exportSettings.format}`;
     const downloadName = getSafeDownloadName(video.file.name, exportSettings.format);
+    const exportAbortController = new AbortController();
+    const { signal } = exportAbortController;
+    let runtimeLoaded = false;
 
     const updateExportProgress = (nextProgress: number, label: string) => {
       const safeProgress = Math.max(0, Math.min(100, Math.round(nextProgress)));
@@ -123,22 +158,30 @@ export function useExportHandler({
     };
 
     setIsExporting(true);
+    setIsCancelling(false);
     setExportError(null);
+    exportAbortControllerRef.current = exportAbortController;
     updateExportProgress(4, t('app.exportStagePreparing'));
     let runtime: Awaited<ReturnType<typeof loadFfmpegRuntimeFromCDN>> | null = null;
     let progressCallback: ((event: { progress: number; time: number }) => void) | null = null;
     let overlayFileNames: string[] = [];
+    let builtCommand: BuildFfmpegCommandResult | null = null;
     let exportSucceeded = false;
 
     try {
       setFfmpegStatus('loading', null);
       updateExportProgress(12, t('app.exportStageLoadingRuntime'));
-      runtime = await loadFfmpegRuntimeFromCDN();
+      runtime = await loadFfmpegRuntimeFromCDN(signal);
+      runtimeLoaded = true;
       setFfmpegStatus('ready', null);
       const activeRuntime = runtime;
 
       if (!activeRuntime) {
         throw new Error(t('app.unknownError'));
+      }
+
+      if (signal.aborted) {
+        throw new DOMException('Export was cancelled', 'AbortError');
       }
 
       updateExportProgress(28, t('app.exportStageRasterizingOverlay'));
@@ -149,6 +192,10 @@ export function useExportHandler({
         exportSettings.height,
       );
       overlayFileNames = rasterizedOverlays.map((overlay) => overlay.fileName);
+
+      if (signal.aborted) {
+        throw new DOMException('Export was cancelled', 'AbortError');
+      }
 
       const built = createCommandPreview(
         inputFileName,
@@ -163,9 +210,13 @@ export function useExportHandler({
         throw new Error(t('app.noExportTarget'));
       }
 
+      builtCommand = built;
       logFfmpegCommandPreview(built);
 
       updateExportProgress(42, t('app.exportStageWritingInput'));
+      if (signal.aborted) {
+        throw new DOMException('Export was cancelled', 'AbortError');
+      }
       const source = await activeRuntime.fetchFile(video.file);
       await activeRuntime.ffmpeg.writeFile(inputFileName, source);
 
@@ -175,6 +226,10 @@ export function useExportHandler({
 
       const overlayProgressStep = rasterizedOverlays.length > 0 ? 14 / rasterizedOverlays.length : 0;
       for (let index = 0; index < rasterizedOverlays.length; index += 1) {
+        if (signal.aborted) {
+          throw new DOMException('Export was cancelled', 'AbortError');
+        }
+
         const overlay = rasterizedOverlays[index];
         const overlayFile = new File([overlay.blob], overlay.fileName, { type: 'image/png' });
         const overlayBytes = await activeRuntime.fetchFile(overlayFile);
@@ -188,8 +243,12 @@ export function useExportHandler({
       }
 
       updateExportProgress(72, t('app.exportStageEncoding'));
-      progressCallback = ({ progress }) => {
-        const normalized = Number.isFinite(progress) ? Math.max(0, Math.min(1, progress)) : 0;
+      const encodingDurationMicros = Math.max(1, Math.round(totalDuration * 1_000_000));
+      progressCallback = ({ progress, time }) => {
+        const timeNormalized = Number.isFinite(time) ? time / encodingDurationMicros : Number.NaN;
+        const normalized = Number.isFinite(timeNormalized)
+          ? Math.max(0, Math.min(1, timeNormalized))
+          : Math.max(0, Math.min(1, progress));
         const encodingProgress = 72 + normalized * 24;
         setExportProgress((current) => {
           const baseline = current ?? 72;
@@ -199,14 +258,14 @@ export function useExportHandler({
         setExportProgressLabel(t('app.exportStageEncoding'));
       };
       activeRuntime.ffmpeg.on('progress', progressCallback);
-      const exitCode = await activeRuntime.ffmpeg.exec(built.execArgs);
+      const exitCode = await activeRuntime.ffmpeg.exec(built.execArgs, undefined, { signal });
 
       if (exitCode !== 0) {
         throw new Error(t('app.ffmpegExecutionFailed', { code: exitCode }));
       }
 
       updateExportProgress(97, t('app.exportStageFinalizing'));
-      const output = await activeRuntime.ffmpeg.readFile(outputFileName);
+      const output = await activeRuntime.ffmpeg.readFile(outputFileName, undefined, { signal });
       const outputBytes = typeof output === 'string' ? new TextEncoder().encode(output) : new Uint8Array(output);
       const mimeType = exportSettings.format === 'gif' ? 'image/gif' : 'video/mp4';
       const blob = new Blob([outputBytes], { type: mimeType });
@@ -221,12 +280,27 @@ export function useExportHandler({
       exportSucceeded = true;
       updateExportProgress(100, t('app.exportStageDone'));
     } catch (error) {
-      const message = toErrorMessage(error);
-      setExportError(message);
-      setFfmpegStatus('error', message);
+      if (!isAbortError(error) && exportSettings.format === 'mp4') {
+        console.error('[export][mp4] failed', {
+          error,
+          command: builtCommand?.command,
+          filterComplex: builtCommand?.filterComplex,
+          execArgs: builtCommand?.execArgs,
+          exportSettings,
+        });
+      }
+      if (isAbortError(error)) {
+        setExportError(null);
+        setFfmpegStatus(runtimeLoaded ? 'ready' : 'idle', null);
+      } else {
+        const message = toErrorMessage(error);
+        setExportError(message);
+        setFfmpegStatus('error', message);
+      }
       setExportProgress(null);
       setExportProgressLabel(null);
     } finally {
+      exportAbortControllerRef.current = null;
       if (runtime && progressCallback) {
         runtime.ffmpeg.off('progress', progressCallback);
       }
@@ -240,6 +314,7 @@ export function useExportHandler({
       }
 
       setIsExporting(false);
+      setIsCancelling(false);
       if (exportSucceeded) {
         window.setTimeout(() => {
           setExportProgress(null);
@@ -251,24 +326,30 @@ export function useExportHandler({
     annotations,
     baseCrop,
     createCommandPreview,
+    exportSettings,
     exportSettings.format,
     exportSettings.height,
     exportSettings.width,
+    isAbortError,
+    isExporting,
     logFfmpegCommandPreview,
     setFfmpegStatus,
     slices.length,
+    totalDuration,
     t,
     video,
   ]);
 
   return {
     isExporting,
+    isCancelling,
     exportProgress,
     exportProgressLabel,
     exportError,
     setExportError,
     ensureFfmpegRuntimeReady,
     handleExport,
+    cancelExport,
     resetExportState,
     syncFfmpegStatusRef,
   };

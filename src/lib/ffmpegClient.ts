@@ -13,7 +13,7 @@ export interface FfmpegRuntime {
 
 let runtimePromise: Promise<FfmpegRuntime> | null = null;
 
-export function loadFfmpegRuntimeFromCDN(): Promise<FfmpegRuntime> {
+export function loadFfmpegRuntimeFromCDN(signal?: AbortSignal): Promise<FfmpegRuntime> {
   if (runtimePromise) {
     return runtimePromise;
   }
@@ -25,7 +25,7 @@ export function loadFfmpegRuntimeFromCDN(): Promise<FfmpegRuntime> {
     await ffmpeg.load({
       coreURL,
       wasmURL,
-    });
+    }, signal ? { signal } : undefined);
 
     return {
       ffmpeg,
