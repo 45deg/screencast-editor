@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Drawer } from '@base-ui/react/drawer';
-import { Settings2, X } from 'lucide-react';
+import { ChevronLeft, Settings2, X } from 'lucide-react';
 
 import CanvasPreview from './components/CanvasPreview';
 import PropertyPanel from './components/PropertyPanel';
@@ -90,8 +90,15 @@ function getSafeDownloadName(fileName: string, format: 'gif' | 'mp4'): string {
   return `${base || 'export'}-edited.${format}`;
 }
 
+function getFirstVideoFile(files: FileList | null): File | null {
+  if (!files?.length) {
+    return null;
+  }
+
+  return Array.from(files).find((file) => file.type.startsWith('video/')) ?? null;
+}
+
 export default function App() {
-  const replaceInputRef = useRef<HTMLInputElement>(null);
   const ffmpegStatusRef = useRef<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [importError, setImportError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
@@ -115,6 +122,7 @@ export default function App() {
     past,
     future,
     setVideo,
+    clearVideo,
     setCurrentTime,
     setSelectedSliceId,
     replaceSlicesPreview,
@@ -259,9 +267,15 @@ export default function App() {
     [ensureFfmpegRuntimeReady, setVideo, video],
   );
 
-  const handleReplaceVideo = useCallback(() => {
-    replaceInputRef.current?.click();
-  }, []);
+  const handleReturnToLanding = useCallback(() => {
+    if (video) {
+      revokeVideoObjectUrl(video);
+    }
+
+    clearVideo();
+    setImportError(null);
+    setExportError(null);
+  }, [clearVideo, video]);
 
   const closeCropEditor = useCallback(() => {
     setCropEditMode('idle');
@@ -471,6 +485,46 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const handleWindowDragOver = (event: DragEvent) => {
+      if (!event.dataTransfer?.types.includes('Files')) {
+        return;
+      }
+
+      event.preventDefault();
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = 'copy';
+      }
+    };
+
+    const handleWindowDrop = (event: DragEvent) => {
+      if (!event.dataTransfer?.files?.length) {
+        return;
+      }
+
+      const nextFile = getFirstVideoFile(event.dataTransfer.files);
+      if (!nextFile) {
+        return;
+      }
+
+      event.preventDefault();
+
+      if (video && !window.confirm('現在の動画を閉じて、新しい動画を読み込みますか？')) {
+        return;
+      }
+
+      void handleImportVideo(nextFile);
+    };
+
+    window.addEventListener('dragover', handleWindowDragOver);
+    window.addEventListener('drop', handleWindowDrop);
+
+    return () => {
+      window.removeEventListener('dragover', handleWindowDragOver);
+      window.removeEventListener('drop', handleWindowDrop);
+    };
+  }, [handleImportVideo, video]);
+
   return (
     <Drawer.Root open={isMobileSettingsDrawerOpen} onOpenChange={setIsMobileSettingsDrawerOpen}>
       <div className="min-h-screen overflow-x-hidden bg-[linear-gradient(160deg,#020617_0%,#0b1120_42%,#111827_100%)] text-slate-100">
@@ -478,7 +532,17 @@ export default function App() {
 
         <header className="relative z-10 border-b border-slate-800/70 bg-slate-950/70 backdrop-blur">
           <div className="mx-auto flex w-full max-w-[1500px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
-            <div>
+            <div className="flex items-center gap-3">
+              {hasVideo ? (
+                <button
+                  type="button"
+                  onClick={handleReturnToLanding}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-100 transition hover:border-cyan-400/60 hover:text-cyan-100"
+                  aria-label="戻る"
+                >
+                  <ChevronLeft size={18} />
+                </button>
+              ) : null}
               <h1 className="font-['Space_Grotesk',sans-serif] text-xl font-bold">Screencast Editor</h1>
             </div>
 
@@ -500,7 +564,7 @@ export default function App() {
             hasVideo ? 'pb-[260px] sm:pb-[300px] lg:pb-4' : ''
           }`}
         >
-          <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <section className={`grid gap-4 ${hasVideo ? 'lg:grid-cols-[minmax(0,1fr)_360px]' : 'justify-items-center'}`}>
             {hasVideo && video && baseCrop ? (
               <CanvasPreview
                 video={video}
@@ -512,7 +576,6 @@ export default function App() {
                 activeSceneCrop={activeSceneCrop}
                 editMode={cropEditMode}
                 editCrop={effectiveEditCrop}
-                onOpenVideo={handleReplaceVideo}
                 onStartCrop={handleStartCropEdit}
                 onEditCropPreview={handleEditCropPreview}
                 onConfirmEdit={handleConfirmCropEdit}
@@ -539,30 +602,8 @@ export default function App() {
                   />
                 </div>
               </>
-            ) : (
-              <aside className="w-full rounded-2xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-xl lg:w-[360px]">
-                <h2 className="sr-only">Property Panel</h2>
-                <p className="mt-1 text-xs text-slate-400">動画を読み込むと出力設定を編集できます。</p>
-                <div className="mt-4 space-y-2">
-                  <div className="h-10 animate-pulse rounded-md bg-slate-900" />
-                  <div className="h-10 animate-pulse rounded-md bg-slate-900/90" />
-                  <div className="h-10 animate-pulse rounded-md bg-slate-900/80" />
-                  <div className="h-28 animate-pulse rounded-lg bg-slate-900/70" />
-                </div>
-              </aside>
-            )}
+            ) : null}
           </section>
-
-          {hasVideo ? null : (
-            <section className="relative z-10 flex h-[280px] w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-950 shadow-xl">
-              <div className="h-14 border-b border-slate-800/80 bg-slate-950/95 px-4" />
-              <div className="flex-1 px-4 py-6">
-                <div className="h-6 w-28 animate-pulse rounded bg-slate-900" />
-                <div className="mt-3 h-20 w-full animate-pulse rounded bg-slate-900/90" />
-                <div className="mt-3 h-20 w-3/4 animate-pulse rounded bg-slate-900/80" />
-              </div>
-            </section>
-          )}
         </main>
 
         {hasVideo && video && baseCrop ? (
@@ -587,20 +628,6 @@ export default function App() {
             />
           </div>
         ) : null}
-
-        <input
-          ref={replaceInputRef}
-          type="file"
-          className="hidden"
-          accept="video/*"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) {
-              void handleImportVideo(file);
-            }
-            event.currentTarget.value = '';
-          }}
-        />
       </div>
 
       {hasVideo && baseCrop && !isDesktopViewport ? (

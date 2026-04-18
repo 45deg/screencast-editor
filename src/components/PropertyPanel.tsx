@@ -254,10 +254,6 @@ export default function PropertyPanel({
                 }}
                 className="h-2 w-full cursor-pointer accent-cyan-400"
               />
-              <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
-                <span>{Math.round(scaleMin * 100)}%</span>
-                <span>{Math.round(scaleMax * 100)}%</span>
-              </div>
             </div>
           </div>
         </PropertySection>

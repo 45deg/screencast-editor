@@ -9,7 +9,7 @@ import {
 } from 'react';
 import { Button } from '@base-ui/react/button';
 import { Toolbar } from '@base-ui/react/toolbar';
-import { Check, Crop, Focus, FolderOpen, Pause, Play, RotateCcw, SkipBack, X } from 'lucide-react';
+import { Check, Crop, Focus, Pause, Play, RotateCcw, SkipBack, X } from 'lucide-react';
 
 import type { CropRect, VideoMeta } from '../types/editor';
 
@@ -25,7 +25,6 @@ interface CanvasPreviewProps {
   activeSceneCrop: CropRect | null;
   editMode: 'idle' | 'crop' | 'scene';
   editCrop: CropRect | null;
-  onOpenVideo: () => void;
   onStartCrop: () => void;
   onEditCropPreview: (crop: CropRect) => void;
   onConfirmEdit: () => void;
@@ -231,7 +230,6 @@ export default function CanvasPreview({
   activeSceneCrop,
   editMode,
   editCrop,
-  onOpenVideo,
   onStartCrop,
   onEditCropPreview,
   onConfirmEdit,
@@ -446,14 +444,6 @@ export default function CanvasPreview({
         <h2 className="sr-only">Canvas Preview</h2>
 
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <Button
-            type="button"
-            onClick={onOpenVideo}
-            className="inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-slate-100 transition hover:border-cyan-400/60 hover:text-cyan-100"
-          >
-            <FolderOpen size={13} />
-            開く
-          </Button>
           <p className="min-w-0 max-w-[52vw] truncate text-xs text-slate-400 sm:max-w-[360px]" title={fileName}>
             {fileName}
           </p>
@@ -463,11 +453,11 @@ export default function CanvasPreview({
           <div className="inline-flex items-center gap-2">
             <Button
               type="button"
-              onClick={onConfirmEdit}
-              className="inline-flex items-center gap-1 rounded-md border border-emerald-300/40 bg-emerald-400/10 px-2.5 py-1.5 text-xs font-medium text-emerald-100 transition hover:bg-emerald-400/20"
+              onClick={onResetEdit}
+              className="inline-flex items-center gap-1 rounded-md border border-slate-600 bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-slate-100 transition hover:border-cyan-400/60 hover:text-cyan-100"
             >
-              <Check size={13} />
-              OK
+              <RotateCcw size={13} />
+              Reset
             </Button>
             <Button
               type="button"
@@ -479,11 +469,11 @@ export default function CanvasPreview({
             </Button>
             <Button
               type="button"
-              onClick={onResetEdit}
-              className="inline-flex items-center gap-1 rounded-md border border-slate-600 bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-slate-100 transition hover:border-cyan-400/60 hover:text-cyan-100"
+              onClick={onConfirmEdit}
+              className="inline-flex items-center gap-1 rounded-md border border-emerald-300/40 bg-emerald-400/10 px-2.5 py-1.5 text-xs font-medium text-emerald-100 transition hover:bg-emerald-400/20"
             >
-              <RotateCcw size={13} />
-              Reset
+              <Check size={13} />
+              OK
             </Button>
           </div>
         ) : (

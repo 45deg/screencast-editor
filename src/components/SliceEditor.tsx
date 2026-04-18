@@ -74,33 +74,31 @@ function EditorToolbar({
   setZoomSlider,
   zoom,
 }: ToolbarProps) {
-  const [speedDraft, setSpeedDraft] = useState('');
-
-  useEffect(() => {
-    setSpeedDraft(selectedSlice ? selectedSlice.speed.toFixed(2) : '');
-  }, [selectedSlice]);
+  const speedInputRef = useRef<HTMLInputElement>(null);
 
   const commitSpeedDraft = useCallback(() => {
     if (!selectedSlice) {
-      setSpeedDraft('');
       return;
     }
 
-    const nextSpeed = Number.parseFloat(speedDraft);
+    const nextSpeed = Number.parseFloat(speedInputRef.current?.value ?? '');
     if (!Number.isFinite(nextSpeed) || nextSpeed <= 0) {
-      setSpeedDraft(selectedSlice.speed.toFixed(2));
+      if (speedInputRef.current) {
+        speedInputRef.current.value = selectedSlice.speed.toFixed(2);
+      }
       return;
     }
 
     onSpeedValueChange(nextSpeed);
     onSpeedValueCommit();
-    setSpeedDraft(nextSpeed.toFixed(2));
-  }, [onSpeedValueChange, onSpeedValueCommit, selectedSlice, speedDraft]);
+    if (speedInputRef.current) {
+      speedInputRef.current.value = nextSpeed.toFixed(2);
+    }
+  }, [onSpeedValueChange, onSpeedValueCommit, selectedSlice]);
 
   const handleSpeedInputChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
       const nextValue = event.target.value;
-      setSpeedDraft(nextValue);
 
       const nextSpeed = Number.parseFloat(nextValue);
       if (Number.isFinite(nextSpeed) && nextSpeed > 0) {
@@ -192,11 +190,11 @@ function EditorToolbar({
             <Popover.Trigger
               type="button"
               disabled={!selectedSlice}
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-800 bg-slate-950 px-2.5 text-[10px] font-medium text-slate-200 transition hover:border-cyan-500/60 hover:bg-slate-900 hover:text-white disabled:opacity-30 sm:text-[11px]"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-800 bg-slate-950 px-2.5 font-medium text-slate-200 transition hover:border-cyan-500/60 hover:bg-slate-900 hover:text-white disabled:opacity-30 sm:text-[11px]"
               aria-label="Slice speed"
             >
               <Gauge size={14} className="text-slate-400" />
-              <span>x{selectedSlice ? selectedSlice.speed.toFixed(1) : '1.0'}</span>
+              <span className="text-xs">x {selectedSlice ? selectedSlice.speed.toFixed(1) : '1.0'}</span>
             </Popover.Trigger>
             <Popover.Portal>
               <Popover.Positioner side="bottom" align="end" sideOffset={8} className="z-[120]">
@@ -205,13 +203,15 @@ function EditorToolbar({
                   <label htmlFor="slice-speed" className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-2 focus-within:border-cyan-500">
                     <Gauge size={14} className="shrink-0 text-slate-400" />
                     <input
+                      key={selectedSlice ? selectedSlice.id : 'no-slice'}
+                      ref={speedInputRef}
                       id="slice-speed"
                       name="slice-speed"
                       type="number"
                       inputMode="decimal"
                       min={0.1}
                       step={0.1}
-                      value={speedDraft}
+                      defaultValue={selectedSlice ? selectedSlice.speed.toFixed(2) : ''}
                       onChange={handleSpeedInputChange}
                       onBlur={commitSpeedDraft}
                       onKeyDown={handleSpeedInputKeyDown}
@@ -225,7 +225,7 @@ function EditorToolbar({
             </Popover.Portal>
           </Popover.Root>
 
-          <div className="flex items-center gap-1.5 rounded-md border border-slate-800 bg-slate-950 px-2 py-1 sm:gap-2 sm:px-3">
+          <div className="flex items-center gap-1.5 rounded-md border border-slate-800 bg-slate-950 px-2 h-8 sm:gap-2 sm:px-3">
             <ZoomIn size={14} className="text-slate-400" />
             <Slider.Root
               min={-6}
@@ -239,8 +239,8 @@ function EditorToolbar({
               }}
               className="w-14 sm:w-24"
             >
-              <Slider.Control className="relative flex h-4 w-full items-center">
-                <Slider.Track className="relative h-1.5 w-full rounded-full bg-slate-700">
+              <Slider.Control className="relative flex h-5 w-full items-center">
+                <Slider.Track className="relative h-3 w-full rounded-full bg-slate-700">
                   <Slider.Indicator className="absolute h-full rounded-full bg-cyan-500" />
                 </Slider.Track>
                 <Slider.Thumb
