@@ -85,12 +85,15 @@ async function drawImageOverlay(
   const bitmap = await createImageBitmap(annotation.file);
 
   try {
+    const targetWidth = Math.max(1, annotation.width * scaleX);
+    const targetHeight = Math.max(1, annotation.height * scaleY);
+
     context.drawImage(
       bitmap,
       annotation.x * scaleX,
       annotation.y * scaleY,
-      Math.max(1, annotation.width * scaleX),
-      Math.max(1, annotation.height * scaleY),
+      targetWidth,
+      targetHeight,
     );
   } finally {
     bitmap.close();

@@ -116,13 +116,38 @@ function clampAnnotationPosition(annotation: AnnotationModel, nextX: number, nex
 
 function clampImageAnnotationRect(
   baseCrop: CropRect,
+  annotation: Extract<AnnotationModel, { kind: 'image' }>,
   nextX: number,
   nextY: number,
   nextWidth: number,
   nextHeight: number,
 ) {
-  const width = Math.max(24, Math.min(baseCrop.w, Math.round(nextWidth)));
-  const height = Math.max(24, Math.min(baseCrop.h, Math.round(nextHeight)));
+  const aspectRatio = Math.max(1 / 4096, annotation.naturalWidth / Math.max(1, annotation.naturalHeight));
+  const maxWidth = Math.max(24, baseCrop.w - Math.max(0, Math.round(nextX)));
+  const maxHeight = Math.max(24, baseCrop.h - Math.max(0, Math.round(nextY)));
+  const widthChange = Math.abs(nextWidth - annotation.width) / Math.max(1, annotation.width);
+  const heightChange = Math.abs(nextHeight - annotation.height) / Math.max(1, annotation.height);
+
+  let width =
+    widthChange >= heightChange
+      ? Math.max(24, Math.round(nextWidth))
+      : Math.max(24, Math.round(nextHeight * aspectRatio));
+  let height = Math.max(24, Math.round(width / aspectRatio));
+
+  if (height > maxHeight) {
+    height = maxHeight;
+    width = Math.max(24, Math.round(height * aspectRatio));
+  }
+
+  if (width > maxWidth) {
+    width = maxWidth;
+    height = Math.max(24, Math.round(width / aspectRatio));
+  }
+
+  if (height > maxHeight) {
+    height = maxHeight;
+    width = Math.max(24, Math.round(height * aspectRatio));
+  }
 
   return {
     x: Math.max(0, Math.min(baseCrop.w - width, Math.round(nextX))),
@@ -595,6 +620,8 @@ export default function App() {
           duration: 3,
           x: Math.max(0, Math.round((baseCrop.w - width) / 2)),
           y: Math.max(0, Math.round((baseCrop.h - height) / 2)),
+          naturalWidth: meta.width,
+          naturalHeight: meta.height,
           width,
           height,
           file,
@@ -666,7 +693,7 @@ export default function App() {
           return annotation;
         }
 
-        const clamped = clampImageAnnotationRect(baseCrop, x, y, width, height);
+        const clamped = clampImageAnnotationRect(baseCrop, annotation, x, y, width, height);
         return {
           ...annotation,
           x: clamped.x,

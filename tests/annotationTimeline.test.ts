@@ -41,6 +41,8 @@ function createAnnotations(): AnnotationModel[] {
       duration: 1.2,
       x: 20,
       y: 20,
+      naturalWidth: 120,
+      naturalHeight: 80,
       width: 120,
       height: 80,
       file: { name: 'b.png' } as File,

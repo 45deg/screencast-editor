@@ -63,6 +63,8 @@ export interface ImageAnnotation extends AnnotationBase {
   kind: 'image';
   file: File;
   imageUrl: string;
+  naturalWidth: number;
+  naturalHeight: number;
   width: number;
   height: number;
 }
@@ -148,6 +150,8 @@ export function cloneAnnotation(annotation: AnnotationModel): AnnotationModel {
     ...annotation,
     start: Math.max(0, annotation.start),
     duration: Math.max(0.0001, annotation.duration),
+    naturalWidth: Math.max(1, Math.round(annotation.naturalWidth ?? annotation.width)),
+    naturalHeight: Math.max(1, Math.round(annotation.naturalHeight ?? annotation.height)),
     width: Math.max(1, annotation.width),
     height: Math.max(1, annotation.height),
   };

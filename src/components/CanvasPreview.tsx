@@ -16,6 +16,7 @@ import TextStyleToolbar from './annotation/TextStyleToolbar';
 import type { AnnotationModel, AnnotationTextStyle, CropRect, TextAnnotation, VideoMeta } from '../types/editor';
 
 type DragMode = 'move' | 'n' | 's' | 'w' | 'e' | 'nw' | 'ne' | 'sw' | 'se';
+type ImageResizeMode = 'nw' | 'ne' | 'sw' | 'se';
 
 interface CanvasPreviewProps {
   video: VideoMeta;
@@ -79,8 +80,11 @@ interface AnnotationDragState {
 
 interface AnnotationResizeState {
   annotation: Extract<AnnotationModel, { kind: 'image' }>;
+  mode: ImageResizeMode;
   startX: number;
   startY: number;
+  initialX: number;
+  initialY: number;
   initialWidth: number;
   initialHeight: number;
 }
@@ -277,21 +281,130 @@ function clampAnnotationPosition(annotation: AnnotationModel, nextX: number, nex
 }
 
 function clampImageAnnotationSize(annotation: Extract<AnnotationModel, { kind: 'image' }>, nextWidth: number, nextHeight: number, frameCrop: CropRect) {
+  const aspectRatio = Math.max(1 / 4096, annotation.naturalWidth / Math.max(1, annotation.naturalHeight));
+  const maxWidth = Math.max(MIN_IMAGE_ANNOTATION_SIZE, frameCrop.w - annotation.x);
+  const maxHeight = Math.max(MIN_IMAGE_ANNOTATION_SIZE, frameCrop.h - annotation.y);
+  const widthChange = Math.abs(nextWidth - annotation.width) / Math.max(1, annotation.width);
+  const heightChange = Math.abs(nextHeight - annotation.height) / Math.max(1, annotation.height);
+
+  let width =
+    widthChange >= heightChange
+      ? Math.max(MIN_IMAGE_ANNOTATION_SIZE, Math.round(nextWidth))
+      : Math.max(MIN_IMAGE_ANNOTATION_SIZE, Math.round(nextHeight * aspectRatio));
+  let height = Math.max(MIN_IMAGE_ANNOTATION_SIZE, Math.round(width / aspectRatio));
+
+  if (height > maxHeight) {
+    height = maxHeight;
+    width = Math.max(MIN_IMAGE_ANNOTATION_SIZE, Math.round(height * aspectRatio));
+  }
+
+  if (width > maxWidth) {
+    width = maxWidth;
+    height = Math.max(MIN_IMAGE_ANNOTATION_SIZE, Math.round(width / aspectRatio));
+  }
+
+  if (height > maxHeight) {
+    height = maxHeight;
+    width = Math.max(MIN_IMAGE_ANNOTATION_SIZE, Math.round(height * aspectRatio));
+  }
+
   return {
-    width: Math.max(
-      MIN_IMAGE_ANNOTATION_SIZE,
-      Math.min(Math.max(MIN_IMAGE_ANNOTATION_SIZE, frameCrop.w - annotation.x), Math.round(nextWidth)),
-    ),
-    height: Math.max(
-      MIN_IMAGE_ANNOTATION_SIZE,
-      Math.min(Math.max(MIN_IMAGE_ANNOTATION_SIZE, frameCrop.h - annotation.y), Math.round(nextHeight)),
-    ),
+    width,
+    height,
   };
 }
 
-function toTextStyle(style: AnnotationTextStyle, scale: number): CSSProperties {
-  const fontSize = Math.max(8, Math.round(style.fontSize * scale));
-  const outlineWidth = Math.max(0, Math.round(style.outlineWidth * scale));
+function resizeImageAnnotationFromCorner(
+  annotation: Extract<AnnotationModel, { kind: 'image' }>,
+  mode: ImageResizeMode,
+  dx: number,
+  dy: number,
+  frameCrop: CropRect,
+) {
+  const right = annotation.x + annotation.width;
+  const bottom = annotation.y + annotation.height;
+
+  let rawWidth = annotation.width;
+  let rawHeight = annotation.height;
+  let maxWidth = frameCrop.w;
+  let maxHeight = frameCrop.h;
+
+  if (mode === 'se') {
+    rawWidth = annotation.width + dx;
+    rawHeight = annotation.height + dy;
+    maxWidth = frameCrop.w - annotation.x;
+    maxHeight = frameCrop.h - annotation.y;
+  } else if (mode === 'sw') {
+    rawWidth = annotation.width - dx;
+    rawHeight = annotation.height + dy;
+    maxWidth = right;
+    maxHeight = frameCrop.h - annotation.y;
+  } else if (mode === 'ne') {
+    rawWidth = annotation.width + dx;
+    rawHeight = annotation.height - dy;
+    maxWidth = frameCrop.w - annotation.x;
+    maxHeight = bottom;
+  } else {
+    rawWidth = annotation.width - dx;
+    rawHeight = annotation.height - dy;
+    maxWidth = right;
+    maxHeight = bottom;
+  }
+
+  const sized = clampImageAnnotationSize(
+    {
+      ...annotation,
+      x: 0,
+      y: 0,
+    },
+    Math.min(maxWidth, rawWidth),
+    Math.min(maxHeight, rawHeight),
+    {
+      x: 0,
+      y: 0,
+      w: maxWidth,
+      h: maxHeight,
+    },
+  );
+
+  if (mode === 'se') {
+    return {
+      x: annotation.x,
+      y: annotation.y,
+      width: sized.width,
+      height: sized.height,
+    };
+  }
+
+  if (mode === 'sw') {
+    return {
+      x: right - sized.width,
+      y: annotation.y,
+      width: sized.width,
+      height: sized.height,
+    };
+  }
+
+  if (mode === 'ne') {
+    return {
+      x: annotation.x,
+      y: bottom - sized.height,
+      width: sized.width,
+      height: sized.height,
+    };
+  }
+
+  return {
+    x: right - sized.width,
+    y: bottom - sized.height,
+    width: sized.width,
+    height: sized.height,
+  };
+}
+
+function toTextStyle(style: AnnotationTextStyle, scaleY: number): CSSProperties {
+  const fontSize = Math.max(8, Math.round(style.fontSize * scaleY));
+  const outlineWidth = Math.max(0, Math.round(style.outlineWidth * scaleY));
   const lineHeight = Math.max(Math.round(fontSize * 1.25), fontSize + 2);
   const paddingX = Math.max(4, Math.round(fontSize * 0.24));
   const paddingY = Math.max(2, Math.round(fontSize * 0.14));
@@ -566,13 +679,15 @@ export default function CanvasPreview({
 
       const dx = event.clientX - current.startX;
       const dy = event.clientY - current.startY;
-      const dxFrame = (dx / frameSize.width) * displayLayout.frameCrop.w;
-      const dyFrame = (dy / frameSize.height) * displayLayout.frameCrop.h;
+      const previewScale = Math.min(
+        frameSize.width / Math.max(1, baseCrop.w),
+        frameSize.height / Math.max(1, baseCrop.h),
+      );
       const clamped = clampAnnotationPosition(
         current.annotation,
-        current.initialX + dxFrame,
-        current.initialY + dyFrame,
-        displayLayout.frameCrop,
+        current.initialX + dx / Math.max(0.0001, previewScale),
+        current.initialY + dy / Math.max(0.0001, previewScale),
+        baseCrop,
       );
 
       onAnnotationPositionPreview(current.annotation.id, clamped.x, clamped.y);
@@ -594,7 +709,7 @@ export default function CanvasPreview({
   }, [
     annotationDragging,
     annotationResizing,
-    displayLayout.frameCrop,
+    baseCrop,
     frameSize.height,
     frameSize.width,
     isEditing,
@@ -615,20 +730,29 @@ export default function CanvasPreview({
 
       const dx = event.clientX - current.startX;
       const dy = event.clientY - current.startY;
-      const dxFrame = (dx / frameSize.width) * displayLayout.frameCrop.w;
-      const dyFrame = (dy / frameSize.height) * displayLayout.frameCrop.h;
+      const previewScale = Math.min(
+        frameSize.width / Math.max(1, baseCrop.w),
+        frameSize.height / Math.max(1, baseCrop.h),
+      );
 
-      const resized = clampImageAnnotationSize(
-        current.annotation,
-        current.initialWidth + dxFrame,
-        current.initialHeight + dyFrame,
-        displayLayout.frameCrop,
+      const resized = resizeImageAnnotationFromCorner(
+        {
+          ...current.annotation,
+          x: current.initialX,
+          y: current.initialY,
+          width: current.initialWidth,
+          height: current.initialHeight,
+        },
+        current.mode,
+        dx / Math.max(0.0001, previewScale),
+        dy / Math.max(0.0001, previewScale),
+        baseCrop,
       );
 
       onAnnotationImageResizePreview(
         current.annotation.id,
-        current.annotation.x,
-        current.annotation.y,
+        resized.x,
+        resized.y,
         resized.width,
         resized.height,
       );
@@ -649,7 +773,7 @@ export default function CanvasPreview({
     };
   }, [
     annotationResizing,
-    displayLayout.frameCrop,
+    baseCrop,
     frameSize.height,
     frameSize.width,
     isEditing,
@@ -702,7 +826,11 @@ export default function CanvasPreview({
   );
 
   const beginImageResize = useCallback(
-    (event: ReactPointerEvent, annotation: Extract<AnnotationModel, { kind: 'image' }>) => {
+    (
+      event: ReactPointerEvent,
+      annotation: Extract<AnnotationModel, { kind: 'image' }>,
+      mode: ImageResizeMode,
+    ) => {
       event.preventDefault();
       event.stopPropagation();
       if (event.currentTarget.setPointerCapture) {
@@ -711,8 +839,11 @@ export default function CanvasPreview({
 
       annotationResizeRef.current = {
         annotation,
+        mode,
         startX: event.clientX,
         startY: event.clientY,
+        initialX: annotation.x,
+        initialY: annotation.y,
         initialWidth: annotation.width,
         initialHeight: annotation.height,
       };
@@ -804,9 +935,23 @@ export default function CanvasPreview({
     onStartCrop();
   }, [onStartCrop]);
 
-  const annotationScale = useMemo(() => {
-    return frameSize.height / Math.max(1, displayLayout.frameCrop.h);
-  }, [displayLayout.frameCrop.h, frameSize.height]);
+  const previewScale = Math.min(frameSize.width / Math.max(1, baseCrop.w), frameSize.height / Math.max(1, baseCrop.h));
+  const overlayWidth = baseCrop.w * previewScale;
+  const overlayHeight = baseCrop.h * previewScale;
+  const overlayOffsetX = (frameSize.width - overlayWidth) / 2;
+  const overlayOffsetY = (frameSize.height - overlayHeight) / 2;
+  const selectedImageAnnotation = activeAnnotations.find(
+    (annotation): annotation is Extract<AnnotationModel, { kind: 'image' }> =>
+      annotation.id === selectedAnnotationId && annotation.kind === 'image',
+  );
+  const selectedImageFrame = selectedImageAnnotation
+    ? {
+        left: overlayOffsetX + selectedImageAnnotation.x * previewScale,
+        top: overlayOffsetY + selectedImageAnnotation.y * previewScale,
+        width: selectedImageAnnotation.width * previewScale,
+        height: selectedImageAnnotation.height * previewScale,
+      }
+    : null;
 
   return (
     <section
@@ -1066,10 +1211,20 @@ export default function CanvasPreview({
                 )
               ) : null}
 
-              <div className="absolute inset-0 select-none">
+              <div
+                className="absolute select-none"
+                style={{
+                  left: `${overlayOffsetX}px`,
+                  top: `${overlayOffsetY}px`,
+                  width: `${baseCrop.w}px`,
+                  height: `${baseCrop.h}px`,
+                  transform: `scale(${previewScale})`,
+                  transformOrigin: 'top left',
+                }}
+              >
                 {activeAnnotations.map((annotation) => {
-                  const left = (annotation.x / Math.max(1, displayLayout.frameCrop.w)) * frameSize.width;
-                  const top = (annotation.y / Math.max(1, displayLayout.frameCrop.h)) * frameSize.height;
+                  const left = annotation.x;
+                  const top = annotation.y;
                   const selected = annotation.id === selectedAnnotationId;
 
                   if (annotation.kind === 'text') {
@@ -1105,11 +1260,11 @@ export default function CanvasPreview({
                           style={{
                             left: `${left}px`,
                             top: `${top}px`,
-                            minWidth: `${Math.min(Math.max(140, frameSize.width * 0.24), frameSize.width * 0.94)}px`,
-                            maxWidth: `${frameSize.width * 0.94}px`,
-                            minHeight: `${Math.max(44, annotationScale * 28)}px`,
+                            minWidth: `${Math.min(Math.max(140, baseCrop.w * 0.24), baseCrop.w * 0.94)}px`,
+                            maxWidth: `${baseCrop.w * 0.94}px`,
+                            minHeight: `${Math.max(44, baseCrop.h * 0.06)}px`,
                             resize: 'none',
-                            ...toTextStyle(annotation.style, annotationScale),
+                            ...toTextStyle(annotation.style, 1),
                           }}
                           aria-label={t('canvas.textContent')}
                         />
@@ -1129,7 +1284,7 @@ export default function CanvasPreview({
                         style={{
                           left: `${left}px`,
                           top: `${top}px`,
-                          ...toTextStyle(annotation.style, annotationScale),
+                          ...toTextStyle(annotation.style, 1),
                         }}
                       >
                         {annotation.text || t('canvas.textPlaceholder')}
@@ -1137,8 +1292,8 @@ export default function CanvasPreview({
                     );
                   }
 
-                  const width = (annotation.width / Math.max(1, displayLayout.frameCrop.w)) * frameSize.width;
-                  const height = (annotation.height / Math.max(1, displayLayout.frameCrop.h)) * frameSize.height;
+                  const width = annotation.width;
+                  const height = annotation.height;
 
                   return (
                     <div
@@ -1157,25 +1312,53 @@ export default function CanvasPreview({
                         onPointerDown={(event) => beginAnnotationDrag(event, annotation)}
                         className={`h-full w-full cursor-move select-none overflow-hidden border transition ${
                           selected
-                            ? 'border-cyan-200 ring-2 ring-cyan-300/80 ring-offset-2 ring-offset-black'
+                            ? 'border-cyan-200'
                             : 'border-slate-200/50'
                         }`}
                       >
-                        <img src={annotation.imageUrl} alt="" className="h-full w-full object-fill" />
+                        <img src={annotation.imageUrl} alt="" className="h-full w-full object-contain" />
                       </button>
-
-                      {selected ? (
-                        <button
-                          type="button"
-                          onPointerDown={(event) => beginImageResize(event, annotation)}
-                          className="absolute bottom-1 right-1 h-3.5 w-3.5 cursor-nwse-resize rounded-full border border-cyan-200 bg-slate-950"
-                          aria-label={t('canvas.resizeSouthEast')}
-                        />
-                      ) : null}
                     </div>
                   );
                 })}
               </div>
+
+              {selectedImageFrame && selectedImageAnnotation ? (
+                <div
+                  className="pointer-events-none absolute border-2 border-cyan-300/90 ring-1 ring-cyan-200/60"
+                  style={{
+                    left: `${selectedImageFrame.left}px`,
+                    top: `${selectedImageFrame.top}px`,
+                    width: `${Math.max(10, selectedImageFrame.width)}px`,
+                    height: `${Math.max(10, selectedImageFrame.height)}px`,
+                  }}
+                >
+                  <button
+                    type="button"
+                    onPointerDown={(event) => beginImageResize(event, selectedImageAnnotation, 'nw')}
+                    className="pointer-events-auto absolute -left-2 -top-2 h-4 w-4 cursor-nwse-resize rounded-full border border-cyan-200 bg-slate-950"
+                    aria-label={t('canvas.resizeNorthWest')}
+                  />
+                  <button
+                    type="button"
+                    onPointerDown={(event) => beginImageResize(event, selectedImageAnnotation, 'ne')}
+                    className="pointer-events-auto absolute -right-2 -top-2 h-4 w-4 cursor-nesw-resize rounded-full border border-cyan-200 bg-slate-950"
+                    aria-label={t('canvas.resizeNorthEast')}
+                  />
+                  <button
+                    type="button"
+                    onPointerDown={(event) => beginImageResize(event, selectedImageAnnotation, 'sw')}
+                    className="pointer-events-auto absolute -bottom-2 -left-2 h-4 w-4 cursor-nesw-resize rounded-full border border-cyan-200 bg-slate-950"
+                    aria-label={t('canvas.resizeSouthWest')}
+                  />
+                  <button
+                    type="button"
+                    onPointerDown={(event) => beginImageResize(event, selectedImageAnnotation, 'se')}
+                    className="pointer-events-auto absolute -bottom-2 -right-2 h-4 w-4 cursor-nwse-resize rounded-full border border-cyan-200 bg-slate-950"
+                    aria-label={t('canvas.resizeSouthEast')}
+                  />
+                </div>
+              ) : null}
             </>
           )}
         </div>
