@@ -12,8 +12,7 @@ import { Toolbar } from '@base-ui/react/toolbar';
 import { Check, Crop, Focus, Pause, Play, RotateCcw, SkipBack, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import TextStyleToolbar from './annotation/TextStyleToolbar';
-import type { AnnotationModel, AnnotationTextStyle, CropRect, TextAnnotation, VideoMeta } from '../types/editor';
+import type { AnnotationModel, AnnotationTextStyle, CropRect, VideoMeta } from '../types/editor';
 
 type DragMode = 'move' | 'n' | 's' | 'w' | 'e' | 'nw' | 'ne' | 'sw' | 'se';
 
@@ -27,7 +26,6 @@ interface CanvasPreviewProps {
   activeSceneCrop: CropRect | null;
   activeAnnotations: AnnotationModel[];
   selectedAnnotationId: string | null;
-  selectedTextAnnotation: TextAnnotation | null;
   hasActiveVideoSlice: boolean;
   editMode: 'idle' | 'crop' | 'scene';
   editCrop: CropRect | null;
@@ -39,9 +37,15 @@ interface CanvasPreviewProps {
   onCurrentTimeChange: (time: number) => void;
   onSelectedAnnotationIdChange: (annotationId: string | null) => void;
   onAnnotationPositionPreview: (annotationId: string, x: number, y: number) => void;
+  onAnnotationImageResizePreview: (
+    annotationId: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ) => void;
   onAnnotationPositionCommit: () => void;
-  onTextAnnotationChange: (text: string) => void;
-  onTextAnnotationStyleChange: (next: Partial<AnnotationTextStyle>) => void;
+  onTextAnnotationChange: (annotationId: string, text: string) => void;
   className?: string;
   fillHeight?: boolean;
 }
@@ -70,6 +74,14 @@ interface AnnotationDragState {
   initialY: number;
 }
 
+interface AnnotationResizeState {
+  annotation: Extract<AnnotationModel, { kind: 'image' }>;
+  startX: number;
+  startY: number;
+  initialWidth: number;
+  initialHeight: number;
+}
+
 interface PadBox {
   left: number;
   top: number;
@@ -89,6 +101,8 @@ interface FrameSize {
 }
 
 const MIN_CROP_SIZE = 24;
+const MIN_IMAGE_ANNOTATION_SIZE = 24;
+const DOUBLE_TAP_MS = 320;
 
 function clampRectToVideo(rect: CropRect, video: VideoMeta): CropRect {
   const x = Math.max(0, Math.min(video.width - 1, Math.round(rect.x)));
@@ -259,6 +273,19 @@ function clampAnnotationPosition(annotation: AnnotationModel, nextX: number, nex
   };
 }
 
+function clampImageAnnotationSize(annotation: Extract<AnnotationModel, { kind: 'image' }>, nextWidth: number, nextHeight: number, frameCrop: CropRect) {
+  return {
+    width: Math.max(
+      MIN_IMAGE_ANNOTATION_SIZE,
+      Math.min(Math.max(MIN_IMAGE_ANNOTATION_SIZE, frameCrop.w - annotation.x), Math.round(nextWidth)),
+    ),
+    height: Math.max(
+      MIN_IMAGE_ANNOTATION_SIZE,
+      Math.min(Math.max(MIN_IMAGE_ANNOTATION_SIZE, frameCrop.h - annotation.y), Math.round(nextHeight)),
+    ),
+  };
+}
+
 function toTextStyle(style: AnnotationTextStyle, scale: number): CSSProperties {
   const fontSize = Math.max(10, style.fontSize * scale);
   const outlineWidth = Math.max(0, style.outlineWidth * scale);
@@ -272,7 +299,6 @@ function toTextStyle(style: AnnotationTextStyle, scale: number): CSSProperties {
     whiteSpace: 'pre-wrap',
     backgroundColor: style.boxEnabled ? style.boxColor : 'transparent',
     padding: style.boxEnabled ? `${Math.max(2, fontSize * 0.14)}px ${Math.max(6, fontSize * 0.24)}px` : '0',
-    borderRadius: style.boxEnabled ? `${Math.max(2, fontSize * 0.14)}px` : '0',
     WebkitTextStroke: outlineWidth > 0 ? `${outlineWidth}px ${style.outlineColor}` : undefined,
   };
 }
@@ -287,7 +313,6 @@ export default function CanvasPreview({
   activeSceneCrop,
   activeAnnotations,
   selectedAnnotationId,
-  selectedTextAnnotation,
   hasActiveVideoSlice,
   editMode,
   editCrop,
@@ -299,9 +324,9 @@ export default function CanvasPreview({
   onCurrentTimeChange,
   onSelectedAnnotationIdChange,
   onAnnotationPositionPreview,
+  onAnnotationImageResizePreview,
   onAnnotationPositionCommit,
   onTextAnnotationChange,
-  onTextAnnotationStyleChange,
   className,
   fillHeight = false,
 }: CanvasPreviewProps) {
@@ -310,11 +335,17 @@ export default function CanvasPreview({
   const viewportRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
   const annotationDragRef = useRef<AnnotationDragState | null>(null);
+  const annotationResizeRef = useRef<AnnotationResizeState | null>(null);
+  const inlineEditorRef = useRef<HTMLTextAreaElement | null>(null);
+  const lastTapRef = useRef<{ annotationId: string; timestamp: number } | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const timelineTimeRef = useRef(currentTime);
   const lastFrameTimeRef = useRef<number | null>(null);
   const [dragging, setDragging] = useState(false);
   const [annotationDragging, setAnnotationDragging] = useState(false);
+  const [annotationResizing, setAnnotationResizing] = useState(false);
+  const [editingTextAnnotationId, setEditingTextAnnotationId] = useState<string | null>(null);
+  const [editingTextValue, setEditingTextValue] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
   const [viewport, setViewport] = useState<ViewportInfo>({
     scale: 1,
@@ -342,6 +373,41 @@ export default function CanvasPreview({
   useEffect(() => {
     timelineTimeRef.current = currentTime;
   }, [currentTime]);
+
+  useEffect(() => {
+    if (!editingTextAnnotationId) {
+      return;
+    }
+
+    const input = inlineEditorRef.current;
+    if (!input) {
+      return;
+    }
+
+    input.focus();
+    const cursor = input.value.length;
+    input.setSelectionRange(cursor, cursor);
+  }, [editingTextAnnotationId]);
+
+  useEffect(() => {
+    if (!editingTextAnnotationId) {
+      return;
+    }
+
+    const exists = activeAnnotations.some(
+      (annotation) => annotation.id === editingTextAnnotationId && annotation.kind === 'text',
+    );
+
+    if (!exists || isEditing) {
+      const timer = window.setTimeout(() => {
+        setEditingTextAnnotationId(null);
+      }, 0);
+
+      return () => {
+        window.clearTimeout(timer);
+      };
+    }
+  }, [activeAnnotations, editingTextAnnotationId, isEditing]);
 
   const displayLayout = useMemo(() => {
     return computeDisplayLayout(video, baseCrop, activeSceneCrop);
@@ -480,7 +546,7 @@ export default function CanvasPreview({
   }, [dragging, isEditing, onEditCropPreview, video, viewport.scale]);
 
   useEffect(() => {
-    if (!annotationDragging || isEditing) {
+    if (!annotationDragging || annotationResizing || isEditing) {
       return;
     }
 
@@ -517,7 +583,71 @@ export default function CanvasPreview({
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
     };
-  }, [annotationDragging, displayLayout.frameCrop, frameSize.height, frameSize.width, isEditing, onAnnotationPositionCommit, onAnnotationPositionPreview]);
+  }, [
+    annotationDragging,
+    annotationResizing,
+    displayLayout.frameCrop,
+    frameSize.height,
+    frameSize.width,
+    isEditing,
+    onAnnotationPositionCommit,
+    onAnnotationPositionPreview,
+  ]);
+
+  useEffect(() => {
+    if (!annotationResizing || isEditing) {
+      return;
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const current = annotationResizeRef.current;
+      if (!current || frameSize.width <= 0 || frameSize.height <= 0) {
+        return;
+      }
+
+      const dx = event.clientX - current.startX;
+      const dy = event.clientY - current.startY;
+      const dxFrame = (dx / frameSize.width) * displayLayout.frameCrop.w;
+      const dyFrame = (dy / frameSize.height) * displayLayout.frameCrop.h;
+
+      const resized = clampImageAnnotationSize(
+        current.annotation,
+        current.initialWidth + dxFrame,
+        current.initialHeight + dyFrame,
+        displayLayout.frameCrop,
+      );
+
+      onAnnotationImageResizePreview(
+        current.annotation.id,
+        current.annotation.x,
+        current.annotation.y,
+        resized.width,
+        resized.height,
+      );
+    };
+
+    const handlePointerUp = () => {
+      annotationResizeRef.current = null;
+      setAnnotationResizing(false);
+      onAnnotationPositionCommit();
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [
+    annotationResizing,
+    displayLayout.frameCrop,
+    frameSize.height,
+    frameSize.width,
+    isEditing,
+    onAnnotationImageResizePreview,
+    onAnnotationPositionCommit,
+  ]);
 
   const beginDrag = useCallback(
     (event: ReactPointerEvent, mode: DragMode) => {
@@ -539,6 +669,10 @@ export default function CanvasPreview({
 
   const beginAnnotationDrag = useCallback(
     (event: ReactPointerEvent, annotation: AnnotationModel) => {
+      if (editingTextAnnotationId === annotation.id || annotationResizing) {
+        return;
+      }
+
       event.preventDefault();
       event.stopPropagation();
 
@@ -553,7 +687,83 @@ export default function CanvasPreview({
       onSelectedAnnotationIdChange(annotation.id);
       setAnnotationDragging(true);
     },
+    [annotationResizing, editingTextAnnotationId, onSelectedAnnotationIdChange],
+  );
+
+  const beginImageResize = useCallback(
+    (event: ReactPointerEvent, annotation: Extract<AnnotationModel, { kind: 'image' }>) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      annotationResizeRef.current = {
+        annotation,
+        startX: event.clientX,
+        startY: event.clientY,
+        initialWidth: annotation.width,
+        initialHeight: annotation.height,
+      };
+
+      onSelectedAnnotationIdChange(annotation.id);
+      setAnnotationDragging(false);
+      setAnnotationResizing(true);
+    },
     [onSelectedAnnotationIdChange],
+  );
+
+  const startInlineTextEdit = useCallback(
+    (annotation: Extract<AnnotationModel, { kind: 'text' }>) => {
+      setEditingTextAnnotationId(annotation.id);
+      setEditingTextValue(annotation.text);
+      onSelectedAnnotationIdChange(annotation.id);
+      setAnnotationDragging(false);
+      setAnnotationResizing(false);
+    },
+    [onSelectedAnnotationIdChange],
+  );
+
+  const cancelInlineTextEdit = useCallback(() => {
+    setEditingTextAnnotationId(null);
+  }, []);
+
+  const commitInlineTextEdit = useCallback(() => {
+    if (!editingTextAnnotationId) {
+      return;
+    }
+
+    onTextAnnotationChange(editingTextAnnotationId, editingTextValue);
+    setEditingTextAnnotationId(null);
+  }, [editingTextAnnotationId, editingTextValue, onTextAnnotationChange]);
+
+  const handleTextPointerDown = useCallback(
+    (event: ReactPointerEvent, annotation: Extract<AnnotationModel, { kind: 'text' }>) => {
+      if (event.detail >= 2) {
+        startInlineTextEdit(annotation);
+        return;
+      }
+
+      if (event.pointerType === 'touch') {
+        const now = Date.now();
+        const previousTap = lastTapRef.current;
+
+        if (
+          previousTap &&
+          previousTap.annotationId === annotation.id &&
+          now - previousTap.timestamp <= DOUBLE_TAP_MS
+        ) {
+          lastTapRef.current = null;
+          startInlineTextEdit(annotation);
+          return;
+        }
+
+        lastTapRef.current = {
+          annotationId: annotation.id,
+          timestamp: now,
+        };
+      }
+
+      beginAnnotationDrag(event, annotation);
+    },
+    [beginAnnotationDrag, startInlineTextEdit],
   );
 
   const handleTogglePlay = useCallback(() => {
@@ -665,15 +875,6 @@ export default function CanvasPreview({
           )}
         </div>
 
-        {!isEditing ? (
-          <div className="flex justify-end">
-            <TextStyleToolbar
-              selectedTextAnnotation={selectedTextAnnotation}
-              onTextChange={onTextAnnotationChange}
-              onStyleChange={onTextAnnotationStyleChange}
-            />
-          </div>
-        ) : null}
       </div>
 
       <div className="flex flex-1 items-center justify-center overflow-hidden rounded-md border border-slate-800 bg-black/95 p-1">
@@ -835,11 +1036,54 @@ export default function CanvasPreview({
                   const selected = annotation.id === selectedAnnotationId;
 
                   if (annotation.kind === 'text') {
+                    const isInlineEditing = editingTextAnnotationId === annotation.id;
+
+                    if (isInlineEditing) {
+                      return (
+                        <textarea
+                          key={annotation.id}
+                          ref={(node) => {
+                            inlineEditorRef.current = node;
+                          }}
+                          value={editingTextValue}
+                          onChange={(event) => setEditingTextValue(event.target.value)}
+                          onBlur={commitInlineTextEdit}
+                          onPointerDown={(event) => {
+                            event.stopPropagation();
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' && !event.shiftKey) {
+                              event.preventDefault();
+                              commitInlineTextEdit();
+                              return;
+                            }
+
+                            if (event.key === 'Escape') {
+                              event.preventDefault();
+                              cancelInlineTextEdit();
+                            }
+                          }}
+                          className="absolute max-w-[94%] border border-cyan-200 bg-slate-900/95 text-left outline-none ring-2 ring-cyan-300/80 ring-offset-2 ring-offset-black"
+                          style={{
+                            left: `${left}px`,
+                            top: `${top}px`,
+                            minWidth: `${Math.min(Math.max(140, frameSize.width * 0.24), frameSize.width * 0.94)}px`,
+                            maxWidth: `${frameSize.width * 0.94}px`,
+                            minHeight: `${Math.max(44, annotationScale * 28)}px`,
+                            resize: 'none',
+                            ...toTextStyle(annotation.style, annotationScale),
+                          }}
+                          aria-label={t('canvas.textContent')}
+                        />
+                      );
+                    }
+
                     return (
                       <button
                         key={annotation.id}
                         type="button"
-                        onPointerDown={(event) => beginAnnotationDrag(event, annotation)}
+                        onPointerDown={(event) => handleTextPointerDown(event, annotation)}
+                        onDoubleClick={() => startInlineTextEdit(annotation)}
                         className={`absolute max-w-[94%] cursor-move text-left transition ${
                           selected ? 'ring-2 ring-cyan-300/80 ring-offset-2 ring-offset-black' : ''
                         }`}
@@ -849,7 +1093,7 @@ export default function CanvasPreview({
                           ...toTextStyle(annotation.style, annotationScale),
                         }}
                       >
-                        {annotation.text}
+                        {annotation.text || t('canvas.textPlaceholder')}
                       </button>
                     );
                   }
@@ -858,13 +1102,9 @@ export default function CanvasPreview({
                   const height = (annotation.height / Math.max(1, displayLayout.frameCrop.h)) * frameSize.height;
 
                   return (
-                    <button
+                    <div
                       key={annotation.id}
-                      type="button"
-                      onPointerDown={(event) => beginAnnotationDrag(event, annotation)}
-                      className={`absolute cursor-move overflow-hidden rounded-sm border transition ${
-                        selected ? 'border-cyan-200 ring-2 ring-cyan-300/80 ring-offset-2 ring-offset-black' : 'border-slate-200/50'
-                      }`}
+                      className="absolute"
                       style={{
                         left: `${left}px`,
                         top: `${top}px`,
@@ -872,8 +1112,27 @@ export default function CanvasPreview({
                         height: `${Math.max(10, height)}px`,
                       }}
                     >
-                      <img src={annotation.imageUrl} alt="" className="h-full w-full object-contain" />
-                    </button>
+                      <button
+                        type="button"
+                        onPointerDown={(event) => beginAnnotationDrag(event, annotation)}
+                        className={`h-full w-full cursor-move overflow-hidden rounded-sm border transition ${
+                          selected
+                            ? 'border-cyan-200 ring-2 ring-cyan-300/80 ring-offset-2 ring-offset-black'
+                            : 'border-slate-200/50'
+                        }`}
+                      >
+                        <img src={annotation.imageUrl} alt="" className="h-full w-full object-contain" />
+                      </button>
+
+                      {selected ? (
+                        <button
+                          type="button"
+                          onPointerDown={(event) => beginImageResize(event, annotation)}
+                          className="absolute -bottom-2 -right-2 h-4 w-4 cursor-nwse-resize rounded-full border border-cyan-200 bg-slate-950"
+                          aria-label={t('canvas.resizeSouthEast')}
+                        />
+                      ) : null}
+                    </div>
                   );
                 })}
               </div>

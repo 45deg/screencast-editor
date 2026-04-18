@@ -24,9 +24,7 @@ import {
   getSourceTimeAtTimelineTime,
   getTotalDuration,
   type AnnotationModel,
-  type AnnotationTextStyle,
   type CropRect,
-  type TextAnnotation,
   type SliceModel,
   type VideoMeta,
 } from './types/editor';
@@ -111,6 +109,24 @@ function clampAnnotationPosition(annotation: AnnotationModel, nextX: number, nex
   return {
     x: Math.max(0, Math.min(baseCrop.w - 8, Math.round(nextX))),
     y: Math.max(0, Math.min(baseCrop.h - 8, Math.round(nextY))),
+  };
+}
+
+function clampImageAnnotationRect(
+  baseCrop: CropRect,
+  nextX: number,
+  nextY: number,
+  nextWidth: number,
+  nextHeight: number,
+) {
+  const width = Math.max(24, Math.min(baseCrop.w, Math.round(nextWidth)));
+  const height = Math.max(24, Math.min(baseCrop.h, Math.round(nextHeight)));
+
+  return {
+    x: Math.max(0, Math.min(baseCrop.w - width, Math.round(nextX))),
+    y: Math.max(0, Math.min(baseCrop.h - height, Math.round(nextY))),
+    width,
+    height,
   };
 }
 
@@ -265,15 +281,6 @@ export default function App() {
     () => getActiveAnnotationsAtTimelineTime(annotations, currentTime),
     [annotations, currentTime],
   );
-
-  const selectedTextAnnotation = useMemo(() => {
-    const selected = annotations.find((annotation) => annotation.id === selectedAnnotationId);
-    if (!selected || selected.kind !== 'text') {
-      return null;
-    }
-
-    return selected;
-  }, [annotations, selectedAnnotationId]);
 
   const hasVideo = Boolean(video && baseCrop);
   const totalDuration = useMemo(() => getTotalDuration(slices, annotations), [annotations, slices]);
@@ -506,7 +513,7 @@ export default function App() {
     }
 
     const annotationId = crypto.randomUUID();
-    const nextAnnotation: TextAnnotation = {
+    const nextAnnotation: AnnotationModel = {
       id: annotationId,
       kind: 'text',
       start: currentTime,
@@ -617,6 +624,33 @@ export default function App() {
     [annotations, baseCrop, replaceAnnotationsPreview],
   );
 
+  const handleAnnotationImageResizePreview = useCallback(
+    (annotationId: string, x: number, y: number, width: number, height: number) => {
+      if (!baseCrop) {
+        return;
+      }
+
+      const nextAnnotations = annotations.map((annotation) => {
+        if (annotation.id !== annotationId || annotation.kind !== 'image') {
+          return annotation;
+        }
+
+        const clamped = clampImageAnnotationRect(baseCrop, x, y, width, height);
+        return {
+          ...annotation,
+          x: clamped.x,
+          y: clamped.y,
+          width: clamped.width,
+          height: clamped.height,
+        };
+      });
+
+      pendingAnnotationPreviewRef.current = nextAnnotations;
+      replaceAnnotationsPreview(nextAnnotations);
+    },
+    [annotations, baseCrop, replaceAnnotationsPreview],
+  );
+
   const handleAnnotationPositionCommit = useCallback(() => {
     const pending = pendingAnnotationPreviewRef.current;
     if (!pending) {
@@ -628,13 +662,17 @@ export default function App() {
   }, [replaceAnnotationsCommit, selectedAnnotationId]);
 
   const handleTextAnnotationChange = useCallback(
-    (text: string) => {
-      if (!selectedTextAnnotation) {
+    (annotationId: string, text: string) => {
+      const selected = annotations.find(
+        (annotation) => annotation.id === annotationId && annotation.kind === 'text',
+      );
+
+      if (!selected) {
         return;
       }
 
       const nextAnnotations = annotations.map((annotation) => {
-        if (annotation.id !== selectedTextAnnotation.id || annotation.kind !== 'text') {
+        if (annotation.id !== selected.id || annotation.kind !== 'text') {
           return annotation;
         }
 
@@ -644,36 +682,9 @@ export default function App() {
         };
       });
 
-      replaceAnnotationsCommit(nextAnnotations, selectedTextAnnotation.id);
+      replaceAnnotationsCommit(nextAnnotations, selected.id);
     },
-    [annotations, replaceAnnotationsCommit, selectedTextAnnotation],
-  );
-
-  const handleTextAnnotationStyleChange = useCallback(
-    (nextStyle: Partial<AnnotationTextStyle>) => {
-      if (!selectedTextAnnotation) {
-        return;
-      }
-
-      const nextAnnotations = annotations.map((annotation) => {
-        if (annotation.id !== selectedTextAnnotation.id || annotation.kind !== 'text') {
-          return annotation;
-        }
-
-        return {
-          ...annotation,
-          style: {
-            ...annotation.style,
-            ...nextStyle,
-            fontSize: Math.max(8, Math.min(180, Math.round(nextStyle.fontSize ?? annotation.style.fontSize))),
-            outlineWidth: Math.max(0, Math.min(24, nextStyle.outlineWidth ?? annotation.style.outlineWidth)),
-          },
-        };
-      });
-
-      replaceAnnotationsCommit(nextAnnotations, selectedTextAnnotation.id);
-    },
-    [annotations, replaceAnnotationsCommit, selectedTextAnnotation],
+    [annotations, replaceAnnotationsCommit],
   );
 
   const createCommandPreview = useCallback(
@@ -1075,7 +1086,6 @@ export default function App() {
                       activeSceneCrop={activeSceneCrop}
                       activeAnnotations={activeAnnotations}
                       selectedAnnotationId={selectedAnnotationId}
-                      selectedTextAnnotation={selectedTextAnnotation}
                       hasActiveVideoSlice={Boolean(previewSlice)}
                       editMode={cropEditMode}
                       editCrop={effectiveEditCrop}
@@ -1087,9 +1097,9 @@ export default function App() {
                       onCurrentTimeChange={setCurrentTime}
                       onSelectedAnnotationIdChange={handleSelectedAnnotationChange}
                       onAnnotationPositionPreview={handleAnnotationPositionPreview}
+                      onAnnotationImageResizePreview={handleAnnotationImageResizePreview}
                       onAnnotationPositionCommit={handleAnnotationPositionCommit}
                       onTextAnnotationChange={handleTextAnnotationChange}
-                      onTextAnnotationStyleChange={handleTextAnnotationStyleChange}
                       className="h-full"
                       fillHeight
                     />

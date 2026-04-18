@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import { motion, type PanInfo } from 'framer-motion';
-import { useTranslation } from 'react-i18next';
 
 import { captureVideoThumbnail } from '../lib/videoThumbnail';
 import {
@@ -182,7 +181,6 @@ export default function SliceEditorTimeline({
   className,
   fillHeight = false,
 }: SliceEditorProps) {
-  const { t } = useTranslation();
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [zoomSlider, setZoomSlider] = useState(0);
   const zoom = useMemo(() => Math.pow(2, zoomSlider), [zoomSlider]);
@@ -626,7 +624,6 @@ export default function SliceEditorTimeline({
         </motion.div>
       </div>
 
-      <div className="border-t border-slate-800/90 px-3 py-1 text-[11px] text-slate-500">{t('sliceEditor.gapIsBlack')}</div>
     </section>
   );
 }

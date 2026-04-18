@@ -151,7 +151,9 @@ export function buildFfmpegCommand(input: BuildFfmpegCommandInput): BuildFfmpegC
     const inputLabel = `${index + 1}:v`;
     const outputLabel = `overlay_${index}`;
     const enable = `between(t,${formatFloat(overlay.start)},${formatFloat(overlay.end)})`;
-    graphParts.push(`[${composedLabel}][${inputLabel}]overlay=0:0:enable='${enable}'[${outputLabel}]`);
+    graphParts.push(
+      `[${composedLabel}][${inputLabel}]overlay=0:0:shortest=1:eof_action=pass:repeatlast=0:enable='${enable}'[${outputLabel}]`,
+    );
     composedLabel = outputLabel;
   }
 

@@ -14,6 +14,8 @@ interface FfmpegRunResult {
   stderr: string;
 }
 
+const FFMPEG_TIMEOUT_MS = 30_000;
+
 const ffmpegAvailable = spawnSync('ffmpeg', ['-version'], { stdio: 'ignore' }).status === 0;
 const describeIfFfmpeg = ffmpegAvailable ? describe : describe.skip;
 
@@ -25,6 +27,12 @@ function runFfmpeg(args: string[]): Promise<FfmpegRunResult> {
 
     let stdout = '';
     let stderr = '';
+    let killedForTimeout = false;
+
+    const timeout = setTimeout(() => {
+      killedForTimeout = true;
+      child.kill('SIGKILL');
+    }, FFMPEG_TIMEOUT_MS);
 
     child.stdout.on('data', (chunk) => {
       stdout += chunk.toString();
@@ -36,6 +44,17 @@ function runFfmpeg(args: string[]): Promise<FfmpegRunResult> {
 
     child.on('error', reject);
     child.on('close', (code) => {
+      clearTimeout(timeout);
+
+      if (killedForTimeout) {
+        resolve({
+          code: -1,
+          stdout,
+          stderr: `${stderr}\nffmpeg timed out after ${FFMPEG_TIMEOUT_MS}ms`,
+        });
+        return;
+      }
+
       resolve({
         code: code ?? -1,
         stdout,
@@ -107,6 +126,7 @@ function createExportSettings(format: 'gif' | 'mp4', overrides: Partial<ExportSe
 describeIfFfmpeg('FFmpeg command integration', () => {
   let tempDir = '';
   let fixtureInput = '';
+  let overlayFixture = '';
 
   const baseCrop: CropRect = {
     x: 0,
@@ -118,6 +138,7 @@ describeIfFfmpeg('FFmpeg command integration', () => {
   beforeAll(async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'screencast-editor-ffmpeg-'));
     fixtureInput = join(tempDir, 'fixture-input.mp4');
+    overlayFixture = join(tempDir, 'fixture-overlay.png');
 
     const fixture = await runFfmpeg([
       '-f',
@@ -129,6 +150,21 @@ describeIfFfmpeg('FFmpeg command integration', () => {
       fixtureInput,
     ]);
     assertFfmpegSucceeded(fixture, 'fixture generation');
+
+    const overlay = await runFfmpeg([
+      '-f',
+      'lavfi',
+      '-i',
+      'color=c=black@0.0:s=640x360:d=0.1',
+      '-vf',
+      'drawbox=x=24:y=24:w=280:h=86:color=red@0.9:t=fill,drawbox=x=32:y=32:w=264:h=70:color=black@0.4:t=fill',
+      '-frames:v',
+      '1',
+      '-pix_fmt',
+      'rgba',
+      overlayFixture,
+    ]);
+    assertFfmpegSucceeded(overlay, 'overlay fixture generation');
 
   });
 
@@ -175,6 +211,36 @@ describeIfFfmpeg('FFmpeg command integration', () => {
 
     const result = await runFfmpeg(built.execArgs);
     assertFfmpegSucceeded(result, 'MP4 export');
+
+    const info = await stat(output);
+    expect(info.size).toBeGreaterThan(0);
+  });
+
+  it('exports MP4 with overlay input (text raster equivalent)', async () => {
+    const output = join(tempDir, 'case-mp4-overlay.mp4');
+    const built = buildFfmpegCommand({
+      video: createVideoMeta('fixture-input.mp4'),
+      slices: createSlices(),
+      globalCrop: baseCrop,
+      exportSettings: createExportSettings('mp4', {
+        width: 640,
+        height: 360,
+        mp4Fps: 30,
+      }),
+      inputFileName: fixtureInput,
+      outputFileName: output,
+      overlayInputs: [
+        {
+          fileName: overlayFixture,
+          start: 0.4,
+          end: 2.6,
+        },
+      ],
+      outputDuration: 3,
+    });
+
+    const result = await runFfmpeg(built.execArgs);
+    assertFfmpegSucceeded(result, 'MP4 export with overlay input');
 
     const info = await stat(output);
     expect(info.size).toBeGreaterThan(0);

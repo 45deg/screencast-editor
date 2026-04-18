@@ -1,6 +1,6 @@
 import { useMemo, useRef } from 'react';
 import { motion, type PanInfo } from 'framer-motion';
-import { Crop, Image as ImageIcon, Type } from 'lucide-react';
+import { Crop, Image as ImageIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type {
@@ -32,10 +32,24 @@ interface TimelineTracksProps {
 
 const VIDEO_TRACK_TOP = 28;
 const VIDEO_TRACK_HEIGHT = 116;
-const TEXT_TRACK_TOP = VIDEO_TRACK_TOP + VIDEO_TRACK_HEIGHT + 10;
-const TEXT_TRACK_HEIGHT = 44;
-const IMAGE_TRACK_TOP = TEXT_TRACK_TOP + TEXT_TRACK_HEIGHT + 8;
-const IMAGE_TRACK_HEIGHT = 44;
+const TRACK_GAP = 10;
+const ANNOTATION_TRACK_PADDING = 6;
+const ANNOTATION_ROW_HEIGHT = 30;
+const ANNOTATION_ROW_GAP = 4;
+const MIN_ANNOTATION_TRACK_HEIGHT = 40;
+const MIN_ANNOTATION_BLOCK_WIDTH = 40;
+const OVERLAP_EPSILON = 0.0001;
+
+interface AnnotationPlacement<T extends DerivedAnnotation> {
+  annotation: T;
+  row: number;
+}
+
+interface AnnotationTrackLayout<T extends DerivedAnnotation> {
+  placements: AnnotationPlacement<T>[];
+  rowCount: number;
+  trackHeight: number;
+}
 
 function isTextAnnotation(annotation: DerivedAnnotation): annotation is DerivedAnnotation<TextAnnotation> {
   return annotation.kind === 'text';
@@ -45,18 +59,72 @@ function isImageAnnotation(annotation: DerivedAnnotation): annotation is Derived
   return annotation.kind === 'image';
 }
 
-function LayerLabel({ title, subtitle }: { title: string; subtitle?: string }) {
-  return (
-    <div className="pointer-events-none absolute left-2 top-1 z-40 rounded border border-slate-700/90 bg-slate-950/90 px-2 py-0.5 text-[10px] leading-tight text-slate-400">
-      <div className="font-semibold tracking-wide text-slate-300">{title}</div>
-      {subtitle ? <div>{subtitle}</div> : null}
-    </div>
+function buildAnnotationTrackLayout<T extends DerivedAnnotation>(annotations: T[]): AnnotationTrackLayout<T> {
+  if (!annotations.length) {
+    return {
+      placements: [],
+      rowCount: 1,
+      trackHeight: MIN_ANNOTATION_TRACK_HEIGHT,
+    };
+  }
+
+  const rows: Array<Array<{ start: number; end: number }>> = [];
+  const rowById = new Map<string, number>();
+
+  const prioritized = annotations
+    .map((annotation, index) => ({ annotation, priority: index }))
+    .sort((a, b) => b.priority - a.priority);
+
+  for (const item of prioritized) {
+    const { annotation } = item;
+    let row = 0;
+
+    while (true) {
+      const segments = rows[row] ?? [];
+      const overlaps = segments.some(
+        (segment) =>
+          annotation.start < segment.end - OVERLAP_EPSILON && segment.start < annotation.end - OVERLAP_EPSILON,
+      );
+
+      if (!overlaps) {
+        break;
+      }
+
+      row += 1;
+    }
+
+    if (!rows[row]) {
+      rows[row] = [];
+    }
+
+    rows[row].push({ start: annotation.start, end: annotation.end });
+    rowById.set(annotation.id, row);
+  }
+
+  const rowCount = Math.max(1, rows.length);
+  const trackHeight = Math.max(
+    MIN_ANNOTATION_TRACK_HEIGHT,
+    ANNOTATION_TRACK_PADDING * 2 + rowCount * ANNOTATION_ROW_HEIGHT + Math.max(0, rowCount - 1) * ANNOTATION_ROW_GAP,
   );
+
+  return {
+    placements: annotations.map((annotation) => ({
+      annotation,
+      row: rowById.get(annotation.id) ?? 0,
+    })),
+    rowCount,
+    trackHeight,
+  };
+}
+
+function getAnnotationRowTop(row: number): number {
+  return ANNOTATION_TRACK_PADDING + row * (ANNOTATION_ROW_HEIGHT + ANNOTATION_ROW_GAP);
 }
 
 function TextLayerBlock({
   annotation,
   pixelsPerSecond,
+  row,
   selected,
   onSelect,
   onMove,
@@ -64,6 +132,7 @@ function TextLayerBlock({
 }: {
   annotation: DerivedAnnotation<TextAnnotation>;
   pixelsPerSecond: number;
+  row: number;
   selected: boolean;
   onSelect: () => void;
   onMove: (nextStart: number) => void;
@@ -81,7 +150,9 @@ function TextLayerBlock({
       }`}
       style={{
         left: `${annotation.start * pixelsPerSecond}px`,
-        width: `${Math.max(40, annotation.duration * pixelsPerSecond)}px`,
+        width: `${Math.max(MIN_ANNOTATION_BLOCK_WIDTH, annotation.duration * pixelsPerSecond)}px`,
+        top: `${getAnnotationRowTop(row)}px`,
+        height: `${ANNOTATION_ROW_HEIGHT}px`,
         touchAction: 'none',
       }}
       onPointerDown={(event) => {
@@ -106,6 +177,7 @@ function TextLayerBlock({
 function ImageLayerBlock({
   annotation,
   pixelsPerSecond,
+  row,
   selected,
   onSelect,
   onMove,
@@ -113,6 +185,7 @@ function ImageLayerBlock({
 }: {
   annotation: DerivedAnnotation<ImageAnnotation>;
   pixelsPerSecond: number;
+  row: number;
   selected: boolean;
   onSelect: () => void;
   onMove: (nextStart: number) => void;
@@ -130,7 +203,9 @@ function ImageLayerBlock({
       }`}
       style={{
         left: `${annotation.start * pixelsPerSecond}px`,
-        width: `${Math.max(40, annotation.duration * pixelsPerSecond)}px`,
+        width: `${Math.max(MIN_ANNOTATION_BLOCK_WIDTH, annotation.duration * pixelsPerSecond)}px`,
+        top: `${getAnnotationRowTop(row)}px`,
+        height: `${ANNOTATION_ROW_HEIGHT}px`,
         touchAction: 'none',
       }}
       onPointerDown={(event) => {
@@ -180,9 +255,17 @@ export default function TimelineTracks({
   const safeOutputAspectRatio = Number.isFinite(outputAspectRatio) && outputAspectRatio > 0 ? outputAspectRatio : 16 / 9;
   const textAnnotations = useMemo(() => annotationsWithPos.filter(isTextAnnotation), [annotationsWithPos]);
   const imageAnnotations = useMemo(() => annotationsWithPos.filter(isImageAnnotation), [annotationsWithPos]);
+  const textTrackLayout = useMemo(() => buildAnnotationTrackLayout(textAnnotations), [textAnnotations]);
+  const imageTrackLayout = useMemo(() => buildAnnotationTrackLayout(imageAnnotations), [imageAnnotations]);
+
+  const textTrackTop = VIDEO_TRACK_TOP + VIDEO_TRACK_HEIGHT + TRACK_GAP;
+  const imageTrackTop = textTrackTop + textTrackLayout.trackHeight + TRACK_GAP;
+  const timelineHeight = imageTrackTop + imageTrackLayout.trackHeight + 12;
 
   return (
     <>
+      <div aria-hidden className="pointer-events-none" style={{ height: `${timelineHeight}px` }} />
+
       <div
         className="absolute inset-x-0 border-y border-slate-800/70 bg-black/70"
         style={{
@@ -190,7 +273,6 @@ export default function TimelineTracks({
           height: `${VIDEO_TRACK_HEIGHT}px`,
         }}
       >
-        <LayerLabel title={t('sliceEditor.videoTrack')} subtitle={t('sliceEditor.gapIsBlack')} />
         {slicesWithPos.map((slice, index) => {
           const isSelected = slice.id === selectedSliceId;
           const thumbnailUrl = thumbnailUrls[slice.id];
@@ -294,16 +376,16 @@ export default function TimelineTracks({
       <div
         className="absolute inset-x-0 border border-rose-950/60 bg-rose-950/35"
         style={{
-          top: `${TEXT_TRACK_TOP}px`,
-          height: `${TEXT_TRACK_HEIGHT}px`,
+          top: `${textTrackTop}px`,
+          height: `${textTrackLayout.trackHeight}px`,
         }}
       >
-        <LayerLabel title={t('sliceEditor.textTrack')} />
-        {textAnnotations.map((annotation) => (
+        {textTrackLayout.placements.map(({ annotation, row }) => (
           <TextLayerBlock
             key={annotation.id}
             annotation={annotation}
             pixelsPerSecond={pixelsPerSecond}
+            row={row}
             selected={annotation.id === selectedAnnotationId}
             onSelect={() => {
               setSelectedSliceId(null);
@@ -318,16 +400,16 @@ export default function TimelineTracks({
       <div
         className="absolute inset-x-0 border border-amber-900/60 bg-amber-900/35"
         style={{
-          top: `${IMAGE_TRACK_TOP}px`,
-          height: `${IMAGE_TRACK_HEIGHT}px`,
+          top: `${imageTrackTop}px`,
+          height: `${imageTrackLayout.trackHeight}px`,
         }}
       >
-        <LayerLabel title={t('sliceEditor.imageTrack')} />
-        {imageAnnotations.map((annotation) => (
+        {imageTrackLayout.placements.map(({ annotation, row }) => (
           <ImageLayerBlock
             key={annotation.id}
             annotation={annotation}
             pixelsPerSecond={pixelsPerSecond}
+            row={row}
             selected={annotation.id === selectedAnnotationId}
             onSelect={() => {
               setSelectedSliceId(null);
@@ -337,13 +419,6 @@ export default function TimelineTracks({
             onMoveEnd={onMoveAnnotationEnd}
           />
         ))}
-      </div>
-
-      <div className="pointer-events-none absolute left-2 text-[10px] text-slate-500" style={{ top: `${IMAGE_TRACK_TOP + IMAGE_TRACK_HEIGHT + 7}px` }}>
-        <span className="inline-flex items-center gap-1">
-          <Type size={11} />
-          {t('sliceEditor.layerHint')}
-        </span>
       </div>
     </>
   );
