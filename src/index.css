@@ -35,27 +35,3 @@ h5,
 h6 {
 	font-family: "Space Grotesk", "IBM Plex Sans JP", sans-serif;
 }
-
-button,
-input,
-select,
-textarea {
-	font: inherit;
-}
-
-.timeline-scrollbar::-webkit-scrollbar {
-	height: 10px;
-}
-
-.timeline-scrollbar::-webkit-scrollbar-track {
-	background: #0f172a;
-}
-
-.timeline-scrollbar::-webkit-scrollbar-thumb {
-	background: #334155;
-	border: 2px solid #0f172a;
-}
-
-.timeline-scrollbar::-webkit-scrollbar-thumb:hover {
-	background: #475569;
-}

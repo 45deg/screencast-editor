@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Popover } from '@base-ui/react/popover';
 import { Drawer } from '@base-ui/react/drawer';
-import { ChevronLeft, Download, X } from 'lucide-react';
+import { ChevronLeft, CircleHelp, Download, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Group, Panel, Separator } from 'react-resizable-panels';
 
@@ -576,8 +577,8 @@ export default function App() {
         <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_10%_8%,rgba(34,211,238,0.2),transparent_38%),radial-gradient(circle_at_92%_4%,rgba(16,185,129,0.2),transparent_30%)]" />
 
         <header className="fixed inset-x-0 top-0 z-30 border-b border-slate-800/70 bg-slate-950/88 backdrop-blur">
-          <div className="mx-auto flex h-16 w-full max-w-[1800px] flex-wrap items-center justify-between gap-3 px-4 sm:px-6">
-            <div className="flex items-center gap-3">
+          <div className="flex h-16 w-full items-center gap-3 px-4 sm:px-6">
+            <div className="flex min-w-0 items-center gap-3">
               {hasVideo ? (
                 <button
                   type="button"
@@ -591,7 +592,36 @@ export default function App() {
               <h1 className="font-['Space_Grotesk',sans-serif] text-xl font-bold">Screencast Editor</h1>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="ml-auto flex shrink-0 items-center gap-2">
+              {hasVideo && video ? (
+                <Popover.Root>
+                  <Popover.Trigger
+                    type="button"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-800/85 bg-slate-950/78 text-slate-300 shadow-lg backdrop-blur transition hover:border-cyan-400/60 hover:bg-slate-900 hover:text-cyan-100"
+                    aria-label={t('canvas.sourceInfo')}
+                    title={t('canvas.sourceInfo')}
+                  >
+                    <CircleHelp size={18} />
+                  </Popover.Trigger>
+                  <Popover.Portal>
+                    <Popover.Positioner side="bottom" align="end" sideOffset={10} className="z-[120]">
+                      <Popover.Popup className="z-[120] w-[min(68vw,420px)] rounded-xl border border-slate-800 bg-slate-950/98 p-3 shadow-2xl backdrop-blur">
+                        <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-300/80">
+                          {t('canvas.source')}
+                        </div>
+                        <div className="truncate text-sm font-medium text-white" title={video.file.name}>
+                          {video.file.name}
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-400">
+                          {videoInfoItems.map((item) => (
+                            <span key={item}>{item}</span>
+                          ))}
+                        </div>
+                      </Popover.Popup>
+                    </Popover.Positioner>
+                  </Popover.Portal>
+                </Popover.Root>
+              ) : null}
               {hasVideo && baseCrop ? (
                 <Drawer.Trigger
                   className="inline-flex items-center gap-1 rounded-md border border-amber-300/40 bg-amber-400/15 px-3 py-2 text-xs font-medium text-amber-100 transition hover:bg-amber-400/25 lg:hidden"
@@ -610,18 +640,6 @@ export default function App() {
               <Group orientation="vertical" className="h-full min-h-0">
                 <Panel defaultSize="52%" minSize="12rem" className="min-h-0">
                   <section className="relative h-full min-h-0 px-1 pt-1 lg:pr-1">
-                    <div className="absolute left-3 top-3 z-20 max-w-[min(68vw,420px)] rounded-md border border-slate-800/85 bg-slate-950/78 px-2.5 py-1.5 shadow-lg backdrop-blur">
-                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-300/80">Source</div>
-                      <div className="truncate text-sm font-medium text-white" title={video.file.name}>
-                        {video.file.name}
-                      </div>
-                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-400">
-                        {videoInfoItems.map((item) => (
-                          <span key={item}>{item}</span>
-                        ))}
-                      </div>
-                    </div>
-
                     <CanvasPreview
                       video={video}
                       fileName={video.file.name}
