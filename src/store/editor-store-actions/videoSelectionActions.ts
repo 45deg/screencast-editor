@@ -1,0 +1,83 @@
+import { getTotalDuration, type SliceModel } from '../../types/editor';
+import { DEFAULT_EXPORT_SETTINGS, normalizeSelectedAnnotationId, normalizeSelectedSliceId } from '../editorStoreHelpers';
+import type { EditorStoreGet, EditorStoreSet, VideoSelectionActions } from './types';
+
+export function createVideoSelectionActions(
+  set: EditorStoreSet,
+  get: EditorStoreGet,
+): VideoSelectionActions {
+  return {
+    setVideo: (video) => {
+      const initialWidth = Math.max(1, Math.round(video.width));
+      const initialHeight = Math.max(1, Math.round(video.height));
+
+      const initialSlice: SliceModel = {
+        id: crypto.randomUUID(),
+        timelineStart: 0,
+        sourceStart: 0,
+        sourceEnd: video.duration,
+        duration: video.duration,
+        crop: null,
+      };
+
+      set({
+        video,
+        slices: [initialSlice],
+        annotations: [],
+        currentTime: 0,
+        selectedSliceId: null,
+        selectedAnnotationId: null,
+        globalCrop: null,
+        exportSettings: {
+          ...DEFAULT_EXPORT_SETTINGS,
+          width: initialWidth,
+          height: initialHeight,
+        },
+        ffmpegStatus: 'idle',
+        ffmpegError: null,
+        past: [],
+        future: [],
+      });
+    },
+
+    clearVideo: () => {
+      set({
+        video: null,
+        slices: [],
+        annotations: [],
+        currentTime: 0,
+        selectedSliceId: null,
+        selectedAnnotationId: null,
+        globalCrop: null,
+        exportSettings: DEFAULT_EXPORT_SETTINGS,
+        ffmpegStatus: 'idle',
+        ffmpegError: null,
+        past: [],
+        future: [],
+      });
+    },
+
+    setCurrentTime: (time) => {
+      const state = get();
+      const totalDuration = getTotalDuration(state.slices, state.annotations);
+      const clamped = Math.max(0, Math.min(totalDuration, time));
+      set({ currentTime: clamped });
+    },
+
+    setSelectedSliceId: (sliceId) => {
+      const nextId = normalizeSelectedSliceId(sliceId, get().slices);
+      set({
+        selectedSliceId: nextId,
+        selectedAnnotationId: nextId ? null : get().selectedAnnotationId,
+      });
+    },
+
+    setSelectedAnnotationId: (annotationId) => {
+      const nextId = normalizeSelectedAnnotationId(annotationId, get().annotations);
+      set({
+        selectedAnnotationId: nextId,
+        selectedSliceId: nextId ? null : get().selectedSliceId,
+      });
+    },
+  };
+}
