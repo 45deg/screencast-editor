@@ -36,7 +36,7 @@ export default function AppHeader({
               <ChevronLeft size={18} />
             </button>
           ) : null}
-          <h1 className="font-['Space_Grotesk',sans-serif] text-xl font-bold">Screencast Editor</h1>
+          <h1 className="font-['Space_Grotesk',sans-serif] text-base sm:text-xl font-bold">Screencast Editor</h1>
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-2">
@@ -56,7 +56,7 @@ export default function AppHeader({
                     <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-300/80">
                       {t('canvas.source')}
                     </div>
-                    <div className="truncate text-sm font-medium text-white" title={video.file.name}>
+                    <div className="text-sm font-medium text-white" title={video.file.name}>
                       {video.file.name}
                     </div>
                     <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-400">
