@@ -36,7 +36,12 @@ export default function AppHeader({
               <ChevronLeft size={18} />
             </button>
           ) : null}
-          <h1 className="font-['Space_Grotesk',sans-serif] text-base sm:text-xl font-bold">Screencast Editor</h1>
+          <img
+            src="/favicon.svg"
+            alt=""
+            className="h-9 w-9 rounded-xl border border-slate-700/80 bg-slate-900/70 p-1.5 shadow-[0_0_24px_rgba(34,211,238,0.12)]"
+          />
+          <h1 className="font-['Space_Grotesk',sans-serif] text-base sm:text-xl font-bold">ScreenCast Editor</h1>
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-2">

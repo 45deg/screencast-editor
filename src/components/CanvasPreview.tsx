@@ -229,6 +229,7 @@ export default function CanvasPreview({
             <CropEditOverlay
               videoObjectUrl={video.objectUrl}
               videoRef={videoRef}
+              isSceneCrop={editMode === 'scene'}
               displayCrop={displayCrop}
               safeEditCrop={safeEditCrop}
               beginDrag={beginDrag}

@@ -66,7 +66,7 @@ export const enTranslation = {
     redo: 'Redo',
     redoWithShortcut: 'Redo (Ctrl+Shift+Z)',
     sceneCrop: 'Scene crop',
-    crop: 'Crop',
+    crop: 'Canvas Crop',
     cutAtPlayhead: 'Cut at playhead',
     cut: 'Cut',
     deleteSelection: 'Delete',

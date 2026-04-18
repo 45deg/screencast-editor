@@ -1,10 +1,8 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Drawer } from '@base-ui/react/drawer';
 import { useTranslation } from 'react-i18next';
 import AppHeader from './app/components/AppHeader';
-import EditorWorkspace from './app/components/EditorWorkspace';
 import LandingWorkspace from './app/components/LandingWorkspace';
-import MobileSettingsDrawer from './app/components/MobileSettingsDrawer';
 import { useAppLifecycle } from './app/hooks/useAppLifecycle';
 import { useAppScreenCapture } from './app/hooks/useAppScreenCapture';
 import { useAppDerivedState } from './app/hooks/useAppDerivedState';
@@ -15,6 +13,19 @@ import { useGlobalDragAndDrop } from './app/hooks/useGlobalDragAndDrop';
 import { useMediaImportHandlers } from './app/hooks/useMediaImportHandlers';
 import { useResponsiveSettingsDrawer } from './app/hooks/useResponsiveSettingsDrawer';
 import { useEditorStore } from './store/editorStore';
+
+const EditorWorkspace = lazy(() => import('./app/components/EditorWorkspace'));
+const MobileSettingsDrawer = lazy(() => import('./app/components/MobileSettingsDrawer'));
+
+function EditorWorkspaceFallback() {
+  return (
+    <main className="fixed inset-x-0 bottom-0 top-16 z-10 overflow-hidden lg:right-[23rem]">
+      <div className="flex h-full min-h-0 items-center justify-center rounded-none border border-slate-800/70 bg-slate-950/50 px-4 text-sm text-slate-300">
+        Loading editor workspace...
+      </div>
+    </main>
+  );
+}
 
 export default function App() {
   const { t } = useTranslation();
@@ -148,6 +159,8 @@ export default function App() {
     setSliceCropCommit,
   });
 
+  const handleToggleSceneCropEdit = cropEditMode === 'scene' ? handleCancelCropEdit : handleStartSceneCropEdit;
+
   const {
     importError,
     setImportError,
@@ -211,59 +224,62 @@ export default function App() {
         />
 
         {hasVideo && video && baseCrop ? (
-          <EditorWorkspace
-            video={video}
-            baseCrop={baseCrop}
-            currentTime={currentTime}
-            previewSourceTime={previewSourceTime}
-            totalDuration={totalDuration}
-            activeSceneCrop={activeSceneCrop}
-            activeAnnotations={activeAnnotations}
-            selectedSliceId={selectedSliceId}
-            selectedAnnotationId={selectedAnnotationId}
-            selectedTextAnnotation={selectedTextAnnotation}
-            hasActiveVideoSlice={Boolean(previewSlice)}
-            cropEditMode={cropEditMode}
-            effectiveEditCrop={effectiveEditCrop}
-            onStartCropEdit={handleStartCropEdit}
-            onEditCropPreview={handleEditCropPreview}
-            onConfirmCropEdit={handleConfirmCropEdit}
-            onCancelCropEdit={handleCancelCropEdit}
-            onResetCropEdit={handleResetCropEdit}
-            onCurrentTimeChange={setCurrentTime}
-            onSelectedAnnotationIdChange={handleSelectedAnnotationChange}
-            onAnnotationPositionPreview={handleAnnotationPositionPreview}
-            onAnnotationImageResizePreview={handleAnnotationImageResizePreview}
-            onAnnotationPositionCommit={handleAnnotationPositionCommit}
-            onTextAnnotationChange={handleTextAnnotationChange}
-            onTextAnnotationStyleChange={handleTextAnnotationStyleChange}
-            slices={slices}
-            annotations={annotations}
-            canUndo={past.length > 0}
-            canRedo={future.length > 0}
-            onSelectedSliceIdChange={setSelectedSliceId}
-            onStartSceneCropEdit={handleStartSceneCropEdit}
-            onSlicesPreview={replaceSlicesPreview}
-            onSlicesCommit={replaceSlicesCommit}
-            onAnnotationsPreview={replaceAnnotationsPreview}
-            onAnnotationsCommit={replaceAnnotationsCommit}
-            onCreateTextAnnotation={handleCreateTextAnnotation}
-            onCreateImageAnnotation={handleCreateImageAnnotation}
-            outputAspectRatio={outputAspectRatio}
-            onUndo={undo}
-            onRedo={redo}
-            exportSettings={exportSettings}
-            ffmpegStatus={ffmpegStatus}
-            ffmpegError={ffmpegError}
-            isExporting={isExporting}
-            isCancelling={isCancelling}
-            exportProgress={exportProgress}
-            exportProgressLabel={exportProgressLabel}
-            exportError={exportError}
-            onChangeExportSettings={updateExportSettings}
-            onExport={handleExport}
-            onCancelExport={cancelExport}
-          />
+          <Suspense fallback={<EditorWorkspaceFallback />}>
+            <EditorWorkspace
+              video={video}
+              baseCrop={baseCrop}
+              currentTime={currentTime}
+              previewSourceTime={previewSourceTime}
+              totalDuration={totalDuration}
+              activeSceneCrop={activeSceneCrop}
+              activeAnnotations={activeAnnotations}
+              selectedSliceId={selectedSliceId}
+              selectedAnnotationId={selectedAnnotationId}
+              selectedTextAnnotation={selectedTextAnnotation}
+              hasActiveVideoSlice={Boolean(previewSlice)}
+              cropEditMode={cropEditMode}
+              effectiveEditCrop={effectiveEditCrop}
+              isSceneCropEditing={cropEditMode === 'scene'}
+              onStartCropEdit={handleStartCropEdit}
+              onEditCropPreview={handleEditCropPreview}
+              onConfirmCropEdit={handleConfirmCropEdit}
+              onCancelCropEdit={handleCancelCropEdit}
+              onResetCropEdit={handleResetCropEdit}
+              onCurrentTimeChange={setCurrentTime}
+              onSelectedAnnotationIdChange={handleSelectedAnnotationChange}
+              onAnnotationPositionPreview={handleAnnotationPositionPreview}
+              onAnnotationImageResizePreview={handleAnnotationImageResizePreview}
+              onAnnotationPositionCommit={handleAnnotationPositionCommit}
+              onTextAnnotationChange={handleTextAnnotationChange}
+              onTextAnnotationStyleChange={handleTextAnnotationStyleChange}
+              slices={slices}
+              annotations={annotations}
+              canUndo={past.length > 0}
+              canRedo={future.length > 0}
+              onSelectedSliceIdChange={setSelectedSliceId}
+              onSceneCropToggle={handleToggleSceneCropEdit}
+              onSlicesPreview={replaceSlicesPreview}
+              onSlicesCommit={replaceSlicesCommit}
+              onAnnotationsPreview={replaceAnnotationsPreview}
+              onAnnotationsCommit={replaceAnnotationsCommit}
+              onCreateTextAnnotation={handleCreateTextAnnotation}
+              onCreateImageAnnotation={handleCreateImageAnnotation}
+              outputAspectRatio={outputAspectRatio}
+              onUndo={undo}
+              onRedo={redo}
+              exportSettings={exportSettings}
+              ffmpegStatus={ffmpegStatus}
+              ffmpegError={ffmpegError}
+              isExporting={isExporting}
+              isCancelling={isCancelling}
+              exportProgress={exportProgress}
+              exportProgressLabel={exportProgressLabel}
+              exportError={exportError}
+              onChangeExportSettings={updateExportSettings}
+              onExport={handleExport}
+              onCancelExport={cancelExport}
+            />
+          </Suspense>
         ) : (
           <LandingWorkspace
             isImporting={isImporting}
@@ -280,21 +296,23 @@ export default function App() {
       </div>
 
       {hasVideo && baseCrop ? (
-        <MobileSettingsDrawer
-          isVisible={!isDesktopViewport}
-          baseCrop={baseCrop}
-          exportSettings={exportSettings}
-          ffmpegStatus={ffmpegStatus}
-          ffmpegError={ffmpegError}
-          isExporting={isExporting}
-          isCancelling={isCancelling}
-          exportProgress={exportProgress}
-          exportProgressLabel={exportProgressLabel}
-          exportError={exportError}
-          onChangeExportSettings={updateExportSettings}
-          onExport={handleExport}
-          onCancelExport={cancelExport}
-        />
+        <Suspense fallback={null}>
+          <MobileSettingsDrawer
+            isVisible={!isDesktopViewport}
+            baseCrop={baseCrop}
+            exportSettings={exportSettings}
+            ffmpegStatus={ffmpegStatus}
+            ffmpegError={ffmpegError}
+            isExporting={isExporting}
+            isCancelling={isCancelling}
+            exportProgress={exportProgress}
+            exportProgressLabel={exportProgressLabel}
+            exportError={exportError}
+            onChangeExportSettings={updateExportSettings}
+            onExport={handleExport}
+            onCancelExport={cancelExport}
+          />
+        </Suspense>
       ) : null}
     </Drawer.Root>
   );

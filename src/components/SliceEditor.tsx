@@ -30,12 +30,13 @@ interface SliceEditorProps {
   selectedSliceId: string | null;
   selectedAnnotationId: string | null;
   canStartSceneCrop: boolean;
+  isSceneCropEditing: boolean;
   canUndo: boolean;
   canRedo: boolean;
   onCurrentTimeChange: (time: number) => void;
   onSelectedSliceIdChange: (id: string | null) => void;
   onSelectedAnnotationIdChange: (id: string | null) => void;
-  onStartSceneCrop: () => void;
+  onSceneCropToggle: () => void;
   onSlicesPreview: (slices: SliceModel[]) => void;
   onSlicesCommit: (slices: SliceModel[], selectedSliceId?: string | null) => void;
   onAnnotationsPreview: (annotations: AnnotationModel[]) => void;
@@ -58,12 +59,13 @@ export default function SliceEditorTimeline({
   selectedSliceId,
   selectedAnnotationId,
   canStartSceneCrop,
+  isSceneCropEditing,
   canUndo,
   canRedo,
   onCurrentTimeChange,
   onSelectedSliceIdChange,
   onSelectedAnnotationIdChange,
-  onStartSceneCrop,
+  onSceneCropToggle,
   onSlicesPreview,
   onSlicesCommit,
   onAnnotationsPreview,
@@ -184,8 +186,9 @@ export default function SliceEditorTimeline({
         redo={onRedo}
         canUndo={canUndo}
         canRedo={canRedo}
-        onSceneCrop={onStartSceneCrop}
+        onSceneCropToggle={onSceneCropToggle}
         canSceneCrop={canStartSceneCrop}
+        isSceneCropEditing={isSceneCropEditing}
         onCut={handleCut}
         canCut={slices.length > 0}
         onDelete={handleDeleteSelected}

@@ -27,6 +27,7 @@ interface EditorWorkspaceProps {
   hasActiveVideoSlice: boolean;
   cropEditMode: 'idle' | 'crop' | 'scene';
   effectiveEditCrop: CropRect | null;
+  isSceneCropEditing: boolean;
   onStartCropEdit: () => void;
   onEditCropPreview: (crop: CropRect) => void;
   onConfirmCropEdit: () => void;
@@ -50,7 +51,7 @@ interface EditorWorkspaceProps {
   canUndo: boolean;
   canRedo: boolean;
   onSelectedSliceIdChange: (sliceId: string | null) => void;
-  onStartSceneCropEdit: () => void;
+  onSceneCropToggle: () => void;
   onSlicesPreview: (slices: SliceModel[]) => void;
   onSlicesCommit: (slices: SliceModel[], selectedSliceId?: string | null) => void;
   onAnnotationsPreview: (annotations: AnnotationModel[]) => void;
@@ -87,6 +88,7 @@ export default function EditorWorkspace({
   hasActiveVideoSlice,
   cropEditMode,
   effectiveEditCrop,
+  isSceneCropEditing,
   onStartCropEdit,
   onEditCropPreview,
   onConfirmCropEdit,
@@ -104,7 +106,7 @@ export default function EditorWorkspace({
   canUndo,
   canRedo,
   onSelectedSliceIdChange,
-  onStartSceneCropEdit,
+  onSceneCropToggle,
   onSlicesPreview,
   onSlicesCommit,
   onAnnotationsPreview,
@@ -179,12 +181,13 @@ export default function EditorWorkspace({
                 selectedSliceId={selectedSliceId}
                 selectedAnnotationId={selectedAnnotationId}
                 canStartSceneCrop={slices.length > 0}
+                isSceneCropEditing={isSceneCropEditing}
                 canUndo={canUndo}
                 canRedo={canRedo}
                 onCurrentTimeChange={onCurrentTimeChange}
                 onSelectedSliceIdChange={onSelectedSliceIdChange}
                 onSelectedAnnotationIdChange={onSelectedAnnotationIdChange}
-                onStartSceneCrop={onStartSceneCropEdit}
+                onSceneCropToggle={onSceneCropToggle}
                 onSlicesPreview={onSlicesPreview}
                 onSlicesCommit={onSlicesCommit}
                 onAnnotationsPreview={onAnnotationsPreview}

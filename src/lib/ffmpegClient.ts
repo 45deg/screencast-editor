@@ -1,10 +1,8 @@
-import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { fetchFile, toBlobURL } from '@ffmpeg/util';
-
 const FFMPEG_CORE_BASE = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm';
 
-type FetchFileFn = typeof fetchFile;
-type FfmpegInstance = InstanceType<typeof FFmpeg>;
+type FetchFileFn = typeof import('@ffmpeg/util').fetchFile;
+type FfmpegClass = typeof import('@ffmpeg/ffmpeg').FFmpeg;
+type FfmpegInstance = InstanceType<FfmpegClass>;
 
 export interface FfmpegRuntime {
   ffmpeg: FfmpegInstance;
@@ -19,6 +17,10 @@ export function loadFfmpegRuntimeFromCDN(signal?: AbortSignal): Promise<FfmpegRu
   }
 
   runtimePromise = (async () => {
+    const [{ FFmpeg }, { fetchFile, toBlobURL }] = await Promise.all([
+      import('@ffmpeg/ffmpeg'),
+      import('@ffmpeg/util'),
+    ]);
     const coreURL = await toBlobURL(`${FFMPEG_CORE_BASE}/ffmpeg-core.js`, 'text/javascript');
     const wasmURL = await toBlobURL(`${FFMPEG_CORE_BASE}/ffmpeg-core.wasm`, 'application/wasm');
     const ffmpeg = new FFmpeg();

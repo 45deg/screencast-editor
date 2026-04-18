@@ -1,7 +1,7 @@
 import { useCallback, useRef, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { Popover } from '@base-ui/react/popover';
 import { Slider } from '@base-ui/react/slider';
-import { Clapperboard, Gauge, ImagePlus, PlusSquare, Redo2, Scissors, Trash2, Undo2, ZoomIn } from 'lucide-react';
+import { Crop, Gauge, ImagePlus, PlusSquare, Redo2, Scissors, Trash2, Undo2, ZoomIn } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { DerivedSlice } from '../../types/editor';
@@ -11,8 +11,9 @@ interface EditorToolbarProps {
   redo: () => void;
   canUndo: boolean;
   canRedo: boolean;
-  onSceneCrop: () => void;
+  onSceneCropToggle: () => void;
   canSceneCrop: boolean;
+  isSceneCropEditing: boolean;
   onCut: () => void;
   canCut: boolean;
   onDelete: () => void;
@@ -32,8 +33,9 @@ export default function EditorToolbar({
   redo,
   canUndo,
   canRedo,
-  onSceneCrop,
+  onSceneCropToggle,
   canSceneCrop,
+  isSceneCropEditing,
   onCut,
   canCut,
   onDelete,
@@ -121,13 +123,19 @@ export default function EditorToolbar({
 
           <button
             type="button"
-            onClick={onSceneCrop}
-            disabled={!canSceneCrop}
-            className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium text-amber-100 transition hover:bg-amber-400/15 hover:text-white disabled:opacity-30 sm:gap-1.5 sm:px-2.5 sm:text-xs"
-            aria-label={t('sliceEditor.sceneCrop')}
+            onClick={onSceneCropToggle}
+            disabled={!canSceneCrop && !isSceneCropEditing}
+            className={`inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition sm:gap-1.5 sm:px-2.5 sm:text-xs ${
+              isSceneCropEditing
+                ? 'bg-cyan-400/20 text-cyan-50 ring-1 ring-cyan-300/40 hover:bg-cyan-400/25'
+                : 'text-amber-100 hover:bg-amber-400/15 hover:text-white'
+            } disabled:opacity-30`}
+            aria-label={isSceneCropEditing ? t('canvas.cancel') : t('sliceEditor.sceneCrop')}
+            aria-pressed={isSceneCropEditing}
+            title={isSceneCropEditing ? t('canvas.cancel') : t('sliceEditor.sceneCrop')}
           >
-            <Clapperboard size={15} />
-            <span className="hidden sm:inline">{t('sliceEditor.crop')}</span>
+            <Crop size={15} />
+            <span className="hidden sm:inline">{t('sliceEditor.sceneCrop')}</span>
           </button>
 
           <button
