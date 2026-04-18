@@ -169,11 +169,7 @@ function Toolbar({
         </div>
 
         <div className="ml-auto flex min-w-max shrink-0 flex-col items-end">
-          <div className="rounded border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 font-mono text-[11px] text-cyan-200">
-            frame={Math.floor(currentTime * 30)
-              .toString()
-              .padStart(5, '0')}
-          </div>
+
           <div className="mt-0.5 font-mono text-[10px] tracking-wider text-slate-500">
             <span className="text-slate-200">{currentTime.toFixed(2)}s</span> / {totalDuration.toFixed(2)}s
           </div>

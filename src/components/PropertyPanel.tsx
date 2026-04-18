@@ -181,7 +181,7 @@ export default function PropertyPanel({
     >
       <h2 className="sr-only">Property Panel</h2>
 
-      <Accordion.Root multiple defaultValue={['basic', 'format']} className="mt-4 space-y-2">
+      <Accordion.Root multiple defaultValue={['basic', 'format']} className="space-y-2">
         <PropertySection value="basic" title="基本設定" icon={<Layers3 size={13} />}>
           <label className="block text-xs text-slate-300">
             <span className="mb-1 inline-flex items-center gap-1 text-slate-400">

@@ -563,9 +563,6 @@ export default function App() {
           <div className="mx-auto flex w-full max-w-[1500px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
             <div>
               <h1 className="font-['Space_Grotesk',sans-serif] text-xl font-bold">Screencast Editor</h1>
-              <p className="text-xs text-slate-400">
-                {video ? `${video.width}x${video.height} | ${video.duration.toFixed(2)}s` : '動画を読み込むとここにメタデータを表示します'}
-              </p>
             </div>
 
             <div className="flex items-center gap-2">
