@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import { Slider } from '@base-ui/react/slider';
+import { Toolbar } from '@base-ui/react/toolbar';
 import { motion, type PanInfo } from 'framer-motion';
-import { FastForward, Redo2, Scissors, Trash2, Undo2, ZoomIn } from 'lucide-react';
+import { Clapperboard, FastForward, Redo2, Scissors, Trash2, Undo2, ZoomIn } from 'lucide-react';
 
 import { captureVideoThumbnail } from '../lib/videoThumbnail';
 import {
@@ -24,10 +25,12 @@ interface SliceEditorProps {
   outputAspectRatio: number;
   currentTime: number;
   selectedSliceId: string | null;
+  canStartSceneCrop: boolean;
   canUndo: boolean;
   canRedo: boolean;
   onCurrentTimeChange: (time: number) => void;
   onSelectedSliceIdChange: (id: string | null) => void;
+  onStartSceneCrop: () => void;
   onSlicesPreview: (slices: SliceModel[]) => void;
   onSlicesCommit: (slices: SliceModel[], selectedSliceId?: string | null) => void;
   onUndo: () => void;
@@ -39,6 +42,8 @@ interface ToolbarProps {
   redo: () => void;
   canUndo: boolean;
   canRedo: boolean;
+  onSceneCrop: () => void;
+  canSceneCrop: boolean;
   onCut: () => void;
   canCut: boolean;
   onDelete: () => void;
@@ -53,11 +58,13 @@ interface ToolbarProps {
   totalDuration: number;
 }
 
-function Toolbar({
+function EditorToolbar({
   undo,
   redo,
   canUndo,
   canRedo,
+  onSceneCrop,
+  canSceneCrop,
   onCut,
   canCut,
   onDelete,
@@ -73,57 +80,75 @@ function Toolbar({
 }: ToolbarProps) {
   return (
     <div className="h-14 border-b border-slate-800/80 bg-slate-950/95 px-2 shadow-sm sm:px-4">
-      <div className="timeline-scrollbar flex h-full items-center gap-2 overflow-x-auto overflow-y-hidden">
-        <div className="flex min-w-max items-center gap-1.5 sm:gap-2">
-          <div className="flex items-center gap-1 rounded-md border border-slate-800 bg-slate-950 p-1">
-            <button
-              type="button"
-              onClick={undo}
-              disabled={!canUndo}
-              className="rounded p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent"
-              title="Undo (Ctrl+Z)"
-            >
-              <Undo2 size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={redo}
-              disabled={!canRedo}
-              className="rounded p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent"
-              title="Redo (Ctrl+Shift+Z)"
-            >
-              <Redo2 size={16} />
-            </button>
-          </div>
+      <Toolbar.Root
+        aria-label="Editor controls"
+        className="timeline-scrollbar flex h-full items-center gap-2 overflow-x-auto overflow-y-hidden"
+      >
+        <Toolbar.Group className="flex min-w-max items-center gap-1.5 sm:gap-2">
+          <Toolbar.Button
+            type="button"
+            onClick={undo}
+            disabled={!canUndo}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-800 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent"
+            aria-label="Undo"
+            title="Undo (Ctrl+Z)"
+          >
+            <Undo2 size={16} />
+          </Toolbar.Button>
+          <Toolbar.Button
+            type="button"
+            onClick={redo}
+            disabled={!canRedo}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-800 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent"
+            aria-label="Redo"
+            title="Redo (Ctrl+Shift+Z)"
+          >
+            <Redo2 size={16} />
+          </Toolbar.Button>
 
-          <div className="h-5 w-px bg-slate-700" />
+          <Toolbar.Separator className="mx-1 h-5 w-px bg-slate-700" />
 
-          <button
+          <Toolbar.Button
+            type="button"
+            onClick={onSceneCrop}
+            disabled={!canSceneCrop}
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium text-amber-100 transition hover:bg-amber-400/15 hover:text-white disabled:opacity-30 sm:gap-1.5 sm:px-2.5 sm:text-xs"
+            aria-label="Scene crop"
+          >
+            <Clapperboard size={15} />
+            Scene Crop
+          </Toolbar.Button>
+
+          <Toolbar.Button
             type="button"
             onClick={onCut}
             disabled={!canCut}
-            className="flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium text-cyan-200 transition-colors hover:bg-cyan-500/15 hover:text-white disabled:opacity-30 sm:gap-1.5 sm:px-2.5 sm:text-xs"
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium text-cyan-200 transition hover:bg-cyan-500/15 hover:text-white disabled:opacity-30 sm:gap-1.5 sm:px-2.5 sm:text-xs"
+            aria-label="Cut at playhead"
             title="Cut at playhead"
           >
             <Scissors size={16} />
-          </button>
+            Cut
+          </Toolbar.Button>
 
-          <button
+          <Toolbar.Button
             type="button"
             onClick={onDelete}
             disabled={!canDelete}
-            className="rounded p-1.5 text-rose-300 transition-colors hover:bg-rose-500/15 hover:text-rose-200 disabled:opacity-30"
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium text-rose-300 transition hover:bg-rose-500/15 hover:text-rose-200 disabled:opacity-30 sm:gap-1.5 sm:px-2.5 sm:text-xs"
+            aria-label="Delete selected slice"
             title="Delete selected slice (Del)"
           >
             <Trash2 size={16} />
-          </button>
+            Delete
+          </Toolbar.Button>
 
-          <div className="h-5 w-px bg-slate-700" />
+          <Toolbar.Separator className="mx-1 h-5 w-px bg-slate-700" />
 
           <div className="flex items-center gap-1.5 rounded-md border border-slate-800 bg-slate-950 px-2 py-1 sm:gap-2 sm:px-3">
             <FastForward size={14} className="text-slate-400" />
             <span className="text-[10px] text-slate-500 sm:text-xs">x</span>
-            <input
+            <Toolbar.Input
               type="number"
               min="0.1"
               step="0.1"
@@ -138,6 +163,7 @@ function Toolbar({
               disabled={!selectedSlice}
               className="w-12 rounded border border-slate-700 bg-slate-900 px-1.5 py-0.5 text-sm text-white outline-none transition-colors focus:border-cyan-500 disabled:opacity-30 sm:w-16 sm:px-2 sm:py-1 sm:text-xs"
               placeholder="1.0"
+              aria-label="Slice speed"
             />
           </div>
 
@@ -166,15 +192,14 @@ function Toolbar({
               </Slider.Control>
             </Slider.Root>
           </div>
-        </div>
+        </Toolbar.Group>
 
         <div className="ml-auto flex min-w-max shrink-0 flex-col items-end">
-
           <div className="mt-0.5 font-mono text-[10px] tracking-wider text-slate-500">
             <span className="text-slate-200">{currentTime.toFixed(2)}s</span> / {totalDuration.toFixed(2)}s
           </div>
         </div>
-      </div>
+      </Toolbar.Root>
     </div>
   );
 }
@@ -395,10 +420,12 @@ export default function SliceEditorTimeline({
   outputAspectRatio,
   currentTime,
   selectedSliceId,
+  canStartSceneCrop,
   canUndo,
   canRedo,
   onCurrentTimeChange,
   onSelectedSliceIdChange,
+  onStartSceneCrop,
   onSlicesPreview,
   onSlicesCommit,
   onUndo,
@@ -684,11 +711,13 @@ export default function SliceEditorTimeline({
 
   return (
     <section className="relative z-10 flex h-[240px] w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-950 shadow-xl sm:h-[280px]">
-      <Toolbar
+      <EditorToolbar
         undo={onUndo}
         redo={onRedo}
         canUndo={canUndo}
         canRedo={canRedo}
+        onSceneCrop={onStartSceneCrop}
+        canSceneCrop={canStartSceneCrop}
         onCut={handleCut}
         canCut={slices.length > 0}
         onDelete={handleDeleteSelected}

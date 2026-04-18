@@ -8,7 +8,8 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { Button } from '@base-ui/react/button';
-import { Check, Clapperboard, Crop, Focus, FolderOpen, RotateCcw, X } from 'lucide-react';
+import { Toolbar } from '@base-ui/react/toolbar';
+import { Check, Crop, Focus, FolderOpen, Pause, Play, RotateCcw, SkipBack, X } from 'lucide-react';
 
 import type { CropRect, VideoMeta } from '../types/editor';
 
@@ -18,18 +19,19 @@ interface CanvasPreviewProps {
   video: VideoMeta;
   fileName: string;
   currentTime: number;
+  sourceTime: number;
+  totalDuration: number;
   baseCrop: CropRect;
   activeSceneCrop: CropRect | null;
   editMode: 'idle' | 'crop' | 'scene';
   editCrop: CropRect | null;
-  canStartSceneCrop: boolean;
   onOpenVideo: () => void;
   onStartCrop: () => void;
-  onStartSceneCrop: () => void;
   onEditCropPreview: (crop: CropRect) => void;
   onConfirmEdit: () => void;
   onCancelEdit: () => void;
   onResetEdit: () => void;
+  onCurrentTimeChange: (time: number) => void;
 }
 
 interface ViewportInfo {
@@ -215,27 +217,36 @@ function measureViewport(container: HTMLDivElement, video: VideoMeta): ViewportI
   };
 }
 
+function formatSeconds(seconds: number): string {
+  return `${seconds.toFixed(2)}s`;
+}
+
 export default function CanvasPreview({
   video,
   fileName,
   currentTime,
+  sourceTime,
+  totalDuration,
   baseCrop,
   activeSceneCrop,
   editMode,
   editCrop,
-  canStartSceneCrop,
   onOpenVideo,
   onStartCrop,
-  onStartSceneCrop,
   onEditCropPreview,
   onConfirmEdit,
   onCancelEdit,
   onResetEdit,
+  onCurrentTimeChange,
 }: CanvasPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const timelineTimeRef = useRef(currentTime);
+  const lastFrameTimeRef = useRef<number | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [viewport, setViewport] = useState<ViewportInfo>({
     scale: 1,
     offsetX: 0,
@@ -244,6 +255,10 @@ export default function CanvasPreview({
     height: video.height,
   });
   const isEditing = editMode !== 'idle';
+
+  useEffect(() => {
+    timelineTimeRef.current = currentTime;
+  }, [currentTime]);
 
   const displayLayout = useMemo(() => {
     return computeDisplayLayout(video, baseCrop, activeSceneCrop);
@@ -285,19 +300,68 @@ export default function CanvasPreview({
       return;
     }
 
-    if (Math.abs(element.currentTime - currentTime) > 0.04) {
-      element.currentTime = Math.max(0, Math.min(video.duration, currentTime));
+    if (Math.abs(element.currentTime - sourceTime) > 0.04) {
+      element.currentTime = Math.max(0, Math.min(video.duration, sourceTime));
     }
-  }, [currentTime, video.duration]);
+  }, [sourceTime, video.duration]);
+
+  useEffect(() => {
+    if (!isPlaying) {
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      lastFrameTimeRef.current = null;
+      return;
+    }
+
+    const tick = (frameTime: number) => {
+      const previousFrameTime = lastFrameTimeRef.current;
+      lastFrameTimeRef.current = frameTime;
+
+      if (previousFrameTime === null) {
+        animationFrameRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      const delta = (frameTime - previousFrameTime) / 1000;
+      const nextTime = Math.min(totalDuration, timelineTimeRef.current + delta);
+      timelineTimeRef.current = nextTime;
+      onCurrentTimeChange(nextTime);
+
+      if (nextTime >= totalDuration) {
+        setIsPlaying(false);
+        return;
+      }
+
+      animationFrameRef.current = requestAnimationFrame(tick);
+    };
+
+    animationFrameRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      lastFrameTimeRef.current = null;
+    };
+  }, [isPlaying, onCurrentTimeChange, totalDuration]);
+
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, []);
 
   const displayCrop = useMemo(() => {
-    const safeCrop = safeEditCrop;
-
     return {
-      left: viewport.offsetX + safeCrop.x * viewport.scale,
-      top: viewport.offsetY + safeCrop.y * viewport.scale,
-      width: safeCrop.w * viewport.scale,
-      height: safeCrop.h * viewport.scale,
+      left: viewport.offsetX + safeEditCrop.x * viewport.scale,
+      top: viewport.offsetY + safeEditCrop.y * viewport.scale,
+      width: safeEditCrop.w * viewport.scale,
+      height: safeEditCrop.h * viewport.scale,
     };
   }, [safeEditCrop, viewport]);
 
@@ -352,6 +416,30 @@ export default function CanvasPreview({
     [safeEditCrop],
   );
 
+  const handleTogglePlay = useCallback(() => {
+    if (isEditing || totalDuration <= 0) {
+      return;
+    }
+
+    if (!isPlaying && currentTime >= totalDuration) {
+      timelineTimeRef.current = 0;
+      onCurrentTimeChange(0);
+    }
+
+    setIsPlaying((value) => !value);
+  }, [currentTime, isEditing, isPlaying, onCurrentTimeChange, totalDuration]);
+
+  const handleRestart = useCallback(() => {
+    timelineTimeRef.current = 0;
+    onCurrentTimeChange(0);
+    setIsPlaying(false);
+  }, [onCurrentTimeChange]);
+
+  const handleStartCropClick = useCallback(() => {
+    setIsPlaying(false);
+    onStartCrop();
+  }, [onStartCrop]);
+
   return (
     <section className="flex min-h-[320px] flex-1 flex-col rounded-2xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-xl">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
@@ -399,23 +487,40 @@ export default function CanvasPreview({
             </Button>
           </div>
         ) : (
-          <div className="inline-flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Toolbar.Root
+              aria-label="Preview controls"
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-950/90 p-1"
+            >
+              <Toolbar.Group className="inline-flex items-center gap-1">
+                <Toolbar.Button
+                  aria-label="Restart preview"
+                  onClick={handleRestart}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-300 transition hover:bg-slate-800 hover:text-white"
+                >
+                  <SkipBack size={14} />
+                </Toolbar.Button>
+                <Toolbar.Button
+                  aria-label={isPlaying ? 'Pause preview' : 'Play preview'}
+                  onClick={handleTogglePlay}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-100 transition hover:bg-cyan-500/15 hover:text-cyan-100"
+                >
+                  {isPlaying ? <Pause size={14} /> : <Play size={14} className="ml-0.5" />}
+                </Toolbar.Button>
+              </Toolbar.Group>
+              <Toolbar.Separator className="mx-1 h-5 w-px bg-slate-800" />
+              <div className="min-w-[110px] px-2 text-right font-mono text-[11px] text-slate-300">
+                {formatSeconds(currentTime)} / {formatSeconds(totalDuration)}
+              </div>
+            </Toolbar.Root>
+
             <Button
               type="button"
-              onClick={onStartCrop}
+              onClick={handleStartCropClick}
               className="inline-flex items-center gap-1 rounded-md border border-cyan-300/40 bg-cyan-400/10 px-2.5 py-1.5 text-xs font-medium text-cyan-100 transition hover:bg-cyan-400/20"
             >
               <Crop size={13} />
               Crop
-            </Button>
-            <Button
-              type="button"
-              onClick={onStartSceneCrop}
-              disabled={!canStartSceneCrop}
-              className="inline-flex items-center gap-1 rounded-md border border-amber-300/40 bg-amber-400/10 px-2.5 py-1.5 text-xs font-medium text-amber-100 transition hover:bg-amber-400/20 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <Clapperboard size={13} />
-              Scene Crop
             </Button>
           </div>
         )}
@@ -563,6 +668,7 @@ export default function CanvasPreview({
                   />
                 </div>
               )}
+
             </>
           )}
         </div>

@@ -43,7 +43,6 @@ export interface ExportSettings {
   dither: DitherMode;
   mp4Fps: number;
   mp4Preset: Mp4Preset;
-  speedOverlay: boolean;
 }
 
 export interface TimelineScrollInfo {
@@ -90,6 +89,33 @@ export function deriveSlices(slices: SliceModel[]): DerivedSlice[] {
       speed,
     };
   });
+}
+
+export function findSliceAtTimelineTime(slices: SliceModel[], time: number): DerivedSlice | null {
+  const derived = deriveSlices(slices);
+  const hit = derived.find((slice) => time >= slice.start && time < slice.end);
+
+  if (hit) {
+    return hit;
+  }
+
+  if (derived.length && time >= derived[derived.length - 1].end) {
+    return derived[derived.length - 1];
+  }
+
+  return derived[0] ?? null;
+}
+
+export function getSourceTimeAtTimelineTime(slices: SliceModel[], time: number): number {
+  const activeSlice = findSliceAtTimelineTime(slices, time);
+  if (!activeSlice) {
+    return 0;
+  }
+
+  const localOffset = Math.max(0, Math.min(activeSlice.duration, time - activeSlice.start));
+  const sourceProgress = localOffset / Math.max(0.0001, activeSlice.duration);
+
+  return activeSlice.sourceStart + activeSlice.sourceDuration * sourceProgress;
 }
 
 export function getTotalDuration(slices: SliceModel[]): number {

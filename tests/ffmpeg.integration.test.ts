@@ -98,27 +98,13 @@ function createExportSettings(format: 'gif' | 'mp4', overrides: Partial<ExportSe
     dither: 'none',
     mp4Fps: 30,
     mp4Preset: 'medium',
-    speedOverlay: true,
     ...overrides,
   };
-}
-
-function getSpeedOverlayFontFile(): string {
-  return join(process.cwd(), 'public', 'fonts', 'SpaceGrotesk.ttf');
-}
-
-async function supportsFilter(filterName: string): Promise<boolean> {
-  const result = await runFfmpeg(['-hide_banner', '-filters']);
-  assertFfmpegSucceeded(result, 'ffmpeg -filters');
-
-  const output = `${result.stdout}\n${result.stderr}`;
-  return new RegExp(`\\b${filterName}\\b`).test(output);
 }
 
 describeIfFfmpeg('FFmpeg command integration', () => {
   let tempDir = '';
   let fixtureInput = '';
-  let drawtextSupported = false;
 
   const baseCrop: CropRect = {
     x: 0,
@@ -142,7 +128,6 @@ describeIfFfmpeg('FFmpeg command integration', () => {
     ]);
     assertFfmpegSucceeded(fixture, 'fixture generation');
 
-    drawtextSupported = await supportsFilter('drawtext');
   });
 
   afterAll(async () => {
@@ -153,21 +138,19 @@ describeIfFfmpeg('FFmpeg command integration', () => {
     await rm(tempDir, { recursive: true, force: true });
   });
 
-  it('exports GIF with crop/pad and no speed overlay', async () => {
-    const output = join(tempDir, 'case-gif-no-overlay.gif');
+  it('exports GIF with crop/pad', async () => {
+    const output = join(tempDir, 'case-gif-basic.gif');
     const built = buildFfmpegCommand({
       video: createVideoMeta('fixture-input.mp4'),
       slices: createSlices(),
       globalCrop: baseCrop,
-      exportSettings: createExportSettings('gif', { speedOverlay: false }),
+      exportSettings: createExportSettings('gif'),
       inputFileName: fixtureInput,
       outputFileName: output,
     });
 
-    expect(built.filterComplex.includes('drawtext')).toBe(false);
-
     const result = await runFfmpeg(built.execArgs);
-    assertFfmpegSucceeded(result, 'GIF export without overlay');
+    assertFfmpegSucceeded(result, 'GIF export');
 
     const info = await stat(output);
     expect(info.size).toBeGreaterThan(0);
@@ -180,7 +163,6 @@ describeIfFfmpeg('FFmpeg command integration', () => {
       slices: createSlices(),
       globalCrop: baseCrop,
       exportSettings: createExportSettings('mp4', {
-        speedOverlay: false,
         width: 480,
         height: 270,
         mp4Fps: 24,
@@ -193,54 +175,6 @@ describeIfFfmpeg('FFmpeg command integration', () => {
     assertFfmpegSucceeded(result, 'MP4 export');
 
     const info = await stat(output);
-    expect(info.size).toBeGreaterThan(0);
-  });
-
-  it('falls back cleanly when drawtext is unavailable', async () => {
-    const slices = createSlices();
-    const withOverlayOutput = join(tempDir, 'case-overlay-direct.gif');
-    const fontFile = getSpeedOverlayFontFile();
-
-    const withOverlay = buildFfmpegCommand({
-      video: createVideoMeta('fixture-input.mp4'),
-      slices,
-      globalCrop: baseCrop,
-      exportSettings: createExportSettings('gif', { speedOverlay: true }),
-      speedOverlayFontFile: fontFile,
-      inputFileName: fixtureInput,
-      outputFileName: withOverlayOutput,
-    });
-
-    expect(withOverlay.filterComplex.includes('drawtext=fontfile=')).toBe(true);
-
-    const directResult = await runFfmpeg(withOverlay.execArgs);
-
-    if (drawtextSupported) {
-      assertFfmpegSucceeded(directResult, 'GIF export with drawtext');
-      const info = await stat(withOverlayOutput);
-      expect(info.size).toBeGreaterThan(0);
-      return;
-    }
-
-    expect(directResult.code).not.toBe(0);
-
-    const fallbackOutput = join(tempDir, 'case-overlay-fallback.gif');
-    const fallback = buildFfmpegCommand({
-      video: createVideoMeta('fixture-input.mp4'),
-      slices,
-      globalCrop: baseCrop,
-      exportSettings: createExportSettings('gif', { speedOverlay: true }),
-      enableSpeedOverlay: false,
-      inputFileName: fixtureInput,
-      outputFileName: fallbackOutput,
-    });
-
-    expect(fallback.filterComplex.includes('drawtext')).toBe(false);
-
-    const fallbackResult = await runFfmpeg(fallback.execArgs);
-    assertFfmpegSucceeded(fallbackResult, 'GIF export fallback without drawtext');
-
-    const info = await stat(fallbackOutput);
     expect(info.size).toBeGreaterThan(0);
   });
 });

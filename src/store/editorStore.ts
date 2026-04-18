@@ -25,7 +25,6 @@ const DEFAULT_EXPORT_SETTINGS: ExportSettings = {
   dither: 'none',
   mp4Fps: 30,
   mp4Preset: 'medium',
-  speedOverlay: true,
 };
 
 type FfmpegStatus = 'idle' | 'loading' | 'ready' | 'error';

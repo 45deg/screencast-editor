@@ -2,8 +2,7 @@ import { type ReactNode } from 'react';
 import { Accordion } from '@base-ui/react/accordion';
 import { Button } from '@base-ui/react/button';
 import { Select } from '@base-ui/react/select';
-import { Switch } from '@base-ui/react/switch';
-import { Check, ChevronDown, Film, Gauge, Layers3, Sparkles } from 'lucide-react';
+import { Check, ChevronDown, Film, Gauge, Layers3, ZoomIn } from 'lucide-react';
 
 import type { CropRect, ExportSettings } from '../types/editor';
 
@@ -29,7 +28,7 @@ const FORMAT_OPTIONS: Array<{ value: ExportSettings['format']; label: string }> 
 
 const GIF_PALETTE_OPTIONS: Array<{ value: ExportSettings['paletteMode']; label: string }> = [
   { value: 'global', label: 'Global Palette' },
-  { value: 'single', label: 'Per-frame Palette (stats_mode=single)' },
+  { value: 'single', label: 'Per-frame Palette' },
 ];
 
 const GIF_DITHER_OPTIONS: Array<{ value: ExportSettings['dither']; label: string }> = [
@@ -53,6 +52,10 @@ const MP4_PRESET_OPTIONS: Array<{ value: ExportSettings['mp4Preset']; label: str
 
 function clampInt(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, Math.round(value)));
+}
+
+function clampFloat(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
 }
 
 function computeHeightFromWidth(width: number, crop: CropRect): number {
@@ -87,28 +90,6 @@ function PropertySection({ value, title, icon, children }: PropertySectionProps)
         <div className="space-y-3">{children}</div>
       </Accordion.Panel>
     </Accordion.Item>
-  );
-}
-
-interface ToggleRowProps {
-  label: string;
-  checked: boolean;
-  onCheckedChange: (checked: boolean) => void;
-}
-
-function ToggleRow({ label, checked, onCheckedChange }: ToggleRowProps) {
-  return (
-    <div className="flex items-center justify-between gap-2 rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-300">
-      <span>{label}</span>
-      <Switch.Root
-        aria-label={label}
-        checked={checked}
-        onCheckedChange={onCheckedChange}
-        className="group inline-flex h-5 w-10 items-center rounded-full border border-slate-700 bg-slate-800 px-0.5 transition-colors data-[checked]:border-cyan-400 data-[checked]:bg-cyan-500/30"
-      >
-        <Switch.Thumb className="h-4 w-4 rounded-full bg-white transition-transform duration-200 group-data-[checked]:translate-x-5" />
-      </Switch.Root>
-    </div>
   );
 }
 
@@ -175,6 +156,11 @@ export default function PropertyPanel({
   onChangeExportSettings,
   onExport,
 }: PropertyPanelProps) {
+  const scaleMin = Math.max(0.1, INPUT_SIZE_MIN / Math.max(1, baseCrop.w));
+  const scaleMax = Math.min(4, INPUT_SIZE_MAX / Math.max(1, baseCrop.w));
+  const outputScale = clampFloat(exportSettings.width / Math.max(1, baseCrop.w), scaleMin, scaleMax);
+  const outputScalePercent = Math.round(outputScale * 100);
+
   return (
     <aside
       className={`w-full rounded-2xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-xl lg:w-[360px] ${className ?? ''}`}
@@ -213,15 +199,11 @@ export default function PropertyPanel({
                   }
 
                   const safeWidth = clampInt(width, INPUT_SIZE_MIN, INPUT_SIZE_MAX);
-                  if (exportSettings.keepAspectRatio) {
-                    onChangeExportSettings({
-                      width: safeWidth,
-                      height: computeHeightFromWidth(safeWidth, baseCrop),
-                    });
-                    return;
-                  }
-
-                  onChangeExportSettings({ width: safeWidth });
+                  onChangeExportSettings({
+                    width: safeWidth,
+                    height: computeHeightFromWidth(safeWidth, baseCrop),
+                    keepAspectRatio: true,
+                  });
                 }}
                 className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-500"
               />
@@ -238,35 +220,46 @@ export default function PropertyPanel({
                   }
 
                   const safeHeight = clampInt(height, INPUT_SIZE_MIN, INPUT_SIZE_MAX);
-                  if (exportSettings.keepAspectRatio) {
-                    onChangeExportSettings({
-                      width: computeWidthFromHeight(safeHeight, baseCrop),
-                      height: safeHeight,
-                    });
-                    return;
-                  }
-
-                  onChangeExportSettings({ height: safeHeight });
+                  onChangeExportSettings({
+                    width: computeWidthFromHeight(safeHeight, baseCrop),
+                    height: safeHeight,
+                    keepAspectRatio: true,
+                  });
                 }}
                 className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-500"
               />
             </div>
-            <div className="mt-2">
-              <ToggleRow
-                label="アスペクト比を保持"
-                checked={exportSettings.keepAspectRatio}
-                onCheckedChange={(checked) => {
-                  if (checked) {
-                    onChangeExportSettings({
-                      keepAspectRatio: true,
-                      height: computeHeightFromWidth(exportSettings.width, baseCrop),
-                    });
-                    return;
-                  }
 
-                  onChangeExportSettings({ keepAspectRatio: false });
+            <div className="mt-3 rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-3">
+              <div className="mb-2 flex items-center justify-between gap-2 text-[11px] text-slate-400">
+                <span className="inline-flex items-center gap-1">
+                  <ZoomIn size={12} />
+                  倍率
+                </span>
+                <span className="font-mono text-slate-200">{outputScale.toFixed(2)}x</span>
+              </div>
+              <input
+                type="range"
+                min={scaleMin}
+                max={scaleMax}
+                step={0.05}
+                value={outputScale}
+                onChange={(event) => {
+                  const nextScale = clampFloat(Number.parseFloat(event.target.value), scaleMin, scaleMax);
+                  const nextWidth = clampInt(baseCrop.w * nextScale, INPUT_SIZE_MIN, INPUT_SIZE_MAX);
+                  onChangeExportSettings({
+                    width: nextWidth,
+                    height: computeHeightFromWidth(nextWidth, baseCrop),
+                    keepAspectRatio: true,
+                  });
                 }}
+                className="h-2 w-full cursor-pointer accent-cyan-400"
               />
+              <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+                <span>{Math.round(scaleMin * 100)}%</span>
+                <span>{outputScalePercent}%</span>
+                <span>{Math.round(scaleMax * 100)}%</span>
+              </div>
             </div>
           </div>
         </PropertySection>
@@ -300,7 +293,7 @@ export default function PropertyPanel({
 
               <label className="block text-xs text-slate-300">
                 <span className="mb-1 inline-flex items-center gap-1 text-slate-400">
-                  <Sparkles size={13} />
+                  <Gauge size={13} />
                   Palette Mode (GIF)
                 </span>
                 <SelectField
@@ -351,14 +344,6 @@ export default function PropertyPanel({
               </label>
             </>
           )}
-        </PropertySection>
-
-        <PropertySection value="overlay" title="速度倍率オーバーレイ" icon={<Sparkles size={13} />}>
-          <ToggleRow
-            label="右下に倍率を重ねる"
-            checked={exportSettings.speedOverlay}
-            onCheckedChange={(checked) => onChangeExportSettings({ speedOverlay: checked })}
-          />
         </PropertySection>
       </Accordion.Root>
 

@@ -6,13 +6,19 @@ import CanvasPreview from './components/CanvasPreview';
 import PropertyPanel from './components/PropertyPanel';
 import SliceEditorTimeline from './components/SliceEditor';
 import VideoDropzone from './components/VideoDropzone';
-import { DEFAULT_SPEED_OVERLAY_FONT_FILE, buildFfmpegCommand } from './lib/ffmpegCommand';
+import { buildFfmpegCommand } from './lib/ffmpegCommand';
 import { loadFfmpegRuntimeFromCDN } from './lib/ffmpegClient';
 import { readVideoMetadata, revokeVideoObjectUrl } from './lib/video';
 import { useEditorStore } from './store/editorStore';
-import { deriveSlices, type CropRect, type SliceModel, type VideoMeta } from './types/editor';
-
-const SPEED_OVERLAY_FONT_ASSET_URL = `${import.meta.env.BASE_URL}fonts/SpaceGrotesk.ttf`;
+import {
+  deriveSlices,
+  findSliceAtTimelineTime,
+  getSourceTimeAtTimelineTime,
+  getTotalDuration,
+  type CropRect,
+  type SliceModel,
+  type VideoMeta,
+} from './types/editor';
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -86,9 +92,6 @@ function getSafeDownloadName(fileName: string, format: 'gif' | 'mp4'): string {
 
 export default function App() {
   const replaceInputRef = useRef<HTMLInputElement>(null);
-  const drawtextSupportRef = useRef<boolean | null>(null);
-  const speedOverlayFontLoadedRef = useRef(false);
-  const speedOverlayFontLoadPromiseRef = useRef<Promise<void> | null>(null);
   const ffmpegStatusRef = useRef<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [importError, setImportError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
@@ -128,11 +131,6 @@ export default function App() {
     ffmpegStatusRef.current = ffmpegStatus;
   }, [ffmpegStatus]);
 
-  const selectedSlice = useMemo(
-    () => slices.find((slice) => slice.id === selectedSliceId) ?? null,
-    [selectedSliceId, slices],
-  );
-
   const fullCrop = useMemo(() => {
     if (!video) {
       return null;
@@ -149,15 +147,19 @@ export default function App() {
     return globalCrop ?? fullCrop;
   }, [fullCrop, globalCrop, video]);
 
+  const previewSlice = useMemo(() => findSliceAtTimelineTime(slices, currentTime), [currentTime, slices]);
+
   const activeSceneCrop = useMemo(() => {
-    if (!selectedSlice?.crop || !video) {
+    if (!previewSlice?.crop || !video) {
       return null;
     }
 
-    return clampCropToVideo(selectedSlice.crop, video);
-  }, [selectedSlice, video]);
+    return clampCropToVideo(previewSlice.crop, video);
+  }, [previewSlice, video]);
 
   const hasVideo = Boolean(video && baseCrop);
+  const totalDuration = useMemo(() => getTotalDuration(slices), [slices]);
+  const previewSourceTime = useMemo(() => getSourceTimeAtTimelineTime(slices, currentTime), [currentTime, slices]);
 
   const outputAspectRatio = useMemo(
     () => exportSettings.width / Math.max(1, exportSettings.height),
@@ -351,73 +353,8 @@ export default function App() {
     setCropEditDraft(fullCrop);
   }, [fullCrop]);
 
-  const ensureSpeedOverlayFont = useCallback(
-    async (ffmpeg: Awaited<ReturnType<typeof loadFfmpegRuntimeFromCDN>>['ffmpeg']): Promise<void> => {
-      if (speedOverlayFontLoadedRef.current) {
-        return;
-      }
-
-      if (speedOverlayFontLoadPromiseRef.current) {
-        return speedOverlayFontLoadPromiseRef.current;
-      }
-
-      speedOverlayFontLoadPromiseRef.current = (async () => {
-        try {
-          await ffmpeg.createDir('/fonts');
-        } catch {
-          // Directory may already exist in the virtual FS.
-        }
-
-        const response = await fetch(SPEED_OVERLAY_FONT_ASSET_URL);
-        if (!response.ok) {
-          throw new Error('Google Fonts の描画用フォントを読み込めませんでした。');
-        }
-
-        const fontBytes = new Uint8Array(await response.arrayBuffer());
-        await ffmpeg.writeFile(DEFAULT_SPEED_OVERLAY_FONT_FILE, fontBytes);
-        speedOverlayFontLoadedRef.current = true;
-      })().finally(() => {
-        speedOverlayFontLoadPromiseRef.current = null;
-      });
-
-      return speedOverlayFontLoadPromiseRef.current;
-    },
-    [],
-  );
-
-  const detectDrawtextSupport = useCallback(
-    async (ffmpeg: Awaited<ReturnType<typeof loadFfmpegRuntimeFromCDN>>['ffmpeg']): Promise<boolean> => {
-      if (drawtextSupportRef.current !== null) {
-        return drawtextSupportRef.current;
-      }
-
-      const logLines: string[] = [];
-      const onLog = (event: { message: string }) => {
-        logLines.push(event.message);
-      };
-
-      ffmpeg.on('log', onLog);
-      try {
-        const exitCode = await ffmpeg.exec(['-hide_banner', '-filters']);
-        const supportsDrawtext = exitCode === 0 && logLines.some((line) => /\bdrawtext\b/.test(line));
-        drawtextSupportRef.current = supportsDrawtext;
-        return supportsDrawtext;
-      } catch {
-        drawtextSupportRef.current = false;
-        return false;
-      } finally {
-        ffmpeg.off('log', onLog);
-      }
-    },
-    [],
-  );
-
   const createCommandPreview = useCallback(
-    (
-      inputFileName?: string,
-      outputFileName?: string,
-      options?: { enableSpeedOverlay?: boolean; speedOverlayFontFile?: string },
-    ) => {
+    (inputFileName?: string, outputFileName?: string) => {
       if (!video || !slices.length) {
         return null;
       }
@@ -427,8 +364,6 @@ export default function App() {
         slices,
         globalCrop,
         exportSettings,
-        enableSpeedOverlay: options?.enableSpeedOverlay,
-        speedOverlayFontFile: options?.speedOverlayFontFile,
         inputFileName,
         outputFileName,
       });
@@ -469,27 +404,12 @@ export default function App() {
       runtime = await loadFfmpegRuntimeFromCDN();
       setFfmpegStatus('ready', null);
 
-      const canUseSpeedOverlay = exportSettings.speedOverlay ? await detectDrawtextSupport(runtime.ffmpeg) : false;
-      const enableSpeedOverlay = exportSettings.speedOverlay && canUseSpeedOverlay;
-
-      if (enableSpeedOverlay) {
-        await ensureSpeedOverlayFont(runtime.ffmpeg);
-      }
-
-      const built = createCommandPreview(inputFileName, outputFileName, {
-        enableSpeedOverlay,
-        speedOverlayFontFile: DEFAULT_SPEED_OVERLAY_FONT_FILE,
-      });
+      const built = createCommandPreview(inputFileName, outputFileName);
       if (!built) {
         throw new Error('エクスポート対象がありません。');
       }
 
-      logFfmpegCommandPreview(
-        built,
-        exportSettings.speedOverlay && !enableSpeedOverlay
-          ? 'drawtext filter is unavailable in this FFmpeg runtime; exported without speed overlay'
-          : undefined,
-      );
+      logFfmpegCommandPreview(built);
 
       const source = await runtime.fetchFile(video.file);
       await runtime.ffmpeg.writeFile(inputFileName, source);
@@ -527,10 +447,7 @@ export default function App() {
     }
   }, [
     createCommandPreview,
-    detectDrawtextSupport,
-    ensureSpeedOverlayFont,
     exportSettings.format,
-    exportSettings.speedOverlay,
     logFfmpegCommandPreview,
     setFfmpegStatus,
     slices.length,
@@ -538,15 +455,15 @@ export default function App() {
   ]);
 
   useEffect(() => {
-    if (!baseCrop || !exportSettings.keepAspectRatio) {
+    if (!baseCrop) {
       return;
     }
 
     const nextHeight = Math.max(64, Math.min(4096, Math.round((exportSettings.width * baseCrop.h) / Math.max(1, baseCrop.w))));
     if (nextHeight !== exportSettings.height) {
-      updateExportSettings({ height: nextHeight });
+      updateExportSettings({ height: nextHeight, keepAspectRatio: true });
     }
-  }, [baseCrop, exportSettings.height, exportSettings.keepAspectRatio, exportSettings.width, updateExportSettings]);
+  }, [baseCrop, exportSettings.height, exportSettings.width, updateExportSettings]);
 
   useEffect(() => {
     return () => {
@@ -589,18 +506,19 @@ export default function App() {
                 video={video}
                 fileName={video.file.name}
                 currentTime={currentTime}
+                sourceTime={previewSourceTime}
+                totalDuration={totalDuration}
                 baseCrop={baseCrop}
                 activeSceneCrop={activeSceneCrop}
                 editMode={cropEditMode}
                 editCrop={effectiveEditCrop}
-                canStartSceneCrop={slices.length > 0}
                 onOpenVideo={handleReplaceVideo}
                 onStartCrop={handleStartCropEdit}
-                onStartSceneCrop={handleStartSceneCropEdit}
                 onEditCropPreview={handleEditCropPreview}
                 onConfirmEdit={handleConfirmCropEdit}
                 onCancelEdit={handleCancelCropEdit}
                 onResetEdit={handleResetCropEdit}
+                onCurrentTimeChange={setCurrentTime}
               />
             ) : (
               <VideoDropzone onFileSelected={handleImportVideo} isLoading={isImporting} error={importError} mode="embedded" />
@@ -654,10 +572,12 @@ export default function App() {
               slices={slices}
               currentTime={currentTime}
               selectedSliceId={selectedSliceId}
+              canStartSceneCrop={slices.length > 0}
               canUndo={past.length > 0}
               canRedo={future.length > 0}
               onCurrentTimeChange={setCurrentTime}
               onSelectedSliceIdChange={setSelectedSliceId}
+              onStartSceneCrop={handleStartSceneCropEdit}
               onSlicesPreview={replaceSlicesPreview}
               onSlicesCommit={replaceSlicesCommit}
               baseCrop={baseCrop}
