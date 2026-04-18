@@ -130,9 +130,31 @@ function formatFileSize(bytes: number): string {
   return `${value >= 10 || exponent === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[exponent]}`;
 }
 
+function getScreenRecordingMimeType(): string {
+  if (typeof MediaRecorder === 'undefined') {
+    return '';
+  }
+
+  const candidates = [
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm;codecs=h264,opus',
+    'video/webm',
+  ];
+
+  return candidates.find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) ?? '';
+}
+
+function getScreenRecordingExtension(mimeType: string): string {
+  return mimeType.includes('mp4') ? 'mp4' : 'webm';
+}
+
 export default function App() {
   const { t } = useTranslation();
   const ffmpegStatusRef = useRef<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const captureRecorderRef = useRef<MediaRecorder | null>(null);
+  const captureStreamRef = useRef<MediaStream | null>(null);
+  const captureChunksRef = useRef<Blob[]>([]);
   const [importError, setImportError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -142,6 +164,7 @@ export default function App() {
   const [sceneCropTargetSliceId, setSceneCropTargetSliceId] = useState<string | null>(null);
   const [isMobileSettingsDrawerOpen, setIsMobileSettingsDrawerOpen] = useState(false);
   const [isDesktopViewport, setIsDesktopViewport] = useState(false);
+  const [screenCaptureState, setScreenCaptureState] = useState<'idle' | 'starting' | 'recording' | 'processing'>('idle');
 
   const {
     video,
@@ -219,6 +242,13 @@ export default function App() {
   );
 
   const isCropEditing = cropEditMode !== 'idle';
+  const supportsScreenCapture = useMemo(() => {
+    if (typeof window === 'undefined' || typeof MediaRecorder === 'undefined') {
+      return false;
+    }
+
+    return Boolean(navigator.mediaDevices?.getDisplayMedia);
+  }, []);
 
   const effectiveEditCrop = useMemo(() => {
     if (!video || !isCropEditing || !fullCrop) {
@@ -530,6 +560,124 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    return () => {
+      captureRecorderRef.current?.stream.getTracks().forEach((track) => track.stop());
+      captureRecorderRef.current = null;
+      captureStreamRef.current?.getTracks().forEach((track) => track.stop());
+      captureStreamRef.current = null;
+    };
+  }, []);
+
+  const finishScreenCapture = useCallback(async () => {
+    const recorder = captureRecorderRef.current;
+    if (!recorder || recorder.state !== 'recording') {
+      return;
+    }
+
+    captureStreamRef.current?.getVideoTracks().forEach((track) => {
+      track.onended = null;
+    });
+    setScreenCaptureState('processing');
+
+    const file = await new Promise<File>((resolve, reject) => {
+      const mimeType = recorder.mimeType || getScreenRecordingMimeType() || 'video/webm';
+      const extension = getScreenRecordingExtension(mimeType);
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          captureChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onerror = () => {
+        reject(new Error(t('dropzone.captureFailed')));
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(captureChunksRef.current, { type: mimeType });
+        captureChunksRef.current = [];
+
+        if (!blob.size) {
+          reject(new Error(t('dropzone.emptyCapture')));
+          return;
+        }
+
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+        resolve(new File([blob], `screen-capture-${stamp}.${extension}`, { type: blob.type || mimeType }));
+      };
+
+      recorder.stop();
+    });
+
+    captureRecorderRef.current = null;
+    captureStreamRef.current?.getTracks().forEach((track) => track.stop());
+    captureStreamRef.current = null;
+
+    await handleImportVideo(file);
+    setScreenCaptureState('idle');
+  }, [handleImportVideo, t]);
+
+  const handleStartScreenCapture = useCallback(async () => {
+    if (!supportsScreenCapture || screenCaptureState !== 'idle') {
+      return;
+    }
+
+    setImportError(null);
+    setExportError(null);
+    setScreenCaptureState('starting');
+
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: false,
+      });
+      const mimeType = getScreenRecordingMimeType();
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+
+      captureChunksRef.current = [];
+      captureStreamRef.current = stream;
+      captureRecorderRef.current = recorder;
+
+      const [videoTrack] = stream.getVideoTracks();
+      if (videoTrack) {
+        videoTrack.onended = () => {
+          const activeRecorder = captureRecorderRef.current;
+          if (activeRecorder && activeRecorder.state === 'recording') {
+            void finishScreenCapture().catch((error: unknown) => {
+              setImportError(toErrorMessage(error));
+              setScreenCaptureState('idle');
+            });
+          } else {
+            setScreenCaptureState('idle');
+          }
+        };
+      }
+
+      recorder.start();
+      setScreenCaptureState('recording');
+    } catch (error) {
+      setImportError(toErrorMessage(error));
+      captureRecorderRef.current = null;
+      captureStreamRef.current?.getTracks().forEach((track) => track.stop());
+      captureStreamRef.current = null;
+      captureChunksRef.current = [];
+      setScreenCaptureState('idle');
+    }
+  }, [finishScreenCapture, screenCaptureState, supportsScreenCapture]);
+
+  const handleStopScreenCapture = useCallback(() => {
+    if (captureRecorderRef.current?.state !== 'recording') {
+      setScreenCaptureState('idle');
+      return;
+    }
+
+    void finishScreenCapture().catch((error: unknown) => {
+      setImportError(toErrorMessage(error));
+      setScreenCaptureState('idle');
+    });
+  }, [finishScreenCapture]);
+
+  useEffect(() => {
     const handleWindowDragOver = (event: DragEvent) => {
       if (!event.dataTransfer?.types.includes('Files')) {
         return;
@@ -711,8 +859,20 @@ export default function App() {
             </aside>
           </>
         ) : (
-          <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-[1600px] items-center px-4 pb-6 pt-20 sm:px-6">
-            <VideoDropzone onFileSelected={handleImportVideo} isLoading={isImporting} error={importError} mode="embedded" />
+          <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-[1600px] items-center justify-center px-4 pb-6 pt-20 sm:px-6">
+            <VideoDropzone
+              onFileSelected={handleImportVideo}
+              isLoading={isImporting || screenCaptureState === 'processing'}
+              error={importError}
+              mode="embedded"
+              screenCapture={{
+                isSupported: supportsScreenCapture,
+                isStarting: screenCaptureState === 'starting' || screenCaptureState === 'processing',
+                isRecording: screenCaptureState === 'recording',
+                onStart: handleStartScreenCapture,
+                onStop: handleStopScreenCapture,
+              }}
+            />
           </main>
         )}
       </div>
