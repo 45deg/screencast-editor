@@ -20,6 +20,7 @@ export interface VideoMeta {
 
 export interface SliceModel {
   id: string;
+  timelineStart: number;
   sourceStart: number;
   sourceEnd: number;
   duration: number;
@@ -32,6 +33,45 @@ export interface DerivedSlice extends SliceModel {
   sourceDuration: number;
   speed: number;
 }
+
+export interface AnnotationTextStyle {
+  boxEnabled: boolean;
+  boxColor: string;
+  textColor: string;
+  bold: boolean;
+  italic: boolean;
+  fontSize: number;
+  outlineWidth: number;
+  outlineColor: string;
+}
+
+interface AnnotationBase {
+  id: string;
+  start: number;
+  duration: number;
+  x: number;
+  y: number;
+}
+
+export interface TextAnnotation extends AnnotationBase {
+  kind: 'text';
+  text: string;
+  style: AnnotationTextStyle;
+}
+
+export interface ImageAnnotation extends AnnotationBase {
+  kind: 'image';
+  file: File;
+  imageUrl: string;
+  width: number;
+  height: number;
+}
+
+export type AnnotationModel = TextAnnotation | ImageAnnotation;
+
+export type DerivedAnnotation<T extends AnnotationModel = AnnotationModel> = T & {
+  end: number;
+};
 
 export interface ExportSettings {
   format: OutputFormat;
@@ -52,8 +92,22 @@ export interface TimelineScrollInfo {
 
 export interface EditorSnapshot {
   slices: SliceModel[];
+  annotations: AnnotationModel[];
   globalCrop: CropRect | null;
+  selectedSliceId: string | null;
+  selectedAnnotationId: string | null;
 }
+
+export const DEFAULT_TEXT_ANNOTATION_STYLE: AnnotationTextStyle = {
+  boxEnabled: true,
+  boxColor: '#b91c1c',
+  textColor: '#ffffff',
+  bold: false,
+  italic: false,
+  fontSize: 44,
+  outlineWidth: 0,
+  outlineColor: '#000000',
+};
 
 export function cloneCrop(crop: CropRect | null): CropRect | null {
   if (!crop) {
@@ -66,23 +120,56 @@ export function cloneCrop(crop: CropRect | null): CropRect | null {
 export function cloneSlices(slices: SliceModel[]): SliceModel[] {
   return slices.map((slice) => ({
     ...slice,
+    timelineStart: Math.max(0, slice.timelineStart),
+    duration: Math.max(0.0001, slice.duration),
     crop: cloneCrop(slice.crop),
   }));
 }
 
+export function cloneAnnotationStyle(style: AnnotationTextStyle): AnnotationTextStyle {
+  return {
+    ...style,
+    fontSize: Math.max(8, Math.round(style.fontSize)),
+    outlineWidth: Math.max(0, style.outlineWidth),
+  };
+}
+
+export function cloneAnnotation(annotation: AnnotationModel): AnnotationModel {
+  if (annotation.kind === 'text') {
+    return {
+      ...annotation,
+      start: Math.max(0, annotation.start),
+      duration: Math.max(0.0001, annotation.duration),
+      style: cloneAnnotationStyle(annotation.style),
+    };
+  }
+
+  return {
+    ...annotation,
+    start: Math.max(0, annotation.start),
+    duration: Math.max(0.0001, annotation.duration),
+    width: Math.max(1, annotation.width),
+    height: Math.max(1, annotation.height),
+  };
+}
+
+export function cloneAnnotations(annotations: AnnotationModel[]): AnnotationModel[] {
+  return annotations.map((annotation) => cloneAnnotation(annotation));
+}
+
 export function deriveSlices(slices: SliceModel[]): DerivedSlice[] {
-  let offset = 0;
-
-  return slices.map((slice) => {
-    const start = offset;
-    const end = start + slice.duration;
+  return [...slices]
+    .sort((a, b) => a.timelineStart - b.timelineStart || a.id.localeCompare(b.id))
+    .map((slice) => {
+    const duration = Math.max(0.0001, slice.duration);
+    const start = Math.max(0, slice.timelineStart);
+    const end = start + duration;
     const sourceDuration = Math.max(0.0001, slice.sourceEnd - slice.sourceStart);
-    const speed = sourceDuration / Math.max(0.0001, slice.duration);
-
-    offset = end;
+    const speed = sourceDuration / duration;
 
     return {
       ...slice,
+      duration,
       start,
       end,
       sourceDuration,
@@ -91,19 +178,28 @@ export function deriveSlices(slices: SliceModel[]): DerivedSlice[] {
   });
 }
 
+export function deriveAnnotations(annotations: AnnotationModel[]): DerivedAnnotation[] {
+  return [...annotations]
+    .sort((a, b) => a.start - b.start || a.id.localeCompare(b.id))
+    .map((annotation) => ({
+      ...cloneAnnotation(annotation),
+      end: Math.max(0, annotation.start) + Math.max(0.0001, annotation.duration),
+    }));
+}
+
 export function findSliceAtTimelineTime(slices: SliceModel[], time: number): DerivedSlice | null {
   const derived = deriveSlices(slices);
-  const hit = derived.find((slice) => time >= slice.start && time < slice.end);
+  const hit = [...derived].reverse().find((slice) => time >= slice.start && time < slice.end);
 
   if (hit) {
     return hit;
   }
 
-  if (derived.length && time >= derived[derived.length - 1].end) {
-    return derived[derived.length - 1];
+  if (derived.length && time >= Math.max(...derived.map((slice) => slice.end))) {
+    return [...derived].sort((a, b) => a.end - b.end)[derived.length - 1] ?? null;
   }
 
-  return derived[0] ?? null;
+  return null;
 }
 
 export function getSourceTimeAtTimelineTime(slices: SliceModel[], time: number): number {
@@ -118,8 +214,19 @@ export function getSourceTimeAtTimelineTime(slices: SliceModel[], time: number):
   return activeSlice.sourceStart + activeSlice.sourceDuration * sourceProgress;
 }
 
-export function getTotalDuration(slices: SliceModel[]): number {
-  return slices.reduce((acc, slice) => acc + slice.duration, 0);
+export function getActiveAnnotationsAtTimelineTime(
+  annotations: AnnotationModel[],
+  time: number,
+): DerivedAnnotation[] {
+  const derived = deriveAnnotations(annotations);
+  return derived.filter((annotation) => time >= annotation.start && time < annotation.end);
+}
+
+export function getTotalDuration(slices: SliceModel[], annotations: AnnotationModel[] = []): number {
+  const sliceEnds = deriveSlices(slices).map((slice) => slice.end);
+  const annotationEnds = deriveAnnotations(annotations).map((annotation) => annotation.end);
+
+  return Math.max(0, ...sliceEnds, ...annotationEnds);
 }
 
 export function cropEquals(a: CropRect | null, b: CropRect | null): boolean {

@@ -12,7 +12,8 @@ import { Toolbar } from '@base-ui/react/toolbar';
 import { Check, Crop, Focus, Pause, Play, RotateCcw, SkipBack, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import type { CropRect, VideoMeta } from '../types/editor';
+import TextStyleToolbar from './annotation/TextStyleToolbar';
+import type { AnnotationModel, AnnotationTextStyle, CropRect, TextAnnotation, VideoMeta } from '../types/editor';
 
 type DragMode = 'move' | 'n' | 's' | 'w' | 'e' | 'nw' | 'ne' | 'sw' | 'se';
 
@@ -24,6 +25,10 @@ interface CanvasPreviewProps {
   totalDuration: number;
   baseCrop: CropRect;
   activeSceneCrop: CropRect | null;
+  activeAnnotations: AnnotationModel[];
+  selectedAnnotationId: string | null;
+  selectedTextAnnotation: TextAnnotation | null;
+  hasActiveVideoSlice: boolean;
   editMode: 'idle' | 'crop' | 'scene';
   editCrop: CropRect | null;
   onStartCrop: () => void;
@@ -32,6 +37,11 @@ interface CanvasPreviewProps {
   onCancelEdit: () => void;
   onResetEdit: () => void;
   onCurrentTimeChange: (time: number) => void;
+  onSelectedAnnotationIdChange: (annotationId: string | null) => void;
+  onAnnotationPositionPreview: (annotationId: string, x: number, y: number) => void;
+  onAnnotationPositionCommit: () => void;
+  onTextAnnotationChange: (text: string) => void;
+  onTextAnnotationStyleChange: (next: Partial<AnnotationTextStyle>) => void;
   className?: string;
   fillHeight?: boolean;
 }
@@ -52,6 +62,14 @@ interface DragState {
   latestCrop: CropRect;
 }
 
+interface AnnotationDragState {
+  annotation: AnnotationModel;
+  startX: number;
+  startY: number;
+  initialX: number;
+  initialY: number;
+}
+
 interface PadBox {
   left: number;
   top: number;
@@ -65,7 +83,13 @@ interface DisplayLayout {
   padBox: PadBox | null;
 }
 
+interface FrameSize {
+  width: number;
+  height: number;
+}
+
 const MIN_CROP_SIZE = 24;
+
 function clampRectToVideo(rect: CropRect, video: VideoMeta): CropRect {
   const x = Math.max(0, Math.min(video.width - 1, Math.round(rect.x)));
   const y = Math.max(0, Math.min(video.height - 1, Math.round(rect.y)));
@@ -221,6 +245,38 @@ function formatSeconds(seconds: number): string {
   return `${seconds.toFixed(2)}s`;
 }
 
+function clampAnnotationPosition(annotation: AnnotationModel, nextX: number, nextY: number, frameCrop: CropRect) {
+  if (annotation.kind === 'image') {
+    return {
+      x: Math.max(0, Math.min(frameCrop.w - annotation.width, Math.round(nextX))),
+      y: Math.max(0, Math.min(frameCrop.h - annotation.height, Math.round(nextY))),
+    };
+  }
+
+  return {
+    x: Math.max(0, Math.min(frameCrop.w - 8, Math.round(nextX))),
+    y: Math.max(0, Math.min(frameCrop.h - 8, Math.round(nextY))),
+  };
+}
+
+function toTextStyle(style: AnnotationTextStyle, scale: number): CSSProperties {
+  const fontSize = Math.max(10, style.fontSize * scale);
+  const outlineWidth = Math.max(0, style.outlineWidth * scale);
+
+  return {
+    color: style.textColor,
+    fontWeight: style.bold ? 700 : 500,
+    fontStyle: style.italic ? 'italic' : 'normal',
+    fontSize: `${fontSize}px`,
+    lineHeight: 1.25,
+    whiteSpace: 'pre-wrap',
+    backgroundColor: style.boxEnabled ? style.boxColor : 'transparent',
+    padding: style.boxEnabled ? `${Math.max(2, fontSize * 0.14)}px ${Math.max(6, fontSize * 0.24)}px` : '0',
+    borderRadius: style.boxEnabled ? `${Math.max(2, fontSize * 0.14)}px` : '0',
+    WebkitTextStroke: outlineWidth > 0 ? `${outlineWidth}px ${style.outlineColor}` : undefined,
+  };
+}
+
 export default function CanvasPreview({
   video,
   fileName,
@@ -229,6 +285,10 @@ export default function CanvasPreview({
   totalDuration,
   baseCrop,
   activeSceneCrop,
+  activeAnnotations,
+  selectedAnnotationId,
+  selectedTextAnnotation,
+  hasActiveVideoSlice,
   editMode,
   editCrop,
   onStartCrop,
@@ -237,6 +297,11 @@ export default function CanvasPreview({
   onCancelEdit,
   onResetEdit,
   onCurrentTimeChange,
+  onSelectedAnnotationIdChange,
+  onAnnotationPositionPreview,
+  onAnnotationPositionCommit,
+  onTextAnnotationChange,
+  onTextAnnotationStyleChange,
   className,
   fillHeight = false,
 }: CanvasPreviewProps) {
@@ -244,10 +309,12 @@ export default function CanvasPreview({
   const videoRef = useRef<HTMLVideoElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
+  const annotationDragRef = useRef<AnnotationDragState | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const timelineTimeRef = useRef(currentTime);
   const lastFrameTimeRef = useRef<number | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [annotationDragging, setAnnotationDragging] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [viewport, setViewport] = useState<ViewportInfo>({
     scale: 1,
@@ -256,6 +323,7 @@ export default function CanvasPreview({
     width: video.width,
     height: video.height,
   });
+  const [frameSize, setFrameSize] = useState<FrameSize>({ width: 1, height: 1 });
   const isEditing = editMode !== 'idle';
 
   const syncVideoTime = useCallback(
@@ -298,6 +366,11 @@ export default function CanvasPreview({
 
     const update = () => {
       setViewport(measureViewport(element, video));
+      const rect = element.getBoundingClientRect();
+      setFrameSize({
+        width: Math.max(1, rect.width),
+        height: Math.max(1, rect.height),
+      });
     };
 
     const observer = new ResizeObserver(update);
@@ -311,7 +384,7 @@ export default function CanvasPreview({
 
   useEffect(() => {
     syncVideoTime(videoRef.current);
-  }, [isEditing, syncVideoTime, video.objectUrl]);
+  }, [hasActiveVideoSlice, isEditing, syncVideoTime, video.objectUrl]);
 
   useEffect(() => {
     if (!isPlaying) {
@@ -406,6 +479,46 @@ export default function CanvasPreview({
     };
   }, [dragging, isEditing, onEditCropPreview, video, viewport.scale]);
 
+  useEffect(() => {
+    if (!annotationDragging || isEditing) {
+      return;
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const current = annotationDragRef.current;
+      if (!current || frameSize.width <= 0 || frameSize.height <= 0) {
+        return;
+      }
+
+      const dx = event.clientX - current.startX;
+      const dy = event.clientY - current.startY;
+      const dxFrame = (dx / frameSize.width) * displayLayout.frameCrop.w;
+      const dyFrame = (dy / frameSize.height) * displayLayout.frameCrop.h;
+      const clamped = clampAnnotationPosition(
+        current.annotation,
+        current.initialX + dxFrame,
+        current.initialY + dyFrame,
+        displayLayout.frameCrop,
+      );
+
+      onAnnotationPositionPreview(current.annotation.id, clamped.x, clamped.y);
+    };
+
+    const handlePointerUp = () => {
+      annotationDragRef.current = null;
+      setAnnotationDragging(false);
+      onAnnotationPositionCommit();
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [annotationDragging, displayLayout.frameCrop, frameSize.height, frameSize.width, isEditing, onAnnotationPositionCommit, onAnnotationPositionPreview]);
+
   const beginDrag = useCallback(
     (event: ReactPointerEvent, mode: DragMode) => {
       event.preventDefault();
@@ -422,6 +535,25 @@ export default function CanvasPreview({
       setDragging(true);
     },
     [safeEditCrop],
+  );
+
+  const beginAnnotationDrag = useCallback(
+    (event: ReactPointerEvent, annotation: AnnotationModel) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      annotationDragRef.current = {
+        annotation,
+        startX: event.clientX,
+        startY: event.clientY,
+        initialX: annotation.x,
+        initialY: annotation.y,
+      };
+
+      onSelectedAnnotationIdChange(annotation.id);
+      setAnnotationDragging(true);
+    },
+    [onSelectedAnnotationIdChange],
   );
 
   const handleTogglePlay = useCallback(() => {
@@ -448,84 +580,100 @@ export default function CanvasPreview({
     onStartCrop();
   }, [onStartCrop]);
 
+  const annotationScale = useMemo(() => {
+    return frameSize.height / Math.max(1, displayLayout.frameCrop.h);
+  }, [displayLayout.frameCrop.h, frameSize.height]);
+
   return (
     <section
       className={`flex flex-1 flex-col rounded-lg border border-slate-800/70 bg-slate-950/55 p-2 shadow-xl ${fillHeight ? 'min-h-0 h-full' : 'min-h-[320px]'} ${className ?? ''}`}
     >
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="sr-only">{t('canvas.title')}</h2>
+      <div className="mb-2 flex flex-col gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="sr-only">{t('canvas.title')}</h2>
 
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <p className="min-w-0 max-w-[52vw] truncate text-xs text-slate-400 sm:max-w-[360px]" title={fileName}>
-            {fileName}
-          </p>
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <p className="min-w-0 max-w-[52vw] truncate text-xs text-slate-400 sm:max-w-[360px]" title={fileName}>
+              {fileName}
+            </p>
+          </div>
+
+          {isEditing ? (
+            <div className="inline-flex items-center gap-2">
+              <Button
+                type="button"
+                onClick={onResetEdit}
+                className="inline-flex items-center gap-1 rounded-md border border-slate-600 bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-slate-100 transition hover:border-cyan-400/60 hover:text-cyan-100"
+              >
+                <RotateCcw size={13} />
+                {t('canvas.reset')}
+              </Button>
+              <Button
+                type="button"
+                onClick={onCancelEdit}
+                className="inline-flex items-center gap-1 rounded-md border border-rose-300/40 bg-rose-400/10 px-2.5 py-1.5 text-xs font-medium text-rose-100 transition hover:bg-rose-400/20"
+              >
+                <X size={13} />
+                {t('canvas.cancel')}
+              </Button>
+              <Button
+                type="button"
+                onClick={onConfirmEdit}
+                className="inline-flex items-center gap-1 rounded-md border border-emerald-300/40 bg-emerald-400/10 px-2.5 py-1.5 text-xs font-medium text-emerald-100 transition hover:bg-emerald-400/20"
+              >
+                <Check size={13} />
+                {t('canvas.confirm')}
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Toolbar.Root
+                aria-label={t('canvas.previewControls')}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-950/90 p-1"
+              >
+                <Toolbar.Group className="inline-flex items-center gap-1">
+                  <Toolbar.Button
+                    aria-label={t('canvas.restartPreview')}
+                    onClick={handleRestart}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-300 transition hover:bg-slate-800 hover:text-white"
+                  >
+                    <SkipBack size={14} />
+                  </Toolbar.Button>
+                  <Toolbar.Button
+                    aria-label={isPlaying ? t('canvas.pausePreview') : t('canvas.playPreview')}
+                    onClick={handleTogglePlay}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-100 transition hover:bg-cyan-500/15 hover:text-cyan-100"
+                  >
+                    {isPlaying ? <Pause size={14} /> : <Play size={14} className="ml-0.5" />}
+                  </Toolbar.Button>
+                </Toolbar.Group>
+                <Toolbar.Separator className="mx-1 h-5 w-px bg-slate-800" />
+                <div className="min-w-[110px] px-2 text-right font-mono text-[11px] text-slate-300">
+                  {formatSeconds(currentTime)} / {formatSeconds(totalDuration)}
+                </div>
+              </Toolbar.Root>
+
+              <Button
+                type="button"
+                onClick={handleStartCropClick}
+                className="inline-flex items-center gap-1 rounded-md border border-cyan-300/40 bg-cyan-400/10 px-2.5 py-1.5 text-xs font-medium text-cyan-100 transition hover:bg-cyan-400/20"
+              >
+                <Crop size={13} />
+                {t('sliceEditor.crop')}
+              </Button>
+            </div>
+          )}
         </div>
 
-        {isEditing ? (
-          <div className="inline-flex items-center gap-2">
-            <Button
-              type="button"
-              onClick={onResetEdit}
-              className="inline-flex items-center gap-1 rounded-md border border-slate-600 bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-slate-100 transition hover:border-cyan-400/60 hover:text-cyan-100"
-            >
-              <RotateCcw size={13} />
-              {t('canvas.reset')}
-            </Button>
-            <Button
-              type="button"
-              onClick={onCancelEdit}
-              className="inline-flex items-center gap-1 rounded-md border border-rose-300/40 bg-rose-400/10 px-2.5 py-1.5 text-xs font-medium text-rose-100 transition hover:bg-rose-400/20"
-            >
-              <X size={13} />
-              {t('canvas.cancel')}
-            </Button>
-            <Button
-              type="button"
-              onClick={onConfirmEdit}
-              className="inline-flex items-center gap-1 rounded-md border border-emerald-300/40 bg-emerald-400/10 px-2.5 py-1.5 text-xs font-medium text-emerald-100 transition hover:bg-emerald-400/20"
-            >
-              <Check size={13} />
-              {t('canvas.confirm')}
-            </Button>
+        {!isEditing ? (
+          <div className="flex justify-end">
+            <TextStyleToolbar
+              selectedTextAnnotation={selectedTextAnnotation}
+              onTextChange={onTextAnnotationChange}
+              onStyleChange={onTextAnnotationStyleChange}
+            />
           </div>
-        ) : (
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Toolbar.Root
-              aria-label={t('canvas.previewControls')}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-950/90 p-1"
-            >
-              <Toolbar.Group className="inline-flex items-center gap-1">
-                <Toolbar.Button
-                  aria-label={t('canvas.restartPreview')}
-                  onClick={handleRestart}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-300 transition hover:bg-slate-800 hover:text-white"
-                >
-                  <SkipBack size={14} />
-                </Toolbar.Button>
-                <Toolbar.Button
-                  aria-label={isPlaying ? t('canvas.pausePreview') : t('canvas.playPreview')}
-                  onClick={handleTogglePlay}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-100 transition hover:bg-cyan-500/15 hover:text-cyan-100"
-                >
-                  {isPlaying ? <Pause size={14} /> : <Play size={14} className="ml-0.5" />}
-                </Toolbar.Button>
-              </Toolbar.Group>
-              <Toolbar.Separator className="mx-1 h-5 w-px bg-slate-800" />
-              <div className="min-w-[110px] px-2 text-right font-mono text-[11px] text-slate-300">
-                {formatSeconds(currentTime)} / {formatSeconds(totalDuration)}
-              </div>
-            </Toolbar.Root>
-
-            <Button
-              type="button"
-              onClick={handleStartCropClick}
-              className="inline-flex items-center gap-1 rounded-md border border-cyan-300/40 bg-cyan-400/10 px-2.5 py-1.5 text-xs font-medium text-cyan-100 transition hover:bg-cyan-400/20"
-            >
-              <Crop size={13} />
-              {t('sliceEditor.crop')}
-            </Button>
-          </div>
-        )}
+        ) : null}
       </div>
 
       <div className="flex flex-1 items-center justify-center overflow-hidden rounded-md border border-slate-800 bg-black/95 p-1">
@@ -537,6 +685,11 @@ export default function CanvasPreview({
               ? `${video.width} / ${video.height}`
               : `${displayLayout.frameCrop.w} / ${displayLayout.frameCrop.h}`,
             maxHeight: '100%',
+          }}
+          onPointerDown={(event) => {
+            if (!isEditing && event.target === event.currentTarget) {
+              onSelectedAnnotationIdChange(null);
+            }
           }}
         >
           {isEditing ? (
@@ -638,41 +791,92 @@ export default function CanvasPreview({
             <>
               <div className="absolute inset-0 bg-black" />
 
-              {displayLayout.padBox ? (
-                <div
-                  className="absolute overflow-hidden"
-                  style={{
-                    left: `${displayLayout.padBox.left}%`,
-                    top: `${displayLayout.padBox.top}%`,
-                    width: `${displayLayout.padBox.width}%`,
-                    height: `${displayLayout.padBox.height}%`,
-                  }}
-                >
-                  <video
-                    ref={videoRef}
-                    src={video.objectUrl}
-                    muted
-                    controls={false}
-                    preload="auto"
-                    className="absolute"
-                    style={createCropVideoStyle(video, displayLayout.contentCrop)}
-                  />
-                </div>
-              ) : (
-                <div className="absolute inset-0 overflow-hidden">
-                  <video
-                    ref={videoRef}
-                    src={video.objectUrl}
-                    muted
-                    controls={false}
-                    preload="auto"
-                    className="absolute"
-                    onLoadedMetadata={() => syncVideoTime(videoRef.current)}
-                    style={createCropVideoStyle(video, displayLayout.contentCrop)}
-                  />
-                </div>
-              )}
+              {hasActiveVideoSlice ? (
+                displayLayout.padBox ? (
+                  <div
+                    className="absolute overflow-hidden"
+                    style={{
+                      left: `${displayLayout.padBox.left}%`,
+                      top: `${displayLayout.padBox.top}%`,
+                      width: `${displayLayout.padBox.width}%`,
+                      height: `${displayLayout.padBox.height}%`,
+                    }}
+                  >
+                    <video
+                      ref={videoRef}
+                      src={video.objectUrl}
+                      muted
+                      controls={false}
+                      preload="auto"
+                      className="absolute"
+                      style={createCropVideoStyle(video, displayLayout.contentCrop)}
+                    />
+                  </div>
+                ) : (
+                  <div className="absolute inset-0 overflow-hidden">
+                    <video
+                      ref={videoRef}
+                      src={video.objectUrl}
+                      muted
+                      controls={false}
+                      preload="auto"
+                      className="absolute"
+                      onLoadedMetadata={() => syncVideoTime(videoRef.current)}
+                      style={createCropVideoStyle(video, displayLayout.contentCrop)}
+                    />
+                  </div>
+                )
+              ) : null}
 
+              <div className="absolute inset-0">
+                {activeAnnotations.map((annotation) => {
+                  const left = (annotation.x / Math.max(1, displayLayout.frameCrop.w)) * frameSize.width;
+                  const top = (annotation.y / Math.max(1, displayLayout.frameCrop.h)) * frameSize.height;
+                  const selected = annotation.id === selectedAnnotationId;
+
+                  if (annotation.kind === 'text') {
+                    return (
+                      <button
+                        key={annotation.id}
+                        type="button"
+                        onPointerDown={(event) => beginAnnotationDrag(event, annotation)}
+                        className={`absolute max-w-[94%] cursor-move text-left transition ${
+                          selected ? 'ring-2 ring-cyan-300/80 ring-offset-2 ring-offset-black' : ''
+                        }`}
+                        style={{
+                          left: `${left}px`,
+                          top: `${top}px`,
+                          ...toTextStyle(annotation.style, annotationScale),
+                        }}
+                      >
+                        {annotation.text}
+                      </button>
+                    );
+                  }
+
+                  const width = (annotation.width / Math.max(1, displayLayout.frameCrop.w)) * frameSize.width;
+                  const height = (annotation.height / Math.max(1, displayLayout.frameCrop.h)) * frameSize.height;
+
+                  return (
+                    <button
+                      key={annotation.id}
+                      type="button"
+                      onPointerDown={(event) => beginAnnotationDrag(event, annotation)}
+                      className={`absolute cursor-move overflow-hidden rounded-sm border transition ${
+                        selected ? 'border-cyan-200 ring-2 ring-cyan-300/80 ring-offset-2 ring-offset-black' : 'border-slate-200/50'
+                      }`}
+                      style={{
+                        left: `${left}px`,
+                        top: `${top}px`,
+                        width: `${Math.max(10, width)}px`,
+                        height: `${Math.max(10, height)}px`,
+                      }}
+                    >
+                      <img src={annotation.imageUrl} alt="" className="h-full w-full object-contain" />
+                    </button>
+                  );
+                })}
+              </div>
             </>
           )}
         </div>

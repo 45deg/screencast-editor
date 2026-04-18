@@ -12,14 +12,21 @@ import VideoDropzone from './components/VideoDropzone';
 import { i18n } from './i18n';
 import { buildFfmpegCommand } from './lib/ffmpegCommand';
 import { loadFfmpegRuntimeFromCDN } from './lib/ffmpegClient';
+import { readImageMetaFromObjectUrl } from './lib/image';
+import { rasterizeAnnotationsToOverlays } from './lib/overlayRasterizer';
 import { readVideoMetadata, revokeVideoObjectUrl } from './lib/video';
 import { useEditorStore } from './store/editorStore';
 import {
+  DEFAULT_TEXT_ANNOTATION_STYLE,
   deriveSlices,
   findSliceAtTimelineTime,
+  getActiveAnnotationsAtTimelineTime,
   getSourceTimeAtTimelineTime,
   getTotalDuration,
+  type AnnotationModel,
+  type AnnotationTextStyle,
   type CropRect,
+  type TextAnnotation,
   type SliceModel,
   type VideoMeta,
 } from './types/editor';
@@ -73,11 +80,38 @@ function findSliceIdAtTimelineTime(slices: SliceModel[], time: number): string |
     return hit.id;
   }
 
-  if (derived.length && time >= derived[derived.length - 1].end) {
-    return derived[derived.length - 1].id;
+  if (derived.length) {
+    const latest = [...derived].sort((a, b) => a.end - b.end)[derived.length - 1];
+    if (latest && time >= latest.end) {
+      return latest.id;
+    }
   }
 
-  return derived[0]?.id ?? null;
+  return null;
+}
+
+function revokeAnnotationImageUrls(annotations: AnnotationModel[]): void {
+  for (const annotation of annotations) {
+    if (annotation.kind !== 'image') {
+      continue;
+    }
+
+    URL.revokeObjectURL(annotation.imageUrl);
+  }
+}
+
+function clampAnnotationPosition(annotation: AnnotationModel, nextX: number, nextY: number, baseCrop: CropRect) {
+  if (annotation.kind === 'image') {
+    return {
+      x: Math.max(0, Math.min(baseCrop.w - annotation.width, Math.round(nextX))),
+      y: Math.max(0, Math.min(baseCrop.h - annotation.height, Math.round(nextY))),
+    };
+  }
+
+  return {
+    x: Math.max(0, Math.min(baseCrop.w - 8, Math.round(nextX))),
+    y: Math.max(0, Math.min(baseCrop.h - 8, Math.round(nextY))),
+  };
 }
 
 function getFileExtension(fileName: string, fallback: string): string {
@@ -155,6 +189,7 @@ export default function App() {
   const captureRecorderRef = useRef<MediaRecorder | null>(null);
   const captureStreamRef = useRef<MediaStream | null>(null);
   const captureChunksRef = useRef<Blob[]>([]);
+  const pendingAnnotationPreviewRef = useRef<AnnotationModel[] | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -169,8 +204,10 @@ export default function App() {
   const {
     video,
     slices,
+    annotations,
     currentTime,
     selectedSliceId,
+    selectedAnnotationId,
     globalCrop,
     exportSettings,
     ffmpegStatus,
@@ -181,8 +218,11 @@ export default function App() {
     clearVideo,
     setCurrentTime,
     setSelectedSliceId,
+    setSelectedAnnotationId,
     replaceSlicesPreview,
     replaceSlicesCommit,
+    replaceAnnotationsPreview,
+    replaceAnnotationsCommit,
     setGlobalCropCommit,
     setSliceCropCommit,
     updateExportSettings,
@@ -221,8 +261,22 @@ export default function App() {
     return clampCropToVideo(previewSlice.crop, video);
   }, [previewSlice, video]);
 
+  const activeAnnotations = useMemo(
+    () => getActiveAnnotationsAtTimelineTime(annotations, currentTime),
+    [annotations, currentTime],
+  );
+
+  const selectedTextAnnotation = useMemo(() => {
+    const selected = annotations.find((annotation) => annotation.id === selectedAnnotationId);
+    if (!selected || selected.kind !== 'text') {
+      return null;
+    }
+
+    return selected;
+  }, [annotations, selectedAnnotationId]);
+
   const hasVideo = Boolean(video && baseCrop);
-  const totalDuration = useMemo(() => getTotalDuration(slices), [slices]);
+  const totalDuration = useMemo(() => getTotalDuration(slices, annotations), [annotations, slices]);
   const previewSourceTime = useMemo(() => getSourceTimeAtTimelineTime(slices, currentTime), [currentTime, slices]);
   const videoInfoItems = useMemo(() => {
     if (!video) {
@@ -289,6 +343,7 @@ export default function App() {
     setCropEditMode('idle');
     setCropEditDraft(null);
     setSceneCropTargetSliceId(null);
+    pendingAnnotationPreviewRef.current = null;
   }, [video?.objectUrl]);
 
   useEffect(() => {
@@ -329,6 +384,7 @@ export default function App() {
         if (video) {
           revokeVideoObjectUrl(video);
         }
+        revokeAnnotationImageUrls(annotations);
 
         setVideo(nextVideo);
         void ensureFfmpegRuntimeReady();
@@ -338,18 +394,19 @@ export default function App() {
         setIsImporting(false);
       }
     },
-    [ensureFfmpegRuntimeReady, setVideo, video],
+    [annotations, ensureFfmpegRuntimeReady, setVideo, video],
   );
 
   const handleReturnToLanding = useCallback(() => {
     if (video) {
       revokeVideoObjectUrl(video);
     }
+    revokeAnnotationImageUrls(annotations);
 
     clearVideo();
     setImportError(null);
     setExportError(null);
-  }, [clearVideo, video]);
+  }, [annotations, clearVideo, video]);
 
   const closeCropEditor = useCallback(() => {
     setCropEditMode('idle');
@@ -363,10 +420,11 @@ export default function App() {
     }
 
     const initial = globalCrop ? clampCropToVideo(globalCrop, video) : fullCrop;
+    setSelectedAnnotationId(null);
     setCropEditMode('crop');
     setSceneCropTargetSliceId(null);
     setCropEditDraft(initial);
-  }, [fullCrop, globalCrop, video]);
+  }, [fullCrop, globalCrop, setSelectedAnnotationId, video]);
 
   const handleStartSceneCropEdit = useCallback(() => {
     if (!video || !slices.length || !baseCrop) {
@@ -383,11 +441,12 @@ export default function App() {
       return;
     }
 
+    setSelectedAnnotationId(null);
     setSelectedSliceId(targetSliceId);
     setCropEditMode('scene');
     setSceneCropTargetSliceId(targetSliceId);
     setCropEditDraft(targetSlice.crop ? clampCropToVideo(targetSlice.crop, video) : baseCrop);
-  }, [baseCrop, currentTime, selectedSliceId, setSelectedSliceId, slices, video]);
+  }, [baseCrop, currentTime, selectedSliceId, setSelectedAnnotationId, setSelectedSliceId, slices, video]);
 
   const handleEditCropPreview = useCallback(
     (crop: CropRect) => {
@@ -441,8 +500,188 @@ export default function App() {
     setCropEditDraft(fullCrop);
   }, [fullCrop]);
 
+  const handleCreateTextAnnotation = useCallback(() => {
+    if (!baseCrop) {
+      return;
+    }
+
+    const annotationId = crypto.randomUUID();
+    const nextAnnotation: TextAnnotation = {
+      id: annotationId,
+      kind: 'text',
+      start: currentTime,
+      duration: 2.5,
+      x: Math.round(baseCrop.w * 0.06),
+      y: Math.round(baseCrop.h * 0.08),
+      text: t('canvas.defaultText'),
+      style: {
+        ...DEFAULT_TEXT_ANNOTATION_STYLE,
+      },
+    };
+
+    const nextAnnotations = [...annotations, nextAnnotation];
+    replaceAnnotationsCommit(nextAnnotations, annotationId);
+    setSelectedSliceId(null);
+    setSelectedAnnotationId(annotationId);
+  }, [
+    annotations,
+    baseCrop,
+    currentTime,
+    replaceAnnotationsCommit,
+    setSelectedAnnotationId,
+    setSelectedSliceId,
+    t,
+  ]);
+
+  const handleCreateImageAnnotation = useCallback(
+    async (file: File) => {
+      if (!baseCrop) {
+        return;
+      }
+
+      let imageUrl = '';
+
+      try {
+        imageUrl = URL.createObjectURL(file);
+        const meta = await readImageMetaFromObjectUrl(imageUrl);
+        const maxWidth = Math.max(72, Math.round(baseCrop.w * 0.35));
+        const scale = Math.min(1, maxWidth / Math.max(1, meta.width));
+        const width = Math.max(24, Math.round(meta.width * scale));
+        const height = Math.max(24, Math.round(meta.height * scale));
+        const annotationId = crypto.randomUUID();
+
+        const nextAnnotation: AnnotationModel = {
+          id: annotationId,
+          kind: 'image',
+          start: currentTime,
+          duration: 3,
+          x: Math.max(0, Math.round((baseCrop.w - width) / 2)),
+          y: Math.max(0, Math.round((baseCrop.h - height) / 2)),
+          width,
+          height,
+          file,
+          imageUrl,
+        };
+
+        const nextAnnotations = [...annotations, nextAnnotation];
+        replaceAnnotationsCommit(nextAnnotations, annotationId);
+        setSelectedSliceId(null);
+        setSelectedAnnotationId(annotationId);
+      } catch (error) {
+        if (imageUrl) {
+          URL.revokeObjectURL(imageUrl);
+        }
+        setImportError(toErrorMessage(error));
+      }
+    },
+    [
+      annotations,
+      baseCrop,
+      currentTime,
+      replaceAnnotationsCommit,
+      setSelectedAnnotationId,
+      setSelectedSliceId,
+    ],
+  );
+
+  const handleSelectedAnnotationChange = useCallback(
+    (annotationId: string | null) => {
+      setSelectedSliceId(null);
+      setSelectedAnnotationId(annotationId);
+    },
+    [setSelectedAnnotationId, setSelectedSliceId],
+  );
+
+  const handleAnnotationPositionPreview = useCallback(
+    (annotationId: string, x: number, y: number) => {
+      if (!baseCrop) {
+        return;
+      }
+
+      const nextAnnotations = annotations.map((annotation) => {
+        if (annotation.id !== annotationId) {
+          return annotation;
+        }
+
+        const clamped = clampAnnotationPosition(annotation, x, y, baseCrop);
+        return {
+          ...annotation,
+          x: clamped.x,
+          y: clamped.y,
+        };
+      });
+
+      pendingAnnotationPreviewRef.current = nextAnnotations;
+      replaceAnnotationsPreview(nextAnnotations);
+    },
+    [annotations, baseCrop, replaceAnnotationsPreview],
+  );
+
+  const handleAnnotationPositionCommit = useCallback(() => {
+    const pending = pendingAnnotationPreviewRef.current;
+    if (!pending) {
+      return;
+    }
+
+    replaceAnnotationsCommit(pending, selectedAnnotationId);
+    pendingAnnotationPreviewRef.current = null;
+  }, [replaceAnnotationsCommit, selectedAnnotationId]);
+
+  const handleTextAnnotationChange = useCallback(
+    (text: string) => {
+      if (!selectedTextAnnotation) {
+        return;
+      }
+
+      const nextAnnotations = annotations.map((annotation) => {
+        if (annotation.id !== selectedTextAnnotation.id || annotation.kind !== 'text') {
+          return annotation;
+        }
+
+        return {
+          ...annotation,
+          text,
+        };
+      });
+
+      replaceAnnotationsCommit(nextAnnotations, selectedTextAnnotation.id);
+    },
+    [annotations, replaceAnnotationsCommit, selectedTextAnnotation],
+  );
+
+  const handleTextAnnotationStyleChange = useCallback(
+    (nextStyle: Partial<AnnotationTextStyle>) => {
+      if (!selectedTextAnnotation) {
+        return;
+      }
+
+      const nextAnnotations = annotations.map((annotation) => {
+        if (annotation.id !== selectedTextAnnotation.id || annotation.kind !== 'text') {
+          return annotation;
+        }
+
+        return {
+          ...annotation,
+          style: {
+            ...annotation.style,
+            ...nextStyle,
+            fontSize: Math.max(8, Math.min(180, Math.round(nextStyle.fontSize ?? annotation.style.fontSize))),
+            outlineWidth: Math.max(0, Math.min(24, nextStyle.outlineWidth ?? annotation.style.outlineWidth)),
+          },
+        };
+      });
+
+      replaceAnnotationsCommit(nextAnnotations, selectedTextAnnotation.id);
+    },
+    [annotations, replaceAnnotationsCommit, selectedTextAnnotation],
+  );
+
   const createCommandPreview = useCallback(
-    (inputFileName?: string, outputFileName?: string) => {
+    (
+      inputFileName?: string,
+      outputFileName?: string,
+      overlayInputs?: Array<{ fileName: string; start: number; end: number }>,
+    ) => {
       if (!video || !slices.length) {
         return null;
       }
@@ -454,9 +693,11 @@ export default function App() {
         exportSettings,
         inputFileName,
         outputFileName,
+        overlayInputs,
+        outputDuration: totalDuration,
       });
     },
-    [exportSettings, globalCrop, slices, video],
+    [exportSettings, globalCrop, slices, totalDuration, video],
   );
 
   const logFfmpegCommandPreview = useCallback(
@@ -473,7 +714,7 @@ export default function App() {
   );
 
   const handleExport = useCallback(async () => {
-    if (!video || !slices.length) {
+    if (!video || !slices.length || !baseCrop) {
       return;
     }
 
@@ -486,28 +727,56 @@ export default function App() {
     setIsExporting(true);
     setExportError(null);
     let runtime: Awaited<ReturnType<typeof loadFfmpegRuntimeFromCDN>> | null = null;
+    let overlayFileNames: string[] = [];
 
     try {
       setFfmpegStatus('loading', null);
       runtime = await loadFfmpegRuntimeFromCDN();
       setFfmpegStatus('ready', null);
+      const activeRuntime = runtime;
 
-      const built = createCommandPreview(inputFileName, outputFileName);
+      if (!activeRuntime) {
+        throw new Error(t('app.unknownError'));
+      }
+
+      const rasterizedOverlays = await rasterizeAnnotationsToOverlays(
+        annotations,
+        baseCrop,
+        exportSettings.width,
+        exportSettings.height,
+      );
+      overlayFileNames = rasterizedOverlays.map((overlay) => overlay.fileName);
+
+      const built = createCommandPreview(
+        inputFileName,
+        outputFileName,
+        rasterizedOverlays.map((overlay) => ({
+          fileName: overlay.fileName,
+          start: overlay.start,
+          end: overlay.end,
+        })),
+      );
       if (!built) {
         throw new Error(t('app.noExportTarget'));
       }
 
       logFfmpegCommandPreview(built);
 
-      const source = await runtime.fetchFile(video.file);
-      await runtime.ffmpeg.writeFile(inputFileName, source);
-      const exitCode = await runtime.ffmpeg.exec(built.execArgs);
+      const source = await activeRuntime.fetchFile(video.file);
+      await activeRuntime.ffmpeg.writeFile(inputFileName, source);
+      for (const overlay of rasterizedOverlays) {
+        const overlayFile = new File([overlay.blob], overlay.fileName, { type: 'image/png' });
+        const overlayBytes = await activeRuntime.fetchFile(overlayFile);
+        await activeRuntime.ffmpeg.writeFile(overlay.fileName, overlayBytes);
+      }
+
+      const exitCode = await activeRuntime.ffmpeg.exec(built.execArgs);
 
       if (exitCode !== 0) {
         throw new Error(t('app.ffmpegExecutionFailed', { code: exitCode }));
       }
 
-      const output = await runtime.ffmpeg.readFile(outputFileName);
+      const output = await activeRuntime.ffmpeg.readFile(outputFileName);
       const outputBytes = typeof output === 'string' ? new TextEncoder().encode(output) : new Uint8Array(output);
       const mimeType = exportSettings.format === 'gif' ? 'image/gif' : 'video/mp4';
       const blob = new Blob([outputBytes], { type: mimeType });
@@ -525,20 +794,26 @@ export default function App() {
       setFfmpegStatus('error', message);
     } finally {
       if (runtime && typeof runtime.ffmpeg.deleteFile === 'function') {
+        const cleanupRuntime = runtime;
+        const cleanupTargets = [inputFileName, outputFileName, ...overlayFileNames];
         await Promise.allSettled([
-          runtime.ffmpeg.deleteFile(inputFileName),
-          runtime.ffmpeg.deleteFile(outputFileName),
+          ...cleanupTargets.map((fileName) => cleanupRuntime.ffmpeg.deleteFile(fileName)),
         ]);
       }
 
       setIsExporting(false);
     }
   }, [
+    annotations,
+    baseCrop,
     createCommandPreview,
+    exportSettings.height,
     exportSettings.format,
+    exportSettings.width,
     logFfmpegCommandPreview,
     setFfmpegStatus,
     slices.length,
+    t,
     video,
   ]);
 
@@ -555,7 +830,9 @@ export default function App() {
 
   useEffect(() => {
     return () => {
-      revokeVideoObjectUrl(useEditorStore.getState().video);
+      const state = useEditorStore.getState();
+      revokeVideoObjectUrl(state.video);
+      revokeAnnotationImageUrls(state.annotations);
     };
   }, []);
 
@@ -715,7 +992,7 @@ export default function App() {
       window.removeEventListener('dragover', handleWindowDragOver);
       window.removeEventListener('drop', handleWindowDrop);
     };
-  }, [handleImportVideo, video]);
+  }, [handleImportVideo, t, video]);
 
   return (
     <Drawer.Root open={isMobileSettingsDrawerOpen} onOpenChange={setIsMobileSettingsDrawerOpen}>
@@ -796,6 +1073,10 @@ export default function App() {
                       totalDuration={totalDuration}
                       baseCrop={baseCrop}
                       activeSceneCrop={activeSceneCrop}
+                      activeAnnotations={activeAnnotations}
+                      selectedAnnotationId={selectedAnnotationId}
+                      selectedTextAnnotation={selectedTextAnnotation}
+                      hasActiveVideoSlice={Boolean(previewSlice)}
                       editMode={cropEditMode}
                       editCrop={effectiveEditCrop}
                       onStartCrop={handleStartCropEdit}
@@ -804,6 +1085,11 @@ export default function App() {
                       onCancelEdit={handleCancelCropEdit}
                       onResetEdit={handleResetCropEdit}
                       onCurrentTimeChange={setCurrentTime}
+                      onSelectedAnnotationIdChange={handleSelectedAnnotationChange}
+                      onAnnotationPositionPreview={handleAnnotationPositionPreview}
+                      onAnnotationPositionCommit={handleAnnotationPositionCommit}
+                      onTextAnnotationChange={handleTextAnnotationChange}
+                      onTextAnnotationStyleChange={handleTextAnnotationStyleChange}
                       className="h-full"
                       fillHeight
                     />
@@ -820,16 +1106,23 @@ export default function App() {
                     <SliceEditorTimeline
                       video={video}
                       slices={slices}
+                      annotations={annotations}
                       currentTime={currentTime}
                       selectedSliceId={selectedSliceId}
+                      selectedAnnotationId={selectedAnnotationId}
                       canStartSceneCrop={slices.length > 0}
                       canUndo={past.length > 0}
                       canRedo={future.length > 0}
                       onCurrentTimeChange={setCurrentTime}
                       onSelectedSliceIdChange={setSelectedSliceId}
+                      onSelectedAnnotationIdChange={handleSelectedAnnotationChange}
                       onStartSceneCrop={handleStartSceneCropEdit}
                       onSlicesPreview={replaceSlicesPreview}
                       onSlicesCommit={replaceSlicesCommit}
+                      onAnnotationsPreview={replaceAnnotationsPreview}
+                      onAnnotationsCommit={replaceAnnotationsCommit}
+                      onCreateTextAnnotation={handleCreateTextAnnotation}
+                      onCreateImageAnnotation={handleCreateImageAnnotation}
                       baseCrop={baseCrop}
                       outputAspectRatio={outputAspectRatio}
                       onUndo={undo}

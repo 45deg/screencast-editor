@@ -67,6 +67,7 @@ function createSlices(): SliceModel[] {
   return [
     {
       id: 'slice-a',
+      timelineStart: 0,
       sourceStart: 0,
       sourceEnd: 2,
       duration: 2,
@@ -74,6 +75,7 @@ function createSlices(): SliceModel[] {
     },
     {
       id: 'slice-b',
+      timelineStart: 2,
       sourceStart: 2,
       sourceEnd: 4,
       duration: 1,
