@@ -1,4 +1,5 @@
 import type { CropRect } from '../types/editor';
+import { i18n } from '../i18n';
 
 export interface VideoThumbnailOptions {
   videoUrl: string;
@@ -64,7 +65,7 @@ function drawFrameWithCrop(
 
   const stageContext = stageCanvas.getContext('2d');
   if (!stageContext) {
-    throw new Error('サムネイル合成用のキャンバスを初期化できませんでした。');
+    throw new Error(i18n.t('thumbnail.stageCanvasInitFailed'));
   }
 
   stageContext.fillStyle = '#000000';
@@ -132,7 +133,7 @@ export async function captureVideoThumbnail({
     };
 
     video.onerror = () => {
-      fail('サムネイルの生成に失敗しました。');
+      fail(i18n.t('thumbnail.generationFailed'));
     };
 
     video.onloadedmetadata = () => {
@@ -140,7 +141,7 @@ export async function captureVideoThumbnail({
       try {
         video.currentTime = captureTime;
       } catch {
-        fail('サムネイルのシークに失敗しました。');
+        fail(i18n.t('thumbnail.seekFailed'));
       }
     };
 
@@ -152,7 +153,7 @@ export async function captureVideoThumbnail({
 
         const context = canvas.getContext('2d');
         if (!context) {
-          fail('サムネイル描画用のキャンバスを初期化できませんでした。');
+          fail(i18n.t('thumbnail.renderCanvasInitFailed'));
           return;
         }
 
@@ -160,7 +161,7 @@ export async function captureVideoThumbnail({
         cleanup();
         resolve(canvas.toDataURL('image/jpeg', 0.82));
       } catch {
-        fail('サムネイルの描画に失敗しました。');
+        fail(i18n.t('thumbnail.drawFailed'));
       }
     };
 

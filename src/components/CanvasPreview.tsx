@@ -10,6 +10,7 @@ import {
 import { Button } from '@base-ui/react/button';
 import { Toolbar } from '@base-ui/react/toolbar';
 import { Check, Crop, Focus, Pause, Play, RotateCcw, SkipBack, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import type { CropRect, VideoMeta } from '../types/editor';
 
@@ -237,6 +238,7 @@ export default function CanvasPreview({
   onResetEdit,
   onCurrentTimeChange,
 }: CanvasPreviewProps) {
+  const { t } = useTranslation();
   const videoRef = useRef<HTMLVideoElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
@@ -253,6 +255,19 @@ export default function CanvasPreview({
     height: video.height,
   });
   const isEditing = editMode !== 'idle';
+
+  const syncVideoTime = useCallback(
+    (element: HTMLVideoElement | null) => {
+      if (!element) {
+        return;
+      }
+
+      if (Math.abs(element.currentTime - sourceTime) > 0.04) {
+        element.currentTime = Math.max(0, Math.min(video.duration || 0, sourceTime));
+      }
+    },
+    [sourceTime, video.duration],
+  );
 
   useEffect(() => {
     timelineTimeRef.current = currentTime;
@@ -293,15 +308,8 @@ export default function CanvasPreview({
   }, [video]);
 
   useEffect(() => {
-    const element = videoRef.current;
-    if (!element) {
-      return;
-    }
-
-    if (Math.abs(element.currentTime - sourceTime) > 0.04) {
-      element.currentTime = Math.max(0, Math.min(video.duration, sourceTime));
-    }
-  }, [sourceTime, video.duration]);
+    syncVideoTime(videoRef.current);
+  }, [isEditing, syncVideoTime, video.objectUrl]);
 
   useEffect(() => {
     if (!isPlaying) {
@@ -441,7 +449,7 @@ export default function CanvasPreview({
   return (
     <section className="flex min-h-[320px] flex-1 flex-col rounded-2xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-xl">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
-        <h2 className="sr-only">Canvas Preview</h2>
+        <h2 className="sr-only">{t('canvas.title')}</h2>
 
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <p className="min-w-0 max-w-[52vw] truncate text-xs text-slate-400 sm:max-w-[360px]" title={fileName}>
@@ -457,7 +465,7 @@ export default function CanvasPreview({
               className="inline-flex items-center gap-1 rounded-md border border-slate-600 bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-slate-100 transition hover:border-cyan-400/60 hover:text-cyan-100"
             >
               <RotateCcw size={13} />
-              Reset
+              {t('canvas.reset')}
             </Button>
             <Button
               type="button"
@@ -465,7 +473,7 @@ export default function CanvasPreview({
               className="inline-flex items-center gap-1 rounded-md border border-rose-300/40 bg-rose-400/10 px-2.5 py-1.5 text-xs font-medium text-rose-100 transition hover:bg-rose-400/20"
             >
               <X size={13} />
-              Cancel
+              {t('canvas.cancel')}
             </Button>
             <Button
               type="button"
@@ -473,25 +481,25 @@ export default function CanvasPreview({
               className="inline-flex items-center gap-1 rounded-md border border-emerald-300/40 bg-emerald-400/10 px-2.5 py-1.5 text-xs font-medium text-emerald-100 transition hover:bg-emerald-400/20"
             >
               <Check size={13} />
-              OK
+              {t('canvas.confirm')}
             </Button>
           </div>
         ) : (
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Toolbar.Root
-              aria-label="Preview controls"
+              aria-label={t('canvas.previewControls')}
               className="inline-flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-950/90 p-1"
             >
               <Toolbar.Group className="inline-flex items-center gap-1">
                 <Toolbar.Button
-                  aria-label="Restart preview"
+                  aria-label={t('canvas.restartPreview')}
                   onClick={handleRestart}
                   className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-300 transition hover:bg-slate-800 hover:text-white"
                 >
                   <SkipBack size={14} />
                 </Toolbar.Button>
                 <Toolbar.Button
-                  aria-label={isPlaying ? 'Pause preview' : 'Play preview'}
+                  aria-label={isPlaying ? t('canvas.pausePreview') : t('canvas.playPreview')}
                   onClick={handleTogglePlay}
                   className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-100 transition hover:bg-cyan-500/15 hover:text-cyan-100"
                 >
@@ -510,7 +518,7 @@ export default function CanvasPreview({
               className="inline-flex items-center gap-1 rounded-md border border-cyan-300/40 bg-cyan-400/10 px-2.5 py-1.5 text-xs font-medium text-cyan-100 transition hover:bg-cyan-400/20"
             >
               <Crop size={13} />
-              Crop
+              {t('sliceEditor.crop')}
             </Button>
           </div>
         )}
@@ -541,6 +549,7 @@ export default function CanvasPreview({
                   if (host) {
                     setViewport(measureViewport(host, video));
                   }
+                  syncVideoTime(videoRef.current);
                 }}
               />
 
@@ -559,7 +568,7 @@ export default function CanvasPreview({
                   type="button"
                   onPointerDown={(event) => beginDrag(event, 'move')}
                   className="absolute inset-0 cursor-move"
-                  aria-label="Move crop"
+                  aria-label={t('canvas.moveCrop')}
                 />
 
                 <div className="pointer-events-none absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-cyan-100/60" />
@@ -567,50 +576,50 @@ export default function CanvasPreview({
 
                 <button
                   type="button"
-                  aria-label="Resize north-west"
+                  aria-label={t('canvas.resizeNorthWest')}
                   onPointerDown={(event) => beginDrag(event, 'nw')}
                   className="absolute -left-2 -top-2 h-4 w-4 cursor-nwse-resize rounded-full border border-cyan-200 bg-slate-950"
                 />
                 <button
                   type="button"
-                  aria-label="Resize north-east"
+                  aria-label={t('canvas.resizeNorthEast')}
                   onPointerDown={(event) => beginDrag(event, 'ne')}
                   className="absolute -right-2 -top-2 h-4 w-4 cursor-nesw-resize rounded-full border border-cyan-200 bg-slate-950"
                 />
                 <button
                   type="button"
-                  aria-label="Resize south-west"
+                  aria-label={t('canvas.resizeSouthWest')}
                   onPointerDown={(event) => beginDrag(event, 'sw')}
                   className="absolute -bottom-2 -left-2 h-4 w-4 cursor-nesw-resize rounded-full border border-cyan-200 bg-slate-950"
                 />
                 <button
                   type="button"
-                  aria-label="Resize south-east"
+                  aria-label={t('canvas.resizeSouthEast')}
                   onPointerDown={(event) => beginDrag(event, 'se')}
                   className="absolute -bottom-2 -right-2 h-4 w-4 cursor-nwse-resize rounded-full border border-cyan-200 bg-slate-950"
                 />
 
                 <button
                   type="button"
-                  aria-label="Resize north"
+                  aria-label={t('canvas.resizeNorth')}
                   onPointerDown={(event) => beginDrag(event, 'n')}
                   className="absolute left-1/2 top-0 h-4 w-8 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize rounded-full border border-cyan-200 bg-slate-950"
                 />
                 <button
                   type="button"
-                  aria-label="Resize south"
+                  aria-label={t('canvas.resizeSouth')}
                   onPointerDown={(event) => beginDrag(event, 's')}
                   className="absolute bottom-0 left-1/2 h-4 w-8 -translate-x-1/2 translate-y-1/2 cursor-ns-resize rounded-full border border-cyan-200 bg-slate-950"
                 />
                 <button
                   type="button"
-                  aria-label="Resize west"
+                  aria-label={t('canvas.resizeWest')}
                   onPointerDown={(event) => beginDrag(event, 'w')}
                   className="absolute left-0 top-1/2 h-8 w-4 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full border border-cyan-200 bg-slate-950"
                 />
                 <button
                   type="button"
-                  aria-label="Resize east"
+                  aria-label={t('canvas.resizeEast')}
                   onPointerDown={(event) => beginDrag(event, 'e')}
                   className="absolute right-0 top-1/2 h-8 w-4 translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full border border-cyan-200 bg-slate-950"
                 />
@@ -654,6 +663,7 @@ export default function CanvasPreview({
                     controls={false}
                     preload="auto"
                     className="absolute"
+                    onLoadedMetadata={() => syncVideoTime(videoRef.current)}
                     style={createCropVideoStyle(video, displayLayout.contentCrop)}
                   />
                 </div>

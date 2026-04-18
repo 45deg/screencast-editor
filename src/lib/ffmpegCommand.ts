@@ -98,10 +98,14 @@ export function buildFfmpegCommand(input: BuildFfmpegCommandInput): BuildFfmpegC
 
   if (exportSettings.format === 'gif') {
     const palettegen = exportSettings.paletteMode === 'single' ? 'palettegen=stats_mode=single' : 'palettegen';
+    const paletteuse =
+      exportSettings.paletteMode === 'single'
+        ? `paletteuse=new=1:dither=${exportSettings.dither}`
+        : `paletteuse=dither=${exportSettings.dither}`;
     graphParts.push(
       `[concat_v]fps=${Math.max(1, Math.round(exportSettings.gifFps))},scale=${outputWidth}:${outputHeight}:flags=lanczos,split[gif_a][gif_b]`,
       `[gif_a]${palettegen}[gif_p]`,
-      `[gif_b][gif_p]paletteuse=dither=${exportSettings.dither}[out_v]`,
+      `[gif_b][gif_p]${paletteuse}[out_v]`,
     );
   } else {
     graphParts.push(`[concat_v]scale=${outputWidth}:${outputHeight}:flags=lanczos[out_v]`);

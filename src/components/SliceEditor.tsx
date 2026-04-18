@@ -3,6 +3,7 @@ import { Popover } from '@base-ui/react/popover';
 import { Slider } from '@base-ui/react/slider';
 import { motion, type PanInfo } from 'framer-motion';
 import { Clapperboard, Crop, Gauge, Redo2, Scissors, Trash2, Undo2, ZoomIn } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { captureVideoThumbnail } from '../lib/videoThumbnail';
 import {
@@ -74,6 +75,7 @@ function EditorToolbar({
   setZoomSlider,
   zoom,
 }: ToolbarProps) {
+  const { t } = useTranslation();
   const speedInputRef = useRef<HTMLInputElement>(null);
 
   const commitSpeedDraft = useCallback(() => {
@@ -120,7 +122,7 @@ function EditorToolbar({
   return (
     <div className="h-14 border-b border-slate-800/80 bg-slate-950/95 px-2 shadow-sm sm:px-4">
       <div
-        aria-label="Editor controls"
+        aria-label={t('sliceEditor.editorControls')}
         className="timeline-scrollbar flex h-full min-w-max items-center gap-2 overflow-x-auto overflow-y-hidden sm:min-w-0"
       >
         <div className="flex min-w-max items-center gap-1.5 sm:gap-2">
@@ -129,8 +131,8 @@ function EditorToolbar({
             onClick={undo}
             disabled={!canUndo}
             className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-800 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent"
-            aria-label="Undo"
-            title="Undo (Ctrl+Z)"
+            aria-label={t('sliceEditor.undo')}
+            title={t('sliceEditor.undoWithShortcut')}
           >
             <Undo2 size={16} />
           </button>
@@ -139,8 +141,8 @@ function EditorToolbar({
             onClick={redo}
             disabled={!canRedo}
             className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-800 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent"
-            aria-label="Redo"
-            title="Redo (Ctrl+Shift+Z)"
+            aria-label={t('sliceEditor.redo')}
+            title={t('sliceEditor.redoWithShortcut')}
           >
             <Redo2 size={16} />
           </button>
@@ -152,10 +154,10 @@ function EditorToolbar({
             onClick={onSceneCrop}
             disabled={!canSceneCrop}
             className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium text-amber-100 transition hover:bg-amber-400/15 hover:text-white disabled:opacity-30 sm:gap-1.5 sm:px-2.5 sm:text-xs"
-            aria-label="Scene crop"
+            aria-label={t('sliceEditor.sceneCrop')}
           >
             <Clapperboard size={15} />
-            <span className="hidden sm:inline">Crop</span>
+            <span className="hidden sm:inline">{t('sliceEditor.crop')}</span>
           </button>
 
           <button
@@ -163,11 +165,11 @@ function EditorToolbar({
             onClick={onCut}
             disabled={!canCut}
             className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium text-cyan-200 transition hover:bg-cyan-500/15 hover:text-white disabled:opacity-30 sm:gap-1.5 sm:px-2.5 sm:text-xs"
-            aria-label="Cut at playhead"
-            title="Cut at playhead"
+            aria-label={t('sliceEditor.cutAtPlayhead')}
+            title={t('sliceEditor.cutAtPlayhead')}
           >
             <Scissors size={16} />
-            <span className="hidden sm:inline">Cut</span>
+            <span className="hidden sm:inline">{t('sliceEditor.cut')}</span>
           </button>
 
           <button
@@ -175,11 +177,11 @@ function EditorToolbar({
             onClick={onDelete}
             disabled={!canDelete}
             className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium text-rose-300 transition hover:bg-rose-500/15 hover:text-rose-200 disabled:opacity-30 sm:gap-1.5 sm:px-2.5 sm:text-xs"
-            aria-label="Delete selected slice"
-            title="Delete selected slice (Del)"
+            aria-label={t('sliceEditor.deleteSelectedSlice')}
+            title={t('sliceEditor.deleteWithShortcut')}
           >
             <Trash2 size={16} />
-            <span className="hidden sm:inline">Delete</span>
+            <span className="hidden sm:inline">{t('sliceEditor.deleteSelectedSlice')}</span>
           </button>
 
           <div aria-hidden="true" className="mx-1 h-5 w-px bg-slate-700" />
@@ -191,7 +193,7 @@ function EditorToolbar({
               type="button"
               disabled={!selectedSlice}
               className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-800 bg-slate-950 px-2.5 font-medium text-slate-200 transition hover:border-cyan-500/60 hover:bg-slate-900 hover:text-white disabled:opacity-30 sm:text-[11px]"
-              aria-label="Slice speed"
+              aria-label={t('sliceEditor.sliceSpeed')}
             >
               <Gauge size={14} className="text-slate-400" />
               <span className="text-xs">x {selectedSlice ? selectedSlice.speed.toFixed(1) : '1.0'}</span>
@@ -199,7 +201,7 @@ function EditorToolbar({
             <Popover.Portal>
               <Popover.Positioner side="bottom" align="end" sideOffset={8} className="z-[120]">
                 <Popover.Popup className="z-[120] w-44 rounded-xl border border-slate-800 bg-slate-950/98 p-3 shadow-2xl backdrop-blur">
-                  <div className="mb-2 text-[11px] font-medium tracking-wide text-slate-400">Playback speed</div>
+                  <div className="mb-2 text-[11px] font-medium tracking-wide text-slate-400">{t('sliceEditor.playbackSpeed')}</div>
                   <label htmlFor="slice-speed" className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-2 focus-within:border-cyan-500">
                     <Gauge size={14} className="shrink-0 text-slate-400" />
                     <input
@@ -245,7 +247,7 @@ function EditorToolbar({
                 </Slider.Track>
                 <Slider.Thumb
                   className="block h-3 w-3 rounded-full border border-cyan-100 bg-cyan-400 shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300"
-                  title={`Timeline zoom (${zoom.toFixed(2)}x)`}
+                  title={t('sliceEditor.timelineZoom', { zoom: zoom.toFixed(2) })}
                 />
               </Slider.Control>
             </Slider.Root>
@@ -330,6 +332,7 @@ function SliceTrack({
   onResize,
   onResizeEnd,
 }: SliceTrackProps) {
+  const { t } = useTranslation();
   const initialDurationRef = useRef<number>(0);
   const safeOutputAspectRatio = Number.isFinite(outputAspectRatio) && outputAspectRatio > 0 ? outputAspectRatio : 16 / 9;
 
@@ -398,7 +401,7 @@ function SliceTrack({
                     }`}
                   >
                     {slice.crop ? <Crop size={13} className="shrink-0 text-amber-200" /> : null}
-                    Scene#{index + 1}
+                    {t('sliceEditor.sceneNumber', { index: index + 1 })}
                   </div>
                   <div
                     className={`font-mono text-[10px] leading-tight text-cyan-100 drop-shadow ${

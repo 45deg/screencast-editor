@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Drawer } from '@base-ui/react/drawer';
-import { ChevronLeft, Settings2, X } from 'lucide-react';
+import { ChevronLeft, Download, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import CanvasPreview from './components/CanvasPreview';
 import PropertyPanel from './components/PropertyPanel';
 import SliceEditorTimeline from './components/SliceEditor';
 import VideoDropzone from './components/VideoDropzone';
+import { i18n } from './i18n';
 import { buildFfmpegCommand } from './lib/ffmpegCommand';
 import { loadFfmpegRuntimeFromCDN } from './lib/ffmpegClient';
 import { readVideoMetadata, revokeVideoObjectUrl } from './lib/video';
@@ -25,7 +27,7 @@ function toErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return '不明なエラーが発生しました。';
+  return i18n.t('app.unknownError');
 }
 
 function getDefaultCrop(width: number, height: number): CropRect {
@@ -99,6 +101,7 @@ function getFirstVideoFile(files: FileList | null): File | null {
 }
 
 export default function App() {
+  const { t } = useTranslation();
   const ffmpegStatusRef = useRef<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [importError, setImportError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
@@ -420,7 +423,7 @@ export default function App() {
 
       const built = createCommandPreview(inputFileName, outputFileName);
       if (!built) {
-        throw new Error('エクスポート対象がありません。');
+        throw new Error(t('app.noExportTarget'));
       }
 
       logFfmpegCommandPreview(built);
@@ -430,7 +433,7 @@ export default function App() {
       const exitCode = await runtime.ffmpeg.exec(built.execArgs);
 
       if (exitCode !== 0) {
-        throw new Error(`FFmpeg 実行が失敗しました (exit code: ${exitCode})`);
+        throw new Error(t('app.ffmpegExecutionFailed', { code: exitCode }));
       }
 
       const output = await runtime.ffmpeg.readFile(outputFileName);
@@ -509,7 +512,7 @@ export default function App() {
 
       event.preventDefault();
 
-      if (video && !window.confirm('現在の動画を閉じて、新しい動画を読み込みますか？')) {
+      if (video && !window.confirm(t('app.replaceVideoConfirm'))) {
         return;
       }
 
@@ -538,7 +541,7 @@ export default function App() {
                   type="button"
                   onClick={handleReturnToLanding}
                   className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-100 transition hover:border-cyan-400/60 hover:text-cyan-100"
-                  aria-label="戻る"
+                  aria-label={t('app.back')}
                 >
                   <ChevronLeft size={18} />
                 </button>
@@ -549,10 +552,10 @@ export default function App() {
             <div className="flex items-center gap-2">
               {hasVideo && baseCrop ? (
                 <Drawer.Trigger
-                  className="inline-flex items-center gap-1 rounded-lg border border-cyan-400/40 bg-cyan-500/15 px-3 py-2 text-xs font-medium text-cyan-100 transition hover:bg-cyan-500/25 lg:hidden"
+                  className="inline-flex items-center gap-1 rounded-lg border border-amber-300/40 bg-amber-400/15 px-3 py-2 text-xs font-medium text-amber-100 transition hover:bg-amber-400/25 lg:hidden"
                 >
-                  <Settings2 size={14} />
-                  設定
+                  <Download size={14} />
+                  {t('app.export')}
                 </Drawer.Trigger>
               ) : null}
             </div>
@@ -637,13 +640,13 @@ export default function App() {
             <Drawer.Content className="flex h-full max-h-[88vh] flex-col overflow-hidden">
               <div className="flex items-center justify-between border-b border-slate-800/80 px-4 py-3">
                 <div>
-                  <Drawer.Title className="text-sm font-semibold text-slate-100">出力設定</Drawer.Title>
-                  <p className="text-[11px] text-slate-400">エクスポート条件と詳細パラメータ</p>
+                  <Drawer.Title className="text-sm font-semibold text-slate-100">{t('app.outputSettings')}</Drawer.Title>
+                  <p className="text-[11px] text-slate-400">{t('app.outputSettingsDescription')}</p>
                 </div>
 
                 <Drawer.Close className="inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200 transition hover:border-cyan-400/60 hover:text-cyan-100">
                   <X size={13} />
-                  閉じる
+                  {t('app.close')}
                 </Drawer.Close>
               </div>
 

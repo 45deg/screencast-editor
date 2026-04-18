@@ -1,4 +1,5 @@
 import type { VideoMeta } from '../types/editor';
+import { i18n } from '../i18n';
 
 export async function readVideoMetadata(file: File): Promise<VideoMeta> {
   const objectUrl = URL.createObjectURL(file);
@@ -24,7 +25,7 @@ export async function readVideoMetadata(file: File): Promise<VideoMeta> {
       };
 
       video.onerror = () => {
-        reject(new Error('動画メタデータの読み込みに失敗しました。対応形式か確認してください。'));
+        reject(new Error(i18n.t('video.metadataLoadFailed')));
         cleanup();
       };
 

@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { Video, Upload } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface VideoDropzoneProps {
   onFileSelected: (file: File) => void;
@@ -9,6 +10,7 @@ interface VideoDropzoneProps {
 }
 
 export default function VideoDropzone({ onFileSelected, isLoading, error, mode = 'fullscreen' }: VideoDropzoneProps) {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const isEmbedded = mode === 'embedded';
@@ -74,21 +76,19 @@ export default function VideoDropzone({ onFileSelected, isLoading, error, mode =
 
             <div className="space-y-2">
               <h1 className="font-['Space_Grotesk',sans-serif] text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-                {isLoading ? 'Loading videos' : 'Upload videos'}
+                {isLoading ? t('dropzone.loadingTitle') : t('dropzone.idleTitle')}
               </h1>
-              <p className="text-sm leading-relaxed text-slate-400 sm:text-base">
-                MP4, WebM, MOV, AVI
-              </p>
+              <p className="text-sm leading-relaxed text-slate-400 sm:text-base">{t('dropzone.formats')}</p>
             </div>
 
             <div className="mt-1 inline-flex items-center justify-center rounded-xl border border-slate-700 bg-slate-950 px-5 py-3 text-base font-semibold text-white shadow-sm transition group-hover:border-cyan-400/50 group-hover:bg-slate-900">
               {isLoading ? (
                 <span className="inline-flex items-center gap-2">
                   <Upload size={16} className="text-cyan-300" />
-                  Reading file...
+                  {t('dropzone.readingFile')}
                 </span>
               ) : (
-                'Select Videos'
+                t('dropzone.selectVideos')
               )}
             </div>
           </div>
