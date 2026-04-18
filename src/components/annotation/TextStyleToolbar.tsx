@@ -1,18 +1,16 @@
 import { Toolbar } from '@base-ui/react/toolbar';
-import { Bold, Italic, PaintBucket, PenLine, RectangleHorizontal, Type } from 'lucide-react';
+import { Bold, Italic, PaintBucket, PenLine, RectangleHorizontal, Type, TypeOutline } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { AnnotationTextStyle, TextAnnotation } from '../../types/editor';
 
 interface TextStyleToolbarProps {
   selectedTextAnnotation: TextAnnotation | null;
-  onTextChange: (text: string) => void;
   onStyleChange: (next: Partial<AnnotationTextStyle>) => void;
 }
 
 export default function TextStyleToolbar({
   selectedTextAnnotation,
-  onTextChange,
   onStyleChange,
 }: TextStyleToolbarProps) {
   const { t } = useTranslation();
@@ -28,20 +26,6 @@ export default function TextStyleToolbar({
       aria-label={t('canvas.textToolbar')}
       className="timeline-scrollbar inline-flex max-w-[min(92vw,760px)] flex-wrap items-center justify-end gap-1 rounded-lg border border-slate-700/90 bg-slate-950/95 p-1.5 shadow-xl backdrop-blur"
     >
-      <div className="flex min-w-[180px] items-center rounded-md border border-slate-700 bg-slate-900 px-2">
-        <Type size={13} className="text-slate-400" />
-        <input
-          type="text"
-          value={selectedTextAnnotation.text}
-          onChange={(event) => onTextChange(event.target.value)}
-          className="w-full border-0 bg-transparent px-2 py-1.5 text-xs text-white outline-none"
-          placeholder={t('canvas.textPlaceholder')}
-          aria-label={t('canvas.textContent')}
-        />
-      </div>
-
-      <Toolbar.Separator className="mx-1 h-6 w-px bg-slate-700" />
-
       <Toolbar.Button
         aria-label={t('canvas.bold')}
         onClick={() => onStyleChange({ bold: !style.bold })}
@@ -83,6 +67,7 @@ export default function TextStyleToolbar({
           className="w-14 border-0 bg-transparent text-right text-[11px] text-white outline-none"
           aria-label={t('canvas.fontSize')}
         />
+        px
       </label>
 
       <label className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px] text-slate-200">
@@ -122,7 +107,7 @@ export default function TextStyleToolbar({
       ) : null}
 
       <label className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px] text-slate-200">
-        <span className="font-mono text-[10px]">OL</span>
+        <span className="font-mono text-[10px]"><TypeOutline size={12} className="text-slate-400" /></span>
         <input
           type="number"
           min={0}
@@ -138,10 +123,7 @@ export default function TextStyleToolbar({
           className="w-10 border-0 bg-transparent text-right text-[11px] text-white outline-none"
           aria-label={t('canvas.outlineWidth')}
         />
-      </label>
-
-      <label className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px] text-slate-200">
-        <span className="font-mono text-[10px]">OL</span>
+        px 
         <input
           type="color"
           value={style.outlineColor}

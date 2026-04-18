@@ -199,7 +199,6 @@ export default function CanvasPreview({
         onTogglePlay={handleTogglePlay}
         onStartCrop={handleStartCropClick}
         selectedTextAnnotation={selectedTextAnnotation}
-        onTextAnnotationChange={onTextAnnotationChange}
         onTextAnnotationStyleChange={onTextAnnotationStyleChange}
       />
 

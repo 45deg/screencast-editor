@@ -20,7 +20,6 @@ interface CanvasPreviewHeaderProps {
   onTogglePlay: () => void;
   onStartCrop: () => void;
   selectedTextAnnotation: TextAnnotation | null;
-  onTextAnnotationChange: (annotationId: string, text: string) => void;
   onTextAnnotationStyleChange: (next: Partial<AnnotationTextStyle>) => void;
 }
 
@@ -37,7 +36,6 @@ export default function CanvasPreviewHeader({
   onTogglePlay,
   onStartCrop,
   selectedTextAnnotation,
-  onTextAnnotationChange,
   onTextAnnotationStyleChange,
 }: CanvasPreviewHeaderProps) {
   const { t } = useTranslation();
@@ -123,13 +121,6 @@ export default function CanvasPreviewHeader({
         <div className="flex justify-end">
           <TextStyleToolbar
             selectedTextAnnotation={selectedTextAnnotation}
-            onTextChange={(text) => {
-              if (!selectedTextAnnotation) {
-                return;
-              }
-
-              onTextAnnotationChange(selectedTextAnnotation.id, text);
-            }}
             onStyleChange={onTextAnnotationStyleChange}
           />
         </div>

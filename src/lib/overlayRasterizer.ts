@@ -63,7 +63,11 @@ function drawTextOverlay(
 
   const outlineWidth = Math.max(0, Math.round(style.outlineWidth * scaleY));
   if (outlineWidth > 0) {
-    context.lineWidth = outlineWidth;
+    // Canvas text stroke is centered on the glyph path and the following fill
+    // pass hides the inner half, so we compensate to better match preview/export.
+    context.lineWidth = outlineWidth * 2;
+    context.lineJoin = 'round';
+    context.miterLimit = 2;
     context.strokeStyle = style.outlineColor;
     for (let index = 0; index < lines.length; index += 1) {
       context.strokeText(lines[index] || ' ', x, y + lineHeight * index);
