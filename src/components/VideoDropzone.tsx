@@ -38,7 +38,7 @@ export default function VideoDropzone({ onFileSelected, isLoading, error, mode =
   return (
     <section
       className={`relative flex items-center justify-center overflow-hidden ${
-        isEmbedded ? 'min-h-[280px] rounded-2xl border border-slate-800/80 bg-slate-950/70 p-6 shadow-xl' : 'min-h-screen px-6 py-10'
+        isEmbedded ? 'min-h-[280px] rounded-xl border border-slate-800/80 bg-slate-950/70 p-6 shadow-xl' : 'min-h-screen px-6 py-10'
       }`}
     >
       <div className={`relative w-full ${isEmbedded ? 'max-w-none' : 'mx-auto max-w-xl'}`}>
@@ -67,7 +67,7 @@ export default function VideoDropzone({ onFileSelected, isLoading, error, mode =
             isDragging
               ? 'border-cyan-300 bg-cyan-300/10'
               : 'border-slate-700/80 bg-slate-900/50 hover:border-cyan-400/60 hover:bg-slate-900/70'
-          } ${isLoading ? 'cursor-wait opacity-80' : 'cursor-pointer'} ${isEmbedded ? 'rounded-2xl p-8 sm:p-10' : 'rounded-[2rem] p-10 sm:p-14'}`}
+          } ${isLoading ? 'cursor-wait opacity-80' : 'cursor-pointer'} ${isEmbedded ? 'rounded-xl p-8 sm:p-10' : 'rounded-2xl p-10 sm:p-14'}`}
         >
           <div className="relative flex flex-col items-center justify-center gap-5 text-center">
             <div className="flex h-20 w-20 items-center justify-center rounded-full border border-slate-700 bg-slate-950/80 text-slate-200 shadow-inner">

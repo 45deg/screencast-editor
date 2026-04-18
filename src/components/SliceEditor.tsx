@@ -36,6 +36,8 @@ interface SliceEditorProps {
   onSlicesCommit: (slices: SliceModel[], selectedSliceId?: string | null) => void;
   onUndo: () => void;
   onRedo: () => void;
+  className?: string;
+  fillHeight?: boolean;
 }
 
 interface ToolbarProps {
@@ -486,6 +488,8 @@ export default function SliceEditorTimeline({
   onSlicesCommit,
   onUndo,
   onRedo,
+  className,
+  fillHeight = false,
 }: SliceEditorProps) {
   const [zoomSlider, setZoomSlider] = useState(0);
   const zoom = useMemo(() => Math.pow(2, zoomSlider), [zoomSlider]);
@@ -765,7 +769,9 @@ export default function SliceEditorTimeline({
   }, [handleDeleteSelected, onRedo, onUndo, selectedSliceId]);
 
   return (
-    <section className="relative z-10 flex h-[240px] w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-950 shadow-xl sm:h-[280px]">
+    <section
+      className={`relative z-10 flex w-full shrink-0 flex-col overflow-hidden rounded-lg border border-slate-800/70 bg-slate-950 shadow-xl ${fillHeight ? 'min-h-0 h-full' : 'h-[280px] sm:h-[320px]'} ${className ?? ''}`}
+    >
       <EditorToolbar
         undo={onUndo}
         redo={onRedo}

@@ -179,12 +179,12 @@ export default function PropertyPanel({
 
   return (
     <aside
-      className={`w-full rounded-2xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-xl lg:w-[360px] ${className ?? ''}`}
+      className={`w-full rounded-xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-xl lg:w-[360px] ${className ?? ''}`}
     >
       <h2 className="sr-only">{t('propertyPanel.title')}</h2>
 
       <div className="space-y-4">
-        <section className="rounded-xl border border-slate-800/90 bg-slate-950/70 p-3">
+        <section className="rounded-lg border border-slate-800/90 bg-slate-950/70 p-3">
           <div className="mb-3 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-200">
             <Film size={13} />
             {t('propertyPanel.format')}
@@ -196,7 +196,7 @@ export default function PropertyPanel({
           />
         </section>
 
-        <section className="rounded-xl border border-slate-800/90 bg-slate-950/70 p-3">
+        <section className="rounded-lg border border-slate-800/90 bg-slate-950/70 p-3">
           <div className="mb-3 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-200">
             <Layers3 size={13} />
             {t('propertyPanel.outputSize')}
@@ -247,7 +247,7 @@ export default function PropertyPanel({
               />
             </div>
 
-            <div className="mt-3 rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-3">
+            <div className="mt-3 rounded-md border border-slate-800 bg-slate-900/80 px-3 py-3">
               <div className="mb-2 flex items-center justify-between gap-2 text-[11px] text-slate-400">
                 <span className="inline-flex items-center gap-1">
                   <ZoomIn size={12} />
@@ -276,7 +276,7 @@ export default function PropertyPanel({
           </div>
         </section>
 
-        <section className="rounded-xl border border-slate-800/90 bg-slate-950/70 p-3">
+        <section className="rounded-lg border border-slate-800/90 bg-slate-950/70 p-3">
           <div className="mb-3 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-200">
             {exportSettings.format === 'gif' ? <Sparkles size={13} /> : <Gauge size={13} />}
             {exportSettings.format === 'gif' ? t('propertyPanel.gifPreset') : t('propertyPanel.mp4Details')}

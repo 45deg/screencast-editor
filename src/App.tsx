@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Drawer } from '@base-ui/react/drawer';
 import { ChevronLeft, Download, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { Group, Panel, Separator } from 'react-resizable-panels';
 
 import CanvasPreview from './components/CanvasPreview';
 import PropertyPanel from './components/PropertyPanel';
@@ -100,6 +101,34 @@ function getFirstVideoFile(files: FileList | null): File | null {
   return Array.from(files).find((file) => file.type.startsWith('video/')) ?? null;
 }
 
+function formatDurationLabel(duration: number): string {
+  if (!Number.isFinite(duration) || duration <= 0) {
+    return '0:00';
+  }
+
+  const rounded = Math.round(duration);
+  const hours = Math.floor(rounded / 3600);
+  const minutes = Math.floor((rounded % 3600) / 60);
+  const seconds = rounded % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  }
+
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
+function formatFileSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return '0 B';
+  }
+
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / 1024 ** exponent;
+  return `${value >= 10 || exponent === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[exponent]}`;
+}
+
 export default function App() {
   const { t } = useTranslation();
   const ffmpegStatusRef = useRef<'idle' | 'loading' | 'ready' | 'error'>('idle');
@@ -171,6 +200,17 @@ export default function App() {
   const hasVideo = Boolean(video && baseCrop);
   const totalDuration = useMemo(() => getTotalDuration(slices), [slices]);
   const previewSourceTime = useMemo(() => getSourceTimeAtTimelineTime(slices, currentTime), [currentTime, slices]);
+  const videoInfoItems = useMemo(() => {
+    if (!video) {
+      return [];
+    }
+
+    return [
+      `${video.width}x${video.height}`,
+      formatDurationLabel(video.duration),
+      formatFileSize(video.file.size),
+    ];
+  }, [video]);
 
   const outputAspectRatio = useMemo(
     () => exportSettings.width / Math.max(1, exportSettings.height),
@@ -530,17 +570,19 @@ export default function App() {
 
   return (
     <Drawer.Root open={isMobileSettingsDrawerOpen} onOpenChange={setIsMobileSettingsDrawerOpen}>
-      <div className="min-h-screen overflow-x-hidden bg-[linear-gradient(160deg,#020617_0%,#0b1120_42%,#111827_100%)] text-slate-100">
+      <div
+        className={`${hasVideo ? 'h-screen overflow-hidden' : 'min-h-screen overflow-x-hidden'} bg-[linear-gradient(160deg,#020617_0%,#0b1120_42%,#111827_100%)] text-slate-100`}
+      >
         <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_10%_8%,rgba(34,211,238,0.2),transparent_38%),radial-gradient(circle_at_92%_4%,rgba(16,185,129,0.2),transparent_30%)]" />
 
-        <header className="relative z-10 border-b border-slate-800/70 bg-slate-950/70 backdrop-blur">
-          <div className="mx-auto flex w-full max-w-[1500px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        <header className="fixed inset-x-0 top-0 z-30 border-b border-slate-800/70 bg-slate-950/88 backdrop-blur">
+          <div className="mx-auto flex h-16 w-full max-w-[1800px] flex-wrap items-center justify-between gap-3 px-4 sm:px-6">
             <div className="flex items-center gap-3">
               {hasVideo ? (
                 <button
                   type="button"
                   onClick={handleReturnToLanding}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-100 transition hover:border-cyan-400/60 hover:text-cyan-100"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700 bg-slate-900 text-slate-100 transition hover:border-cyan-400/60 hover:text-cyan-100"
                   aria-label={t('app.back')}
                 >
                   <ChevronLeft size={18} />
@@ -552,7 +594,7 @@ export default function App() {
             <div className="flex items-center gap-2">
               {hasVideo && baseCrop ? (
                 <Drawer.Trigger
-                  className="inline-flex items-center gap-1 rounded-lg border border-amber-300/40 bg-amber-400/15 px-3 py-2 text-xs font-medium text-amber-100 transition hover:bg-amber-400/25 lg:hidden"
+                  className="inline-flex items-center gap-1 rounded-md border border-amber-300/40 bg-amber-400/15 px-3 py-2 text-xs font-medium text-amber-100 transition hover:bg-amber-400/25 lg:hidden"
                 >
                   <Download size={14} />
                   {t('app.export')}
@@ -562,75 +604,99 @@ export default function App() {
           </div>
         </header>
 
-        <main
-          className={`relative z-10 mx-auto flex w-full max-w-[1500px] flex-col gap-4 px-4 py-4 sm:px-6 ${
-            hasVideo ? 'pb-[260px] sm:pb-[300px] lg:pb-4' : ''
-          }`}
-        >
-          <section className={`grid gap-4 ${hasVideo ? 'lg:grid-cols-[minmax(0,1fr)_360px]' : 'justify-items-center'}`}>
-            {hasVideo && video && baseCrop ? (
-              <CanvasPreview
-                video={video}
-                fileName={video.file.name}
-                currentTime={currentTime}
-                sourceTime={previewSourceTime}
-                totalDuration={totalDuration}
-                baseCrop={baseCrop}
-                activeSceneCrop={activeSceneCrop}
-                editMode={cropEditMode}
-                editCrop={effectiveEditCrop}
-                onStartCrop={handleStartCropEdit}
-                onEditCropPreview={handleEditCropPreview}
-                onConfirmEdit={handleConfirmCropEdit}
-                onCancelEdit={handleCancelCropEdit}
-                onResetEdit={handleResetCropEdit}
-                onCurrentTimeChange={setCurrentTime}
-              />
-            ) : (
-              <VideoDropzone onFileSelected={handleImportVideo} isLoading={isImporting} error={importError} mode="embedded" />
-            )}
-
-            {hasVideo && baseCrop ? (
-              <>
-                <div className="hidden lg:block">
-                  <PropertyPanel
-                    baseCrop={baseCrop}
-                    exportSettings={exportSettings}
-                    ffmpegStatus={ffmpegStatus}
-                    ffmpegError={ffmpegError}
-                    isExporting={isExporting}
-                    exportError={exportError}
-                    onChangeExportSettings={updateExportSettings}
-                    onExport={handleExport}
-                  />
-                </div>
-              </>
-            ) : null}
-          </section>
-        </main>
-
         {hasVideo && video && baseCrop ? (
-          <div className="fixed inset-x-0 bottom-0 z-20 px-2 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2 lg:static lg:mx-auto lg:w-full lg:max-w-[1500px] lg:px-6 lg:pb-0 lg:pt-0">
-            <SliceEditorTimeline
-              video={video}
-              slices={slices}
-              currentTime={currentTime}
-              selectedSliceId={selectedSliceId}
-              canStartSceneCrop={slices.length > 0}
-              canUndo={past.length > 0}
-              canRedo={future.length > 0}
-              onCurrentTimeChange={setCurrentTime}
-              onSelectedSliceIdChange={setSelectedSliceId}
-              onStartSceneCrop={handleStartSceneCropEdit}
-              onSlicesPreview={replaceSlicesPreview}
-              onSlicesCommit={replaceSlicesCommit}
-              baseCrop={baseCrop}
-              outputAspectRatio={outputAspectRatio}
-              onUndo={undo}
-              onRedo={redo}
-            />
-          </div>
-        ) : null}
+          <>
+            <main className="fixed inset-x-0 bottom-0 top-16 z-10 overflow-hidden lg:right-[23rem]">
+              <Group orientation="vertical" className="h-full min-h-0">
+                <Panel defaultSize="52%" minSize="12rem" className="min-h-0">
+                  <section className="relative h-full min-h-0 px-1 pt-1 lg:pr-1">
+                    <div className="absolute left-3 top-3 z-20 max-w-[min(68vw,420px)] rounded-md border border-slate-800/85 bg-slate-950/78 px-2.5 py-1.5 shadow-lg backdrop-blur">
+                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-300/80">Source</div>
+                      <div className="truncate text-sm font-medium text-white" title={video.file.name}>
+                        {video.file.name}
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-400">
+                        {videoInfoItems.map((item) => (
+                          <span key={item}>{item}</span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <CanvasPreview
+                      video={video}
+                      fileName={video.file.name}
+                      currentTime={currentTime}
+                      sourceTime={previewSourceTime}
+                      totalDuration={totalDuration}
+                      baseCrop={baseCrop}
+                      activeSceneCrop={activeSceneCrop}
+                      editMode={cropEditMode}
+                      editCrop={effectiveEditCrop}
+                      onStartCrop={handleStartCropEdit}
+                      onEditCropPreview={handleEditCropPreview}
+                      onConfirmEdit={handleConfirmCropEdit}
+                      onCancelEdit={handleCancelCropEdit}
+                      onResetEdit={handleResetCropEdit}
+                      onCurrentTimeChange={setCurrentTime}
+                      className="h-full"
+                      fillHeight
+                    />
+                  </section>
+                </Panel>
+
+                <Separator className="group relative mx-1 my-0.5 h-4 shrink-0 lg:mr-1">
+                  <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-slate-800/90 transition group-hover:bg-cyan-400/60" />
+                  <div className="absolute left-1/2 top-1/2 h-1.5 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full border border-slate-700 bg-slate-900 transition group-hover:border-cyan-400/60 group-hover:bg-slate-800" />
+                </Separator>
+
+                <Panel defaultSize="48%" minSize="16rem" className="min-h-0">
+                  <div className="h-full min-h-0 px-0.5 pb-[calc(env(safe-area-inset-bottom)+2px)] pt-0 lg:pr-1">
+                    <SliceEditorTimeline
+                      video={video}
+                      slices={slices}
+                      currentTime={currentTime}
+                      selectedSliceId={selectedSliceId}
+                      canStartSceneCrop={slices.length > 0}
+                      canUndo={past.length > 0}
+                      canRedo={future.length > 0}
+                      onCurrentTimeChange={setCurrentTime}
+                      onSelectedSliceIdChange={setSelectedSliceId}
+                      onStartSceneCrop={handleStartSceneCropEdit}
+                      onSlicesPreview={replaceSlicesPreview}
+                      onSlicesCommit={replaceSlicesCommit}
+                      baseCrop={baseCrop}
+                      outputAspectRatio={outputAspectRatio}
+                      onUndo={undo}
+                      onRedo={redo}
+                      className="h-full"
+                      fillHeight
+                    />
+                  </div>
+                </Panel>
+              </Group>
+            </main>
+
+            <aside className="fixed bottom-0 right-0 top-16 z-20 hidden overflow-hidden border-l border-slate-800/80 bg-slate-950/30 backdrop-blur lg:block lg:w-[23rem]">
+              <div className="h-full overflow-y-auto px-2 py-1">
+                <PropertyPanel
+                  baseCrop={baseCrop}
+                  exportSettings={exportSettings}
+                  ffmpegStatus={ffmpegStatus}
+                  ffmpegError={ffmpegError}
+                  isExporting={isExporting}
+                  exportError={exportError}
+                  onChangeExportSettings={updateExportSettings}
+                  onExport={handleExport}
+                  className="min-h-full border-none bg-transparent p-0 shadow-none rounded-none lg:w-full"
+                />
+              </div>
+            </aside>
+          </>
+        ) : (
+          <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-[1600px] items-center px-4 pb-6 pt-20 sm:px-6">
+            <VideoDropzone onFileSelected={handleImportVideo} isLoading={isImporting} error={importError} mode="embedded" />
+          </main>
+        )}
       </div>
 
       {hasVideo && baseCrop && !isDesktopViewport ? (

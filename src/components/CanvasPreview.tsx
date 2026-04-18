@@ -32,6 +32,8 @@ interface CanvasPreviewProps {
   onCancelEdit: () => void;
   onResetEdit: () => void;
   onCurrentTimeChange: (time: number) => void;
+  className?: string;
+  fillHeight?: boolean;
 }
 
 interface ViewportInfo {
@@ -64,8 +66,6 @@ interface DisplayLayout {
 }
 
 const MIN_CROP_SIZE = 24;
-const MAX_PREVIEW_HEIGHT_PX = 560;
-
 function clampRectToVideo(rect: CropRect, video: VideoMeta): CropRect {
   const x = Math.max(0, Math.min(video.width - 1, Math.round(rect.x)));
   const y = Math.max(0, Math.min(video.height - 1, Math.round(rect.y)));
@@ -237,6 +237,8 @@ export default function CanvasPreview({
   onCancelEdit,
   onResetEdit,
   onCurrentTimeChange,
+  className,
+  fillHeight = false,
 }: CanvasPreviewProps) {
   const { t } = useTranslation();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -447,8 +449,10 @@ export default function CanvasPreview({
   }, [onStartCrop]);
 
   return (
-    <section className="flex min-h-[320px] flex-1 flex-col rounded-2xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-xl">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+    <section
+      className={`flex flex-1 flex-col rounded-lg border border-slate-800/70 bg-slate-950/55 p-2 shadow-xl ${fillHeight ? 'min-h-0 h-full' : 'min-h-[320px]'} ${className ?? ''}`}
+    >
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <h2 className="sr-only">{t('canvas.title')}</h2>
 
         <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -524,15 +528,15 @@ export default function CanvasPreview({
         )}
       </div>
 
-      <div className="flex flex-1 items-center justify-center overflow-hidden rounded-xl border border-slate-800 bg-black/90 p-2">
+      <div className="flex flex-1 items-center justify-center overflow-hidden rounded-md border border-slate-800 bg-black/95 p-1">
         <div
           ref={viewportRef}
-          className="relative w-full max-w-[980px] overflow-hidden rounded-lg border border-slate-800 bg-black"
+          className="relative h-full w-full overflow-hidden rounded-sm border border-slate-800 bg-black"
           style={{
             aspectRatio: isEditing
               ? `${video.width} / ${video.height}`
               : `${displayLayout.frameCrop.w} / ${displayLayout.frameCrop.h}`,
-            maxHeight: `${MAX_PREVIEW_HEIGHT_PX}px`,
+            maxHeight: '100%',
           }}
         >
           {isEditing ? (
