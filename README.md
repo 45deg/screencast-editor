@@ -1,75 +1,133 @@
-# React + TypeScript + Vite
+# Screencast Editor
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Screencast Editor is a browser-based video editor for short screen recordings and product walkthroughs. It focuses on a small set of editing operations that are common in screencast workflows: cutting a recording into scenes, adjusting timing, applying crop regions, placing text or image overlays, and exporting the result as `GIF` or `MP4`.
 
-Currently, two official plugins are available:
+The application runs entirely in the browser. Source media is imported locally, previewed in the UI, and exported with WebAssembly FFmpeg.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Features
 
-## React Compiler
+- Import local video files including `MP4`, `WebM`, `MOV`, and `AVI`
+- Capture the current tab, window, or display with `getDisplayMedia`
+- Split recordings into timeline slices and rearrange timing
+- Resize and move slices on the timeline
+- Adjust playback speed per slice
+- Apply a global crop or a crop per scene
+- Add text overlays
+- Add image overlays
+- Preview edits directly in the browser
+- Export to `GIF` or `MP4`
+- Undo and redo editor operations
+- Use the UI in English or Japanese
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+## Tech Stack
 
-Note: This will impact Vite dev & build performances.
+- React 19
+- TypeScript
+- Vite
+- Zustand for editor state management
+- Tailwind CSS 4 for styling
+- Framer Motion for timeline and UI motion
+- `@ffmpeg/ffmpeg` and `@ffmpeg/util` for in-browser export
+- `i18next` and `react-i18next` for localization
+- Vitest for unit and integration tests
 
-## Expanding the ESLint configuration
+## Requirements
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- Node.js 20 or later recommended
+- `pnpm`
+- A modern browser with support for:
+  - `MediaRecorder`
+  - `getDisplayMedia`
+  - `WebAssembly`
+- Network access at runtime to download the FFmpeg core from jsDelivr
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Development
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+Install dependencies and start the Vite development server:
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+pnpm install
+pnpm dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Build for production:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+pnpm build
 ```
+
+Preview the production build locally:
+
+```bash
+pnpm preview
+```
+
+## Scripts
+
+```bash
+pnpm dev
+pnpm build
+pnpm preview
+pnpm lint
+pnpm test
+pnpm test:ffmpeg
+pnpm -s tsc -p tsconfig.app.json --noEmit
+```
+
+`pnpm test:ffmpeg` requires a system `ffmpeg` binary. The application itself does not depend on a system FFmpeg installation during normal use; it loads the browser runtime on demand.
+
+## Export
+
+The export pipeline is built around FFmpeg filter generation in the browser.
+
+Supported output settings include:
+
+- Format: `GIF` or `MP4`
+- Output width and height
+- GIF FPS
+- GIF palette mode
+- GIF dithering mode
+- MP4 FPS
+- MP4 encoding preset
+
+Blank regions on the timeline are rendered as black frames in the exported output.
+
+## Project Structure
+
+```text
+src/App.tsx                          App shell and feature wiring
+src/app/hooks/useScreenCapture.ts    Browser screen recording flow
+src/components/SliceEditor.tsx       Timeline editor container
+src/components/PropertyPanel.tsx     Export settings UI
+src/store/editorStore.ts             Zustand editor state
+src/lib/ffmpegCommand.ts             FFmpeg command and filter generation
+src/i18n.ts                          i18n initialization
+src/i18n/resources/*                 Translation dictionaries
+```
+
+## Contributing
+
+Contributions are welcome.
+
+If you plan to make a code change, please:
+
+1. Open an issue or discussion first for larger changes.
+2. Keep changes scoped to the relevant area of the app.
+3. Run the checks below before submitting.
+
+Recommended verification:
+
+```bash
+pnpm -s tsc -p tsconfig.app.json --noEmit
+pnpm test
+```
+
+If you modify export behavior, it is also useful to run:
+
+```bash
+pnpm test:ffmpeg
+```
+
+## License
+
+MIT
