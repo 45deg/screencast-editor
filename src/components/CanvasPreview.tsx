@@ -290,18 +290,21 @@ function clampImageAnnotationSize(annotation: Extract<AnnotationModel, { kind: '
 }
 
 function toTextStyle(style: AnnotationTextStyle, scale: number): CSSProperties {
-  const fontSize = Math.max(10, style.fontSize * scale);
-  const outlineWidth = Math.max(0, style.outlineWidth * scale);
+  const fontSize = Math.max(8, Math.round(style.fontSize * scale));
+  const outlineWidth = Math.max(0, Math.round(style.outlineWidth * scale));
+  const lineHeight = Math.max(Math.round(fontSize * 1.25), fontSize + 2);
+  const paddingX = Math.max(4, Math.round(fontSize * 0.24));
+  const paddingY = Math.max(2, Math.round(fontSize * 0.14));
 
   return {
     color: style.textColor,
     fontWeight: style.bold ? 700 : 500,
     fontStyle: style.italic ? 'italic' : 'normal',
     fontSize: `${fontSize}px`,
-    lineHeight: 1.25,
+    lineHeight: `${lineHeight}px`,
     whiteSpace: 'pre-wrap',
     backgroundColor: style.boxEnabled ? style.boxColor : 'transparent',
-    padding: style.boxEnabled ? `${Math.max(2, fontSize * 0.14)}px ${Math.max(6, fontSize * 0.24)}px` : '0',
+    padding: style.boxEnabled ? `${paddingY}px ${paddingX}px` : '0',
     WebkitTextStroke: outlineWidth > 0 ? `${outlineWidth}px ${style.outlineColor}` : undefined,
   };
 }
@@ -915,9 +918,16 @@ export default function CanvasPreview({
             maxHeight: '100%',
           }}
           onPointerDown={(event) => {
-            if (!isEditing && event.target === event.currentTarget) {
-              onSelectedAnnotationIdChange(null);
+            if (isEditing) {
+              return;
             }
+
+            const target = event.target as HTMLElement | null;
+            if (target?.closest('[data-annotation-box="true"]')) {
+              return;
+            }
+
+            onSelectedAnnotationIdChange(null);
           }}
         >
           {isEditing ? (
@@ -1069,6 +1079,7 @@ export default function CanvasPreview({
                       return (
                         <textarea
                           key={annotation.id}
+                          data-annotation-box="true"
                           ref={(node) => {
                             inlineEditorRef.current = node;
                           }}
@@ -1108,6 +1119,7 @@ export default function CanvasPreview({
                     return (
                       <button
                         key={annotation.id}
+                        data-annotation-box="true"
                         type="button"
                         onPointerDown={(event) => handleTextPointerDown(event, annotation)}
                         onDoubleClick={() => startInlineTextEdit(annotation)}
@@ -1131,6 +1143,7 @@ export default function CanvasPreview({
                   return (
                     <div
                       key={annotation.id}
+                      data-annotation-box="true"
                       className="absolute"
                       style={{
                         left: `${left}px`,
@@ -1142,13 +1155,13 @@ export default function CanvasPreview({
                       <button
                         type="button"
                         onPointerDown={(event) => beginAnnotationDrag(event, annotation)}
-                        className={`h-full w-full cursor-move select-none overflow-hidden rounded-sm border transition ${
+                        className={`h-full w-full cursor-move select-none overflow-hidden border transition ${
                           selected
                             ? 'border-cyan-200 ring-2 ring-cyan-300/80 ring-offset-2 ring-offset-black'
                             : 'border-slate-200/50'
                         }`}
                       >
-                        <img src={annotation.imageUrl} alt="" className="h-full w-full object-contain" />
+                        <img src={annotation.imageUrl} alt="" className="h-full w-full object-fill" />
                       </button>
 
                       {selected ? (

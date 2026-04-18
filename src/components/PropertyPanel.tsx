@@ -1,4 +1,5 @@
 import { Button } from '@base-ui/react/button';
+import { Progress } from '@base-ui/react/progress';
 import { Toggle } from '@base-ui/react/toggle';
 import { ToggleGroup } from '@base-ui/react/toggle-group';
 import { Film, Gauge, Layers3, Sparkles, ZoomIn } from 'lucide-react';
@@ -12,6 +13,8 @@ interface PropertyPanelProps {
   ffmpegStatus: 'idle' | 'loading' | 'ready' | 'error';
   ffmpegError: string | null;
   isExporting: boolean;
+  exportProgress: number | null;
+  exportProgressLabel: string | null;
   exportError: string | null;
   className?: string;
   onChangeExportSettings: (next: Partial<ExportSettings>) => void;
@@ -155,6 +158,8 @@ export default function PropertyPanel({
   ffmpegStatus,
   ffmpegError,
   isExporting,
+  exportProgress,
+  exportProgressLabel,
   exportError,
   className,
   onChangeExportSettings,
@@ -365,6 +370,27 @@ export default function PropertyPanel({
             ? t('propertyPanel.exporting')
             : t('propertyPanel.exportFormat', { format: exportSettings.format.toUpperCase() })}
         </Button>
+
+        {isExporting && exportProgress !== null ? (
+          <div className="mt-2 rounded-md border border-cyan-300/20 bg-cyan-400/5 px-2.5 py-2">
+            <div className="mb-1.5 flex items-center justify-between text-[11px] text-slate-300">
+              <span>{exportProgressLabel ?? t('propertyPanel.exportProgress')}</span>
+              <span className="font-mono text-cyan-100">{Math.round(exportProgress)}%</span>
+            </div>
+            <Progress.Root
+              aria-label={t('propertyPanel.exportProgress')}
+              value={exportProgress}
+              className="w-full"
+            >
+              <Progress.Track className="h-2 w-full overflow-hidden rounded-full bg-slate-800">
+                <Progress.Indicator
+                  className="h-full rounded-full bg-cyan-400 transition-[width] duration-200"
+                  style={{ width: `${Math.max(0, Math.min(100, exportProgress))}%` }}
+                />
+              </Progress.Track>
+            </Progress.Root>
+          </div>
+        ) : null}
       </div>
 
       <p className="mt-2 text-[11px] text-slate-500">

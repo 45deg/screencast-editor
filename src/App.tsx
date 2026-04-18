@@ -219,6 +219,8 @@ export default function App() {
   const [importError, setImportError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState<number | null>(null);
+  const [exportProgressLabel, setExportProgressLabel] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const [cropEditMode, setCropEditMode] = useState<'idle' | 'crop' | 'scene'>('idle');
   const [cropEditDraft, setCropEditDraft] = useState<CropRect | null>(null);
@@ -403,6 +405,8 @@ export default function App() {
       setIsImporting(true);
       setImportError(null);
       setExportError(null);
+      setExportProgress(null);
+      setExportProgressLabel(null);
 
       try {
         const nextVideo = await readVideoMetadata(file);
@@ -432,6 +436,8 @@ export default function App() {
     clearVideo();
     setImportError(null);
     setExportError(null);
+    setExportProgress(null);
+    setExportProgressLabel(null);
   }, [annotations, clearVideo, video]);
 
   const closeCropEditor = useCallback(() => {
@@ -531,15 +537,21 @@ export default function App() {
       return;
     }
 
+    const initialText = t('canvas.defaultText');
+    const estimatedTextWidth = Math.max(
+      120,
+      Math.round(initialText.length * DEFAULT_TEXT_ANNOTATION_STYLE.fontSize * 0.56 + 16),
+    );
+    const estimatedTextHeight = Math.max(40, Math.round(DEFAULT_TEXT_ANNOTATION_STYLE.fontSize * 1.5 + 8));
     const annotationId = crypto.randomUUID();
     const nextAnnotation: AnnotationModel = {
       id: annotationId,
       kind: 'text',
       start: currentTime,
       duration: 2.5,
-      x: Math.round(baseCrop.w * 0.06),
-      y: Math.round(baseCrop.h * 0.08),
-      text: t('canvas.defaultText'),
+      x: Math.max(0, Math.round((baseCrop.w - estimatedTextWidth) / 2)),
+      y: Math.max(0, Math.round((baseCrop.h - estimatedTextHeight) / 2)),
+      text: initialText,
       style: {
         ...DEFAULT_TEXT_ANNOTATION_STYLE,
       },
@@ -781,13 +793,23 @@ export default function App() {
     const outputFileName = `output-${runId}.${exportSettings.format}`;
     const downloadName = getSafeDownloadName(video.file.name, exportSettings.format);
 
+    const updateExportProgress = (nextProgress: number, label: string) => {
+      const safeProgress = Math.max(0, Math.min(100, Math.round(nextProgress)));
+      setExportProgress(safeProgress);
+      setExportProgressLabel(label);
+    };
+
     setIsExporting(true);
     setExportError(null);
+    updateExportProgress(4, t('app.exportStagePreparing'));
     let runtime: Awaited<ReturnType<typeof loadFfmpegRuntimeFromCDN>> | null = null;
+    let progressCallback: ((event: { progress: number; time: number }) => void) | null = null;
     let overlayFileNames: string[] = [];
+    let exportSucceeded = false;
 
     try {
       setFfmpegStatus('loading', null);
+      updateExportProgress(12, t('app.exportStageLoadingRuntime'));
       runtime = await loadFfmpegRuntimeFromCDN();
       setFfmpegStatus('ready', null);
       const activeRuntime = runtime;
@@ -796,6 +818,7 @@ export default function App() {
         throw new Error(t('app.unknownError'));
       }
 
+      updateExportProgress(28, t('app.exportStageRasterizingOverlay'));
       const rasterizedOverlays = await rasterizeAnnotationsToOverlays(
         annotations,
         baseCrop,
@@ -819,20 +842,47 @@ export default function App() {
 
       logFfmpegCommandPreview(built);
 
+      updateExportProgress(42, t('app.exportStageWritingInput'));
       const source = await activeRuntime.fetchFile(video.file);
       await activeRuntime.ffmpeg.writeFile(inputFileName, source);
-      for (const overlay of rasterizedOverlays) {
+
+      if (rasterizedOverlays.length > 0) {
+        updateExportProgress(54, t('app.exportStageWritingOverlay'));
+      }
+
+      const overlayProgressStep = rasterizedOverlays.length > 0 ? 14 / rasterizedOverlays.length : 0;
+      for (let index = 0; index < rasterizedOverlays.length; index += 1) {
+        const overlay = rasterizedOverlays[index];
         const overlayFile = new File([overlay.blob], overlay.fileName, { type: 'image/png' });
         const overlayBytes = await activeRuntime.fetchFile(overlayFile);
         await activeRuntime.ffmpeg.writeFile(overlay.fileName, overlayBytes);
+        if (overlayProgressStep > 0) {
+          updateExportProgress(
+            54 + overlayProgressStep * (index + 1),
+            t('app.exportStageWritingOverlay'),
+          );
+        }
       }
 
+      updateExportProgress(72, t('app.exportStageEncoding'));
+      progressCallback = ({ progress }) => {
+        const normalized = Number.isFinite(progress) ? Math.max(0, Math.min(1, progress)) : 0;
+        const encodingProgress = 72 + normalized * 24;
+        setExportProgress((current) => {
+          const baseline = current ?? 72;
+          const next = Math.max(baseline, Math.round(encodingProgress));
+          return Math.min(96, next);
+        });
+        setExportProgressLabel(t('app.exportStageEncoding'));
+      };
+      activeRuntime.ffmpeg.on('progress', progressCallback);
       const exitCode = await activeRuntime.ffmpeg.exec(built.execArgs);
 
       if (exitCode !== 0) {
         throw new Error(t('app.ffmpegExecutionFailed', { code: exitCode }));
       }
 
+      updateExportProgress(97, t('app.exportStageFinalizing'));
       const output = await activeRuntime.ffmpeg.readFile(outputFileName);
       const outputBytes = typeof output === 'string' ? new TextEncoder().encode(output) : new Uint8Array(output);
       const mimeType = exportSettings.format === 'gif' ? 'image/gif' : 'video/mp4';
@@ -845,11 +895,19 @@ export default function App() {
       link.click();
 
       setTimeout(() => URL.revokeObjectURL(blobUrl), 0);
+      exportSucceeded = true;
+      updateExportProgress(100, t('app.exportStageDone'));
     } catch (error) {
       const message = toErrorMessage(error);
       setExportError(message);
       setFfmpegStatus('error', message);
+      setExportProgress(null);
+      setExportProgressLabel(null);
     } finally {
+      if (runtime && progressCallback) {
+        runtime.ffmpeg.off('progress', progressCallback);
+      }
+
       if (runtime && typeof runtime.ffmpeg.deleteFile === 'function') {
         const cleanupRuntime = runtime;
         const cleanupTargets = [inputFileName, outputFileName, ...overlayFileNames];
@@ -859,6 +917,12 @@ export default function App() {
       }
 
       setIsExporting(false);
+      if (exportSucceeded) {
+        window.setTimeout(() => {
+          setExportProgress(null);
+          setExportProgressLabel(null);
+        }, 900);
+      }
     }
   }, [
     annotations,
@@ -1215,6 +1279,8 @@ export default function App() {
                   ffmpegStatus={ffmpegStatus}
                   ffmpegError={ffmpegError}
                   isExporting={isExporting}
+                  exportProgress={exportProgress}
+                  exportProgressLabel={exportProgressLabel}
                   exportError={exportError}
                   onChangeExportSettings={updateExportSettings}
                   onExport={handleExport}
@@ -1266,6 +1332,8 @@ export default function App() {
                   ffmpegStatus={ffmpegStatus}
                   ffmpegError={ffmpegError}
                   isExporting={isExporting}
+                  exportProgress={exportProgress}
+                  exportProgressLabel={exportProgressLabel}
                   exportError={exportError}
                   onChangeExportSettings={updateExportSettings}
                   onExport={handleExport}

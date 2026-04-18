@@ -33,13 +33,13 @@ function drawTextOverlay(
   scaleX: number,
   scaleY: number,
 ) {
-  const fontSize = Math.max(8, style.fontSize * scaleY);
+  const fontSize = Math.max(8, Math.round(style.fontSize * scaleY));
   const fontWeight = style.bold ? '700' : '500';
   const fontStyle = style.italic ? 'italic' : 'normal';
   const fontFamily = '"IBM Plex Sans JP", "Hiragino Kaku Gothic ProN", sans-serif';
-  const lineHeight = Math.max(fontSize * 1.25, fontSize + 2);
-  const paddingX = Math.max(4, fontSize * 0.24);
-  const paddingY = Math.max(2, fontSize * 0.14);
+  const lineHeight = Math.max(Math.round(fontSize * 1.25), fontSize + 2);
+  const paddingX = Math.max(4, Math.round(fontSize * 0.24));
+  const paddingY = Math.max(2, Math.round(fontSize * 0.14));
   const lines = getTextLines(annotation.text || '');
 
   context.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
@@ -61,7 +61,7 @@ function drawTextOverlay(
     );
   }
 
-  const outlineWidth = Math.max(0, style.outlineWidth * scaleY);
+  const outlineWidth = Math.max(0, Math.round(style.outlineWidth * scaleY));
   if (outlineWidth > 0) {
     context.lineWidth = outlineWidth;
     context.strokeStyle = style.outlineColor;

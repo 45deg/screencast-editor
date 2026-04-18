@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildUnifiedAnnotationLayout,
+  canMoveAnnotationLayer,
   moveAnnotationLayer,
   resizeAnnotationDuration,
 } from '../src/lib/annotationTimeline';
@@ -84,11 +85,15 @@ describe('annotation timeline helpers', () => {
   it('moves annotation layer up and down', () => {
     const annotations = createAnnotations();
 
+    expect(canMoveAnnotationLayer(annotations, 'image-b', 'up')).toBe(true);
+    expect(canMoveAnnotationLayer(annotations, 'image-b', 'down')).toBe(false);
+    expect(canMoveAnnotationLayer(annotations, 'text-c', 'up')).toBe(false);
+
     const up = moveAnnotationLayer(annotations, 'image-b', 'up');
     expect(up.map((annotation) => annotation.id)).toEqual(['image-b', 'text-a', 'text-c']);
 
     const down = moveAnnotationLayer(annotations, 'image-b', 'down');
-    expect(down.map((annotation) => annotation.id)).toEqual(['text-a', 'text-c', 'image-b']);
+    expect(down).toBe(annotations);
 
     const unchanged = moveAnnotationLayer(annotations, 'text-a', 'up');
     expect(unchanged).toBe(annotations);

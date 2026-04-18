@@ -108,17 +108,18 @@ export default function TextStyleToolbar({
         <RectangleHorizontal size={14} />
       </Toolbar.Button>
 
-      <label className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px] text-slate-200">
-        <PaintBucket size={12} className="text-slate-400" />
-        <input
-          type="color"
-          value={style.boxColor}
-          onChange={(event) => onStyleChange({ boxColor: event.target.value })}
-          className="h-5 w-7 cursor-pointer rounded border-0 bg-transparent p-0"
-          aria-label={t('canvas.boxColor')}
-          disabled={!style.boxEnabled}
-        />
-      </label>
+      {style.boxEnabled ? (
+        <label className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px] text-slate-200">
+          <PaintBucket size={12} className="text-slate-400" />
+          <input
+            type="color"
+            value={style.boxColor}
+            onChange={(event) => onStyleChange({ boxColor: event.target.value })}
+            className="h-5 w-7 cursor-pointer rounded border-0 bg-transparent p-0"
+            aria-label={t('canvas.boxColor')}
+          />
+        </label>
+      ) : null}
 
       <label className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px] text-slate-200">
         <span className="font-mono text-[10px]">OL</span>

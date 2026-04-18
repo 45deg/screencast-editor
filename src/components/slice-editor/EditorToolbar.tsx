@@ -90,7 +90,7 @@ export default function EditorToolbar({
   );
 
   return (
-    <div className="h-14 border-b border-slate-800/80 bg-slate-950/95 px-2 shadow-sm sm:px-4">
+    <div className="sticky top-0 z-50 h-14 border-b border-slate-800/80 bg-slate-950/95 px-2 shadow-sm sm:px-4">
       <div
         aria-label={t('sliceEditor.editorControls')}
         className="timeline-scrollbar flex h-full min-w-max items-center gap-2 overflow-x-auto overflow-y-hidden sm:min-w-0"

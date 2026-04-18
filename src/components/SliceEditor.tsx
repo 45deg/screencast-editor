@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, ty
 import { motion, type PanInfo } from 'framer-motion';
 
 import {
+  canMoveAnnotationLayer,
   moveAnnotationLayer,
   resizeAnnotationDuration,
 } from '../lib/annotationTimeline';
@@ -200,8 +201,20 @@ export default function SliceEditorTimeline({
     () => annotations.findIndex((annotation) => annotation.id === selectedAnnotationId),
     [annotations, selectedAnnotationId],
   );
-  const canMoveAnnotationUp = selectedAnnotationIndex > 0;
-  const canMoveAnnotationDown = selectedAnnotationIndex >= 0 && selectedAnnotationIndex < annotations.length - 1;
+  const canMoveAnnotationUp = useMemo(() => {
+    if (!selectedAnnotationId || selectedAnnotationIndex < 0) {
+      return false;
+    }
+
+    return canMoveAnnotationLayer(annotations, selectedAnnotationId, 'up');
+  }, [annotations, selectedAnnotationId, selectedAnnotationIndex]);
+  const canMoveAnnotationDown = useMemo(() => {
+    if (!selectedAnnotationId || selectedAnnotationIndex < 0) {
+      return false;
+    }
+
+    return canMoveAnnotationLayer(annotations, selectedAnnotationId, 'down');
+  }, [annotations, selectedAnnotationId, selectedAnnotationIndex]);
   const safeOutputAspectRatio = useMemo(
     () => (Number.isFinite(outputAspectRatio) && outputAspectRatio > 0 ? outputAspectRatio : 16 / 9),
     [outputAspectRatio],
@@ -635,7 +648,7 @@ export default function SliceEditorTimeline({
         onChange={handleImageInputChange}
       />
 
-      <div ref={scrollContainerRef} className="timeline-scrollbar relative flex-1 overflow-x-auto overflow-y-hidden bg-slate-950">
+      <div ref={scrollContainerRef} className="timeline-scrollbar relative flex-1 overflow-auto bg-slate-950">
         <motion.div
           ref={timelineRef}
           className="relative min-h-full cursor-text select-none"
