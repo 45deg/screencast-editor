@@ -179,27 +179,15 @@ export function deriveSlices(slices: SliceModel[]): DerivedSlice[] {
 }
 
 export function deriveAnnotations(annotations: AnnotationModel[]): DerivedAnnotation[] {
-  return [...annotations]
-    .sort((a, b) => a.start - b.start || a.id.localeCompare(b.id))
-    .map((annotation) => ({
-      ...cloneAnnotation(annotation),
-      end: Math.max(0, annotation.start) + Math.max(0.0001, annotation.duration),
-    }));
+  return annotations.map((annotation) => ({
+    ...cloneAnnotation(annotation),
+    end: Math.max(0, annotation.start) + Math.max(0.0001, annotation.duration),
+  }));
 }
 
 export function findSliceAtTimelineTime(slices: SliceModel[], time: number): DerivedSlice | null {
   const derived = deriveSlices(slices);
-  const hit = [...derived].reverse().find((slice) => time >= slice.start && time < slice.end);
-
-  if (hit) {
-    return hit;
-  }
-
-  if (derived.length && time >= Math.max(...derived.map((slice) => slice.end))) {
-    return [...derived].sort((a, b) => a.end - b.end)[derived.length - 1] ?? null;
-  }
-
-  return null;
+  return derived.find((slice) => time >= slice.start && time < slice.end) ?? null;
 }
 
 export function getSourceTimeAtTimelineTime(slices: SliceModel[], time: number): number {

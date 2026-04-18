@@ -1,13 +1,12 @@
 import { useMemo, useRef } from 'react';
 import { motion, type PanInfo } from 'framer-motion';
-import { Crop, Image as ImageIcon } from 'lucide-react';
+import { ChevronDown, ChevronUp, Crop, Image as ImageIcon, Type } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { buildUnifiedAnnotationLayout, type LayerMoveDirection } from '../../lib/annotationTimeline';
 import type {
   DerivedAnnotation,
   DerivedSlice,
-  ImageAnnotation,
-  TextAnnotation,
   TimelineScrollInfo,
 } from '../../types/editor';
 
@@ -28,6 +27,14 @@ interface TimelineTracksProps {
   onMoveSliceEnd: () => void;
   onMoveAnnotation: (annotationId: string, nextStart: number) => void;
   onMoveAnnotationEnd: () => void;
+  onResizeAnnotation: (annotationId: string, nextDuration: number) => void;
+  onResizeAnnotationEnd: () => void;
+  onMoveAnnotationLayer: (annotationId: string, direction: LayerMoveDirection) => void;
+  canMoveAnnotationUp: boolean;
+  canMoveAnnotationDown: boolean;
+  draggingAnnotationId: string | null;
+  onAnnotationDragStart: (annotationId: string) => void;
+  onAnnotationDragEnd: () => void;
 }
 
 const VIDEO_TRACK_TOP = 28;
@@ -38,195 +45,175 @@ const ANNOTATION_ROW_HEIGHT = 30;
 const ANNOTATION_ROW_GAP = 4;
 const MIN_ANNOTATION_TRACK_HEIGHT = 40;
 const MIN_ANNOTATION_BLOCK_WIDTH = 40;
-const OVERLAP_EPSILON = 0.0001;
-
-interface AnnotationPlacement<T extends DerivedAnnotation> {
-  annotation: T;
-  row: number;
-}
-
-interface AnnotationTrackLayout<T extends DerivedAnnotation> {
-  placements: AnnotationPlacement<T>[];
-  rowCount: number;
-  trackHeight: number;
-}
-
-function isTextAnnotation(annotation: DerivedAnnotation): annotation is DerivedAnnotation<TextAnnotation> {
-  return annotation.kind === 'text';
-}
-
-function isImageAnnotation(annotation: DerivedAnnotation): annotation is DerivedAnnotation<ImageAnnotation> {
-  return annotation.kind === 'image';
-}
-
-function buildAnnotationTrackLayout<T extends DerivedAnnotation>(annotations: T[]): AnnotationTrackLayout<T> {
-  if (!annotations.length) {
-    return {
-      placements: [],
-      rowCount: 1,
-      trackHeight: MIN_ANNOTATION_TRACK_HEIGHT,
-    };
-  }
-
-  const rows: Array<Array<{ start: number; end: number }>> = [];
-  const rowById = new Map<string, number>();
-
-  const prioritized = annotations
-    .map((annotation, index) => ({ annotation, priority: index }))
-    .sort((a, b) => b.priority - a.priority);
-
-  for (const item of prioritized) {
-    const { annotation } = item;
-    let row = 0;
-
-    while (true) {
-      const segments = rows[row] ?? [];
-      const overlaps = segments.some(
-        (segment) =>
-          annotation.start < segment.end - OVERLAP_EPSILON && segment.start < annotation.end - OVERLAP_EPSILON,
-      );
-
-      if (!overlaps) {
-        break;
-      }
-
-      row += 1;
-    }
-
-    if (!rows[row]) {
-      rows[row] = [];
-    }
-
-    rows[row].push({ start: annotation.start, end: annotation.end });
-    rowById.set(annotation.id, row);
-  }
-
-  const rowCount = Math.max(1, rows.length);
-  const trackHeight = Math.max(
-    MIN_ANNOTATION_TRACK_HEIGHT,
-    ANNOTATION_TRACK_PADDING * 2 + rowCount * ANNOTATION_ROW_HEIGHT + Math.max(0, rowCount - 1) * ANNOTATION_ROW_GAP,
-  );
-
-  return {
-    placements: annotations.map((annotation) => ({
-      annotation,
-      row: rowById.get(annotation.id) ?? 0,
-    })),
-    rowCount,
-    trackHeight,
-  };
-}
 
 function getAnnotationRowTop(row: number): number {
   return ANNOTATION_TRACK_PADDING + row * (ANNOTATION_ROW_HEIGHT + ANNOTATION_ROW_GAP);
 }
 
-function TextLayerBlock({
-  annotation,
-  pixelsPerSecond,
-  row,
-  selected,
-  onSelect,
-  onMove,
-  onMoveEnd,
-}: {
-  annotation: DerivedAnnotation<TextAnnotation>;
-  pixelsPerSecond: number;
-  row: number;
-  selected: boolean;
-  onSelect: () => void;
-  onMove: (nextStart: number) => void;
-  onMoveEnd: () => void;
-}) {
-  const initialStartRef = useRef(annotation.start);
+function getAnnotationLabel(annotation: DerivedAnnotation): string {
+  if (annotation.kind === 'text') {
+    return annotation.text || 'Text';
+  }
 
-  return (
-    <motion.button
-      type="button"
-      className={`absolute top-0 h-full rounded border px-2 text-left text-xs transition ${
-        selected
-          ? 'z-20 border-rose-200 bg-rose-500/95 text-white'
-          : 'z-10 border-rose-300/60 bg-rose-700/85 text-rose-50 hover:bg-rose-600/90'
-      }`}
-      style={{
-        left: `${annotation.start * pixelsPerSecond}px`,
-        width: `${Math.max(MIN_ANNOTATION_BLOCK_WIDTH, annotation.duration * pixelsPerSecond)}px`,
-        top: `${getAnnotationRowTop(row)}px`,
-        height: `${ANNOTATION_ROW_HEIGHT}px`,
-        touchAction: 'none',
-      }}
-      onPointerDown={(event) => {
-        event.stopPropagation();
-        onSelect();
-      }}
-      onPanStart={() => {
-        initialStartRef.current = annotation.start;
-      }}
-      onPan={(_event: Event, info: PanInfo) => {
-        const nextStart = Math.max(0, initialStartRef.current + info.offset.x / pixelsPerSecond);
-        onMove(nextStart);
-      }}
-      onPanEnd={onMoveEnd}
-      title={annotation.text}
-    >
-      <span className="block truncate font-semibold tracking-wide">{annotation.text || 'Text'}</span>
-    </motion.button>
-  );
+  return annotation.file.name;
 }
 
-function ImageLayerBlock({
+function AnnotationLayerBlock({
   annotation,
   pixelsPerSecond,
   row,
+  zIndex,
   selected,
+  draggingAnnotationId,
+  canMoveUp,
+  canMoveDown,
+  layerUpLabel,
+  layerDownLabel,
   onSelect,
   onMove,
   onMoveEnd,
+  onResize,
+  onResizeEnd,
+  onLayerMove,
+  onDragStart,
+  onDragEnd,
 }: {
-  annotation: DerivedAnnotation<ImageAnnotation>;
+  annotation: DerivedAnnotation;
   pixelsPerSecond: number;
   row: number;
+  zIndex: number;
   selected: boolean;
+  draggingAnnotationId: string | null;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  layerUpLabel: string;
+  layerDownLabel: string;
   onSelect: () => void;
   onMove: (nextStart: number) => void;
   onMoveEnd: () => void;
+  onResize: (nextDuration: number) => void;
+  onResizeEnd: () => void;
+  onLayerMove: (direction: LayerMoveDirection) => void;
+  onDragStart: () => void;
+  onDragEnd: () => void;
 }) {
   const initialStartRef = useRef(annotation.start);
+  const initialDurationRef = useRef(annotation.duration);
+  const isDragging = draggingAnnotationId === annotation.id;
+  const isDragLocked = draggingAnnotationId !== null && !isDragging;
+  const blockWidth = Math.max(MIN_ANNOTATION_BLOCK_WIDTH, annotation.duration * pixelsPerSecond);
+  const isText = annotation.kind === 'text';
+
+  const baseColorClass = isText
+    ? 'border-rose-300/60 bg-rose-700/85 text-rose-50 hover:bg-rose-600/90'
+    : 'border-amber-300/60 bg-amber-600/85 text-amber-50 hover:bg-amber-500/90';
+  const selectedColorClass = isText
+    ? 'border-rose-200 bg-rose-500/95 text-white'
+    : 'border-amber-200 bg-amber-400/95 text-slate-950';
 
   return (
-    <motion.button
-      type="button"
-      className={`absolute top-0 h-full rounded border px-2 text-left text-xs transition ${
-        selected
-          ? 'z-20 border-amber-200 bg-amber-400/95 text-slate-950'
-          : 'z-10 border-amber-300/60 bg-amber-600/85 text-amber-50 hover:bg-amber-500/90'
-      }`}
+    <div
+      className="absolute"
       style={{
         left: `${annotation.start * pixelsPerSecond}px`,
-        width: `${Math.max(MIN_ANNOTATION_BLOCK_WIDTH, annotation.duration * pixelsPerSecond)}px`,
+        width: `${blockWidth}px`,
         top: `${getAnnotationRowTop(row)}px`,
         height: `${ANNOTATION_ROW_HEIGHT}px`,
-        touchAction: 'none',
+        zIndex: selected ? zIndex + 10000 : zIndex,
+        pointerEvents: isDragLocked ? 'none' : 'auto',
       }}
-      onPointerDown={(event) => {
-        event.stopPropagation();
-        onSelect();
-      }}
-      onPanStart={() => {
-        initialStartRef.current = annotation.start;
-      }}
-      onPan={(_event: Event, info: PanInfo) => {
-        const nextStart = Math.max(0, initialStartRef.current + info.offset.x / pixelsPerSecond);
-        onMove(nextStart);
-      }}
-      onPanEnd={onMoveEnd}
-      title={annotation.file.name}
     >
-      <span className="inline-flex max-w-full items-center gap-1 truncate font-semibold tracking-wide">
-        <ImageIcon size={12} className="shrink-0" />
-        <span className="truncate">{annotation.file.name}</span>
-      </span>
-    </motion.button>
+      <motion.button
+        type="button"
+        className={`absolute inset-y-0 left-0 w-full rounded border px-2 pr-4 text-left text-xs transition ${
+          selected ? selectedColorClass : baseColorClass
+        }`}
+        style={{ touchAction: 'none' }}
+        onPointerDown={(event) => {
+          event.stopPropagation();
+          if (event.currentTarget.setPointerCapture) {
+            event.currentTarget.setPointerCapture(event.pointerId);
+          }
+          onSelect();
+        }}
+        onPanStart={() => {
+          initialStartRef.current = annotation.start;
+          onDragStart();
+        }}
+        onPan={(_event: Event, info: PanInfo) => {
+          const nextStart = Math.max(0, initialStartRef.current + info.offset.x / pixelsPerSecond);
+          onMove(nextStart);
+        }}
+        onPanEnd={() => {
+          onMoveEnd();
+          onDragEnd();
+        }}
+        title={getAnnotationLabel(annotation)}
+      >
+        <span className="inline-flex max-w-full items-center gap-1 truncate font-semibold tracking-wide select-none">
+          {isText ? <Type size={12} className="shrink-0" /> : <ImageIcon size={12} className="shrink-0" />}
+          <span className="truncate">{getAnnotationLabel(annotation)}</span>
+        </span>
+      </motion.button>
+
+      <motion.div
+        className="group absolute inset-y-0 right-0 z-30 flex w-3 cursor-col-resize items-center justify-center"
+        style={{ touchAction: 'none' }}
+        onPointerDown={(event) => {
+          event.stopPropagation();
+          onSelect();
+        }}
+        onPanStart={() => {
+          initialDurationRef.current = annotation.duration;
+          onDragStart();
+        }}
+        onPan={(_event: Event, info: PanInfo) => {
+          const deltaSeconds = info.offset.x / pixelsPerSecond;
+          onResize(initialDurationRef.current + deltaSeconds);
+        }}
+        onPanEnd={() => {
+          onResizeEnd();
+          onDragEnd();
+        }}
+      >
+        <div className="h-full w-1 bg-black/30 transition-colors group-hover:bg-cyan-200/90" />
+      </motion.div>
+
+      {selected ? (
+        <div className="absolute -right-8 top-1/2 z-40 flex -translate-y-1/2 flex-col gap-1">
+          <button
+            type="button"
+            onPointerDown={(event) => {
+              event.stopPropagation();
+            }}
+            onClick={(event) => {
+              event.stopPropagation();
+              onLayerMove('up');
+            }}
+            disabled={!canMoveUp}
+            className="inline-flex h-4 w-4 items-center justify-center rounded border border-slate-500/80 bg-slate-900/95 text-slate-100 transition hover:border-cyan-300/80 hover:text-cyan-100 disabled:opacity-30"
+            aria-label={layerUpLabel}
+          >
+            <ChevronUp size={10} />
+          </button>
+          <button
+            type="button"
+            onPointerDown={(event) => {
+              event.stopPropagation();
+            }}
+            onClick={(event) => {
+              event.stopPropagation();
+              onLayerMove('down');
+            }}
+            disabled={!canMoveDown}
+            className="inline-flex h-4 w-4 items-center justify-center rounded border border-slate-500/80 bg-slate-900/95 text-slate-100 transition hover:border-cyan-300/80 hover:text-cyan-100 disabled:opacity-30"
+            aria-label={layerDownLabel}
+          >
+            <ChevronDown size={10} />
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -247,20 +234,32 @@ export default function TimelineTracks({
   onMoveSliceEnd,
   onMoveAnnotation,
   onMoveAnnotationEnd,
+  onResizeAnnotation,
+  onResizeAnnotationEnd,
+  onMoveAnnotationLayer,
+  canMoveAnnotationUp,
+  canMoveAnnotationDown,
+  draggingAnnotationId,
+  onAnnotationDragStart,
+  onAnnotationDragEnd,
 }: TimelineTracksProps) {
   const { t } = useTranslation();
   const initialDurationRef = useRef<number>(0);
   const initialStartRef = useRef<number>(0);
 
   const safeOutputAspectRatio = Number.isFinite(outputAspectRatio) && outputAspectRatio > 0 ? outputAspectRatio : 16 / 9;
-  const textAnnotations = useMemo(() => annotationsWithPos.filter(isTextAnnotation), [annotationsWithPos]);
-  const imageAnnotations = useMemo(() => annotationsWithPos.filter(isImageAnnotation), [annotationsWithPos]);
-  const textTrackLayout = useMemo(() => buildAnnotationTrackLayout(textAnnotations), [textAnnotations]);
-  const imageTrackLayout = useMemo(() => buildAnnotationTrackLayout(imageAnnotations), [imageAnnotations]);
-
-  const textTrackTop = VIDEO_TRACK_TOP + VIDEO_TRACK_HEIGHT + TRACK_GAP;
-  const imageTrackTop = textTrackTop + textTrackLayout.trackHeight + TRACK_GAP;
-  const timelineHeight = imageTrackTop + imageTrackLayout.trackHeight + 12;
+  const annotationTrackTop = VIDEO_TRACK_TOP + VIDEO_TRACK_HEIGHT + TRACK_GAP;
+  const annotationLayout = useMemo(
+    () => buildUnifiedAnnotationLayout(annotationsWithPos),
+    [annotationsWithPos],
+  );
+  const annotationTrackHeight = Math.max(
+    MIN_ANNOTATION_TRACK_HEIGHT,
+    ANNOTATION_TRACK_PADDING * 2 +
+      annotationLayout.rowCount * ANNOTATION_ROW_HEIGHT +
+      Math.max(0, annotationLayout.rowCount - 1) * ANNOTATION_ROW_GAP,
+  );
+  const timelineHeight = annotationTrackTop + annotationTrackHeight + 12;
 
   return (
     <>
@@ -374,49 +373,36 @@ export default function TimelineTracks({
       </div>
 
       <div
-        className="absolute inset-x-0 border border-rose-950/60 bg-rose-950/35"
+        className="absolute inset-x-0 border border-slate-700/70 bg-slate-900/35"
         style={{
-          top: `${textTrackTop}px`,
-          height: `${textTrackLayout.trackHeight}px`,
+          top: `${annotationTrackTop}px`,
+          height: `${annotationTrackHeight}px`,
         }}
       >
-        {textTrackLayout.placements.map(({ annotation, row }) => (
-          <TextLayerBlock
+        {annotationLayout.placements.map(({ annotation, row, zIndex }) => (
+          <AnnotationLayerBlock
             key={annotation.id}
             annotation={annotation}
             pixelsPerSecond={pixelsPerSecond}
             row={row}
+            zIndex={zIndex}
             selected={annotation.id === selectedAnnotationId}
+            draggingAnnotationId={draggingAnnotationId}
+            canMoveUp={annotation.id === selectedAnnotationId ? canMoveAnnotationUp : false}
+            canMoveDown={annotation.id === selectedAnnotationId ? canMoveAnnotationDown : false}
+            layerUpLabel={t('sliceEditor.layerUp')}
+            layerDownLabel={t('sliceEditor.layerDown')}
             onSelect={() => {
               setSelectedSliceId(null);
               setSelectedAnnotationId(annotation.id);
             }}
             onMove={(nextStart) => onMoveAnnotation(annotation.id, nextStart)}
             onMoveEnd={onMoveAnnotationEnd}
-          />
-        ))}
-      </div>
-
-      <div
-        className="absolute inset-x-0 border border-amber-900/60 bg-amber-900/35"
-        style={{
-          top: `${imageTrackTop}px`,
-          height: `${imageTrackLayout.trackHeight}px`,
-        }}
-      >
-        {imageTrackLayout.placements.map(({ annotation, row }) => (
-          <ImageLayerBlock
-            key={annotation.id}
-            annotation={annotation}
-            pixelsPerSecond={pixelsPerSecond}
-            row={row}
-            selected={annotation.id === selectedAnnotationId}
-            onSelect={() => {
-              setSelectedSliceId(null);
-              setSelectedAnnotationId(annotation.id);
-            }}
-            onMove={(nextStart) => onMoveAnnotation(annotation.id, nextStart)}
-            onMoveEnd={onMoveAnnotationEnd}
+            onResize={(nextDuration) => onResizeAnnotation(annotation.id, nextDuration)}
+            onResizeEnd={onResizeAnnotationEnd}
+            onLayerMove={(direction) => onMoveAnnotationLayer(annotation.id, direction)}
+            onDragStart={() => onAnnotationDragStart(annotation.id)}
+            onDragEnd={onAnnotationDragEnd}
           />
         ))}
       </div>

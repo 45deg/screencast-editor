@@ -24,8 +24,10 @@ import {
   getSourceTimeAtTimelineTime,
   getTotalDuration,
   type AnnotationModel,
+  type AnnotationTextStyle,
   type CropRect,
   type SliceModel,
+  type TextAnnotation,
   type VideoMeta,
 } from './types/editor';
 
@@ -150,6 +152,14 @@ function getFirstVideoFile(files: FileList | null): File | null {
   }
 
   return Array.from(files).find((file) => file.type.startsWith('video/')) ?? null;
+}
+
+function getFirstImageFile(files: FileList | null): File | null {
+  if (!files?.length) {
+    return null;
+  }
+
+  return Array.from(files).find((file) => file.type.startsWith('image/')) ?? null;
 }
 
 function formatDurationLabel(duration: number): string {
@@ -281,6 +291,15 @@ export default function App() {
     () => getActiveAnnotationsAtTimelineTime(annotations, currentTime),
     [annotations, currentTime],
   );
+
+  const selectedTextAnnotation = useMemo(() => {
+    const selected = annotations.find((annotation) => annotation.id === selectedAnnotationId);
+    if (!selected || selected.kind !== 'text') {
+      return null;
+    }
+
+    return selected as TextAnnotation;
+  }, [annotations, selectedAnnotationId]);
 
   const hasVideo = Boolean(video && baseCrop);
   const totalDuration = useMemo(() => getTotalDuration(slices, annotations), [annotations, slices]);
@@ -687,6 +706,33 @@ export default function App() {
     [annotations, replaceAnnotationsCommit],
   );
 
+  const handleTextAnnotationStyleChange = useCallback(
+    (nextStyle: Partial<AnnotationTextStyle>) => {
+      if (!selectedTextAnnotation) {
+        return;
+      }
+
+      const nextAnnotations = annotations.map((annotation) => {
+        if (annotation.id !== selectedTextAnnotation.id || annotation.kind !== 'text') {
+          return annotation;
+        }
+
+        return {
+          ...annotation,
+          style: {
+            ...annotation.style,
+            ...nextStyle,
+            fontSize: Math.max(8, Math.min(180, Math.round(nextStyle.fontSize ?? annotation.style.fontSize))),
+            outlineWidth: Math.max(0, Math.min(24, nextStyle.outlineWidth ?? annotation.style.outlineWidth)),
+          },
+        };
+      });
+
+      replaceAnnotationsCommit(nextAnnotations, selectedTextAnnotation.id);
+    },
+    [annotations, replaceAnnotationsCommit, selectedTextAnnotation],
+  );
+
   const createCommandPreview = useCallback(
     (
       inputFileName?: string,
@@ -971,6 +1017,12 @@ export default function App() {
         return;
       }
 
+      const hasVideoFile = getFirstVideoFile(event.dataTransfer.files) !== null;
+      const hasImageFile = getFirstImageFile(event.dataTransfer.files) !== null;
+      if (!hasVideoFile && !(hasVideo && hasImageFile)) {
+        return;
+      }
+
       event.preventDefault();
       if (event.dataTransfer) {
         event.dataTransfer.dropEffect = 'copy';
@@ -983,17 +1035,25 @@ export default function App() {
       }
 
       const nextFile = getFirstVideoFile(event.dataTransfer.files);
-      if (!nextFile) {
+      const nextImage = getFirstImageFile(event.dataTransfer.files);
+      if (!nextFile && !(hasVideo && nextImage)) {
         return;
       }
 
       event.preventDefault();
 
+      if (hasVideo && nextImage && !nextFile) {
+        void handleCreateImageAnnotation(nextImage);
+        return;
+      }
+
       if (video && !window.confirm(t('app.replaceVideoConfirm'))) {
         return;
       }
 
-      void handleImportVideo(nextFile);
+      if (nextFile) {
+        void handleImportVideo(nextFile);
+      }
     };
 
     window.addEventListener('dragover', handleWindowDragOver);
@@ -1003,7 +1063,7 @@ export default function App() {
       window.removeEventListener('dragover', handleWindowDragOver);
       window.removeEventListener('drop', handleWindowDrop);
     };
-  }, [handleImportVideo, t, video]);
+  }, [handleCreateImageAnnotation, handleImportVideo, hasVideo, t, video]);
 
   return (
     <Drawer.Root open={isMobileSettingsDrawerOpen} onOpenChange={setIsMobileSettingsDrawerOpen}>
@@ -1086,6 +1146,7 @@ export default function App() {
                       activeSceneCrop={activeSceneCrop}
                       activeAnnotations={activeAnnotations}
                       selectedAnnotationId={selectedAnnotationId}
+                      selectedTextAnnotation={selectedTextAnnotation}
                       hasActiveVideoSlice={Boolean(previewSlice)}
                       editMode={cropEditMode}
                       editCrop={effectiveEditCrop}
@@ -1100,6 +1161,7 @@ export default function App() {
                       onAnnotationImageResizePreview={handleAnnotationImageResizePreview}
                       onAnnotationPositionCommit={handleAnnotationPositionCommit}
                       onTextAnnotationChange={handleTextAnnotationChange}
+                      onTextAnnotationStyleChange={handleTextAnnotationStyleChange}
                       className="h-full"
                       fillHeight
                     />

@@ -12,7 +12,8 @@ import { Toolbar } from '@base-ui/react/toolbar';
 import { Check, Crop, Focus, Pause, Play, RotateCcw, SkipBack, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import type { AnnotationModel, AnnotationTextStyle, CropRect, VideoMeta } from '../types/editor';
+import TextStyleToolbar from './annotation/TextStyleToolbar';
+import type { AnnotationModel, AnnotationTextStyle, CropRect, TextAnnotation, VideoMeta } from '../types/editor';
 
 type DragMode = 'move' | 'n' | 's' | 'w' | 'e' | 'nw' | 'ne' | 'sw' | 'se';
 
@@ -26,6 +27,7 @@ interface CanvasPreviewProps {
   activeSceneCrop: CropRect | null;
   activeAnnotations: AnnotationModel[];
   selectedAnnotationId: string | null;
+  selectedTextAnnotation: TextAnnotation | null;
   hasActiveVideoSlice: boolean;
   editMode: 'idle' | 'crop' | 'scene';
   editCrop: CropRect | null;
@@ -46,6 +48,7 @@ interface CanvasPreviewProps {
   ) => void;
   onAnnotationPositionCommit: () => void;
   onTextAnnotationChange: (annotationId: string, text: string) => void;
+  onTextAnnotationStyleChange: (next: Partial<AnnotationTextStyle>) => void;
   className?: string;
   fillHeight?: boolean;
 }
@@ -313,6 +316,7 @@ export default function CanvasPreview({
   activeSceneCrop,
   activeAnnotations,
   selectedAnnotationId,
+  selectedTextAnnotation,
   hasActiveVideoSlice,
   editMode,
   editCrop,
@@ -327,6 +331,7 @@ export default function CanvasPreview({
   onAnnotationImageResizePreview,
   onAnnotationPositionCommit,
   onTextAnnotationChange,
+  onTextAnnotationStyleChange,
   className,
   fillHeight = false,
 }: CanvasPreviewProps) {
@@ -675,6 +680,9 @@ export default function CanvasPreview({
 
       event.preventDefault();
       event.stopPropagation();
+      if (event.currentTarget.setPointerCapture) {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }
 
       annotationDragRef.current = {
         annotation,
@@ -694,6 +702,9 @@ export default function CanvasPreview({
     (event: ReactPointerEvent, annotation: Extract<AnnotationModel, { kind: 'image' }>) => {
       event.preventDefault();
       event.stopPropagation();
+      if (event.currentTarget.setPointerCapture) {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }
 
       annotationResizeRef.current = {
         annotation,
@@ -875,6 +886,22 @@ export default function CanvasPreview({
           )}
         </div>
 
+        {!isEditing ? (
+          <div className="flex justify-end">
+            <TextStyleToolbar
+              selectedTextAnnotation={selectedTextAnnotation}
+              onTextChange={(text) => {
+                if (!selectedTextAnnotation) {
+                  return;
+                }
+
+                onTextAnnotationChange(selectedTextAnnotation.id, text);
+              }}
+              onStyleChange={onTextAnnotationStyleChange}
+            />
+          </div>
+        ) : null}
+
       </div>
 
       <div className="flex flex-1 items-center justify-center overflow-hidden rounded-md border border-slate-800 bg-black/95 p-1">
@@ -1029,7 +1056,7 @@ export default function CanvasPreview({
                 )
               ) : null}
 
-              <div className="absolute inset-0">
+              <div className="absolute inset-0 select-none">
                 {activeAnnotations.map((annotation) => {
                   const left = (annotation.x / Math.max(1, displayLayout.frameCrop.w)) * frameSize.width;
                   const top = (annotation.y / Math.max(1, displayLayout.frameCrop.h)) * frameSize.height;
@@ -1084,7 +1111,7 @@ export default function CanvasPreview({
                         type="button"
                         onPointerDown={(event) => handleTextPointerDown(event, annotation)}
                         onDoubleClick={() => startInlineTextEdit(annotation)}
-                        className={`absolute max-w-[94%] cursor-move text-left transition ${
+                        className={`absolute max-w-[94%] cursor-move select-none text-left transition ${
                           selected ? 'ring-2 ring-cyan-300/80 ring-offset-2 ring-offset-black' : ''
                         }`}
                         style={{
@@ -1115,7 +1142,7 @@ export default function CanvasPreview({
                       <button
                         type="button"
                         onPointerDown={(event) => beginAnnotationDrag(event, annotation)}
-                        className={`h-full w-full cursor-move overflow-hidden rounded-sm border transition ${
+                        className={`h-full w-full cursor-move select-none overflow-hidden rounded-sm border transition ${
                           selected
                             ? 'border-cyan-200 ring-2 ring-cyan-300/80 ring-offset-2 ring-offset-black'
                             : 'border-slate-200/50'
@@ -1128,7 +1155,7 @@ export default function CanvasPreview({
                         <button
                           type="button"
                           onPointerDown={(event) => beginImageResize(event, annotation)}
-                          className="absolute -bottom-2 -right-2 h-4 w-4 cursor-nwse-resize rounded-full border border-cyan-200 bg-slate-950"
+                          className="absolute bottom-1 right-1 h-3.5 w-3.5 cursor-nwse-resize rounded-full border border-cyan-200 bg-slate-950"
                           aria-label={t('canvas.resizeSouthEast')}
                         />
                       ) : null}

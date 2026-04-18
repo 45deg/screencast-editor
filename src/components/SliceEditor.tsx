@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import { motion, type PanInfo } from 'framer-motion';
 
+import {
+  moveAnnotationLayer,
+  resizeAnnotationDuration,
+} from '../lib/annotationTimeline';
 import { captureVideoThumbnail } from '../lib/videoThumbnail';
 import {
   type AnnotationModel,
@@ -192,6 +196,12 @@ export default function SliceEditorTimeline({
     () => slicesWithPos.find((slice) => slice.id === selectedSliceId),
     [slicesWithPos, selectedSliceId],
   );
+  const selectedAnnotationIndex = useMemo(
+    () => annotations.findIndex((annotation) => annotation.id === selectedAnnotationId),
+    [annotations, selectedAnnotationId],
+  );
+  const canMoveAnnotationUp = selectedAnnotationIndex > 0;
+  const canMoveAnnotationDown = selectedAnnotationIndex >= 0 && selectedAnnotationIndex < annotations.length - 1;
   const safeOutputAspectRatio = useMemo(
     () => (Number.isFinite(outputAspectRatio) && outputAspectRatio > 0 ? outputAspectRatio : 16 / 9),
     [outputAspectRatio],
@@ -257,6 +267,7 @@ export default function SliceEditorTimeline({
   const pendingSliceCommitRef = useRef<SliceModel[] | null>(null);
   const pendingAnnotationCommitRef = useRef<AnnotationModel[] | null>(null);
   const [scrollInfo, setScrollInfo] = useState<TimelineScrollInfo>({ left: 0, width: 1000 });
+  const [draggingAnnotationId, setDraggingAnnotationId] = useState<string | null>(null);
 
   useEffect(() => {
     const element = scrollContainerRef.current;
@@ -471,8 +482,45 @@ export default function SliceEditorTimeline({
     commitPendingAnnotations();
   }, [commitPendingAnnotations]);
 
+  const handleResizeAnnotation = useCallback(
+    (annotationId: string, nextDuration: number) => {
+      const updated = resizeAnnotationDuration(annotations, annotationId, nextDuration);
+      pendingAnnotationCommitRef.current = updated;
+      onAnnotationsPreview(updated);
+    },
+    [annotations, onAnnotationsPreview],
+  );
+
+  const handleResizeAnnotationEnd = useCallback(() => {
+    commitPendingAnnotations();
+  }, [commitPendingAnnotations]);
+
+  const handleMoveAnnotationLayer = useCallback(
+    (annotationId: string, direction: 'up' | 'down') => {
+      const updated = moveAnnotationLayer(annotations, annotationId, direction);
+      if (updated === annotations) {
+        return;
+      }
+
+      onAnnotationsCommit(updated, annotationId);
+    },
+    [annotations, onAnnotationsCommit],
+  );
+
+  const handleAnnotationDragStart = useCallback((annotationId: string) => {
+    setDraggingAnnotationId(annotationId);
+  }, []);
+
+  const handleAnnotationDragEnd = useCallback(() => {
+    setDraggingAnnotationId(null);
+  }, []);
+
   const handleTimelinePointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
+      if (draggingAnnotationId) {
+        return;
+      }
+
       const target = event.target as Element;
       const nextTime = updateTimeFromClientX(event.clientX);
 
@@ -495,6 +543,7 @@ export default function SliceEditorTimeline({
       onSelectedAnnotationIdChange,
       onSelectedSliceIdChange,
       updateTimeFromClientX,
+      draggingAnnotationId,
     ],
   );
 
@@ -555,7 +604,7 @@ export default function SliceEditorTimeline({
 
   return (
     <section
-      className={`relative z-10 flex w-full shrink-0 flex-col overflow-hidden rounded-lg border border-slate-800/70 bg-slate-950 shadow-xl ${fillHeight ? 'min-h-0 h-full' : 'h-[320px] sm:h-[360px]'} ${className ?? ''}`}
+      className={`relative z-10 flex w-full shrink-0 select-none flex-col overflow-hidden rounded-lg border border-slate-800/70 bg-slate-950 shadow-xl ${fillHeight ? 'min-h-0 h-full' : 'h-[320px] sm:h-[360px]'} ${className ?? ''}`}
     >
       <EditorToolbar
         undo={onUndo}
@@ -589,7 +638,7 @@ export default function SliceEditorTimeline({
       <div ref={scrollContainerRef} className="timeline-scrollbar relative flex-1 overflow-x-auto overflow-y-hidden bg-slate-950">
         <motion.div
           ref={timelineRef}
-          className="relative min-h-full cursor-text"
+          className="relative min-h-full cursor-text select-none"
           style={{
             width: `${Math.max(10, totalDuration) * pixelsPerSecond}px`,
             minWidth: '100%',
@@ -618,6 +667,14 @@ export default function SliceEditorTimeline({
             onMoveSliceEnd={handleMoveSliceEnd}
             onMoveAnnotation={handleMoveAnnotation}
             onMoveAnnotationEnd={handleMoveAnnotationEnd}
+            onResizeAnnotation={handleResizeAnnotation}
+            onResizeAnnotationEnd={handleResizeAnnotationEnd}
+            onMoveAnnotationLayer={handleMoveAnnotationLayer}
+            canMoveAnnotationUp={canMoveAnnotationUp}
+            canMoveAnnotationDown={canMoveAnnotationDown}
+            draggingAnnotationId={draggingAnnotationId}
+            onAnnotationDragStart={handleAnnotationDragStart}
+            onAnnotationDragEnd={handleAnnotationDragEnd}
           />
 
           <Playhead currentTime={currentTime} pixelsPerSecond={pixelsPerSecond} />
