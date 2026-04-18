@@ -37,7 +37,7 @@ export default function AppHeader({
             </button>
           ) : null}
           <img
-            src="/favicon.svg"
+            src={`${import.meta.env.BASE_URL}favicon.svg`}
             alt=""
             className="h-9 w-9 rounded-xl border border-slate-700/80 bg-slate-900/70 p-1.5 shadow-[0_0_24px_rgba(34,211,238,0.12)]"
           />
