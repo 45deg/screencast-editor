@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { Popover } from '@base-ui/react/popover';
 import { Slider } from '@base-ui/react/slider';
-import { Toolbar } from '@base-ui/react/toolbar';
 import { motion, type PanInfo } from 'framer-motion';
-import { Clapperboard, FastForward, Redo2, Scissors, Trash2, Undo2, ZoomIn } from 'lucide-react';
+import { Clapperboard, Crop, Gauge, Redo2, Scissors, Trash2, Undo2, ZoomIn } from 'lucide-react';
 
 import { captureVideoThumbnail } from '../lib/videoThumbnail';
 import {
@@ -49,13 +49,11 @@ interface ToolbarProps {
   onDelete: () => void;
   canDelete: boolean;
   selectedSlice: DerivedSlice | undefined;
-  onSpeedChange: (e: ChangeEvent<HTMLInputElement>) => void;
-  onSpeedChangeEnd: () => void;
+  onSpeedValueChange: (value: number | null) => void;
+  onSpeedValueCommit: () => void;
   zoomSlider: number;
   setZoomSlider: (val: number) => void;
   zoom: number;
-  currentTime: number;
-  totalDuration: number;
 }
 
 function EditorToolbar({
@@ -70,22 +68,65 @@ function EditorToolbar({
   onDelete,
   canDelete,
   selectedSlice,
-  onSpeedChange,
-  onSpeedChangeEnd,
+  onSpeedValueChange,
+  onSpeedValueCommit,
   zoomSlider,
   setZoomSlider,
   zoom,
-  currentTime,
-  totalDuration,
 }: ToolbarProps) {
+  const [speedDraft, setSpeedDraft] = useState('');
+
+  useEffect(() => {
+    setSpeedDraft(selectedSlice ? selectedSlice.speed.toFixed(2) : '');
+  }, [selectedSlice]);
+
+  const commitSpeedDraft = useCallback(() => {
+    if (!selectedSlice) {
+      setSpeedDraft('');
+      return;
+    }
+
+    const nextSpeed = Number.parseFloat(speedDraft);
+    if (!Number.isFinite(nextSpeed) || nextSpeed <= 0) {
+      setSpeedDraft(selectedSlice.speed.toFixed(2));
+      return;
+    }
+
+    onSpeedValueChange(nextSpeed);
+    onSpeedValueCommit();
+    setSpeedDraft(nextSpeed.toFixed(2));
+  }, [onSpeedValueChange, onSpeedValueCommit, selectedSlice, speedDraft]);
+
+  const handleSpeedInputChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const nextValue = event.target.value;
+      setSpeedDraft(nextValue);
+
+      const nextSpeed = Number.parseFloat(nextValue);
+      if (Number.isFinite(nextSpeed) && nextSpeed > 0) {
+        onSpeedValueChange(nextSpeed);
+      }
+    },
+    [onSpeedValueChange],
+  );
+
+  const handleSpeedInputKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLInputElement>) => {
+      if (event.key === 'Enter') {
+        commitSpeedDraft();
+      }
+    },
+    [commitSpeedDraft],
+  );
+
   return (
     <div className="h-14 border-b border-slate-800/80 bg-slate-950/95 px-2 shadow-sm sm:px-4">
-      <Toolbar.Root
+      <div
         aria-label="Editor controls"
-        className="timeline-scrollbar flex h-full items-center gap-2 overflow-x-auto overflow-y-hidden"
+        className="timeline-scrollbar flex h-full min-w-max items-center gap-2 overflow-x-auto overflow-y-hidden sm:min-w-0"
       >
-        <Toolbar.Group className="flex min-w-max items-center gap-1.5 sm:gap-2">
-          <Toolbar.Button
+        <div className="flex min-w-max items-center gap-1.5 sm:gap-2">
+          <button
             type="button"
             onClick={undo}
             disabled={!canUndo}
@@ -94,8 +135,8 @@ function EditorToolbar({
             title="Undo (Ctrl+Z)"
           >
             <Undo2 size={16} />
-          </Toolbar.Button>
-          <Toolbar.Button
+          </button>
+          <button
             type="button"
             onClick={redo}
             disabled={!canRedo}
@@ -104,11 +145,11 @@ function EditorToolbar({
             title="Redo (Ctrl+Shift+Z)"
           >
             <Redo2 size={16} />
-          </Toolbar.Button>
+          </button>
 
-          <Toolbar.Separator className="mx-1 h-5 w-px bg-slate-700" />
+          <div aria-hidden="true" className="mx-1 h-5 w-px bg-slate-700" />
 
-          <Toolbar.Button
+          <button
             type="button"
             onClick={onSceneCrop}
             disabled={!canSceneCrop}
@@ -116,10 +157,10 @@ function EditorToolbar({
             aria-label="Scene crop"
           >
             <Clapperboard size={15} />
-            Scene Crop
-          </Toolbar.Button>
+            <span className="hidden sm:inline">Crop</span>
+          </button>
 
-          <Toolbar.Button
+          <button
             type="button"
             onClick={onCut}
             disabled={!canCut}
@@ -128,10 +169,10 @@ function EditorToolbar({
             title="Cut at playhead"
           >
             <Scissors size={16} />
-            Cut
-          </Toolbar.Button>
+            <span className="hidden sm:inline">Cut</span>
+          </button>
 
-          <Toolbar.Button
+          <button
             type="button"
             onClick={onDelete}
             disabled={!canDelete}
@@ -140,32 +181,49 @@ function EditorToolbar({
             title="Delete selected slice (Del)"
           >
             <Trash2 size={16} />
-            Delete
-          </Toolbar.Button>
+            <span className="hidden sm:inline">Delete</span>
+          </button>
 
-          <Toolbar.Separator className="mx-1 h-5 w-px bg-slate-700" />
+          <div aria-hidden="true" className="mx-1 h-5 w-px bg-slate-700" />
+        </div>
 
-          <div className="flex items-center gap-1.5 rounded-md border border-slate-800 bg-slate-950 px-2 py-1 sm:gap-2 sm:px-3">
-            <FastForward size={14} className="text-slate-400" />
-            <span className="text-[10px] text-slate-500 sm:text-xs">x</span>
-            <Toolbar.Input
-              type="number"
-              min="0.1"
-              step="0.1"
-              value={selectedSlice ? Number(selectedSlice.speed.toFixed(2)) : ''}
-              onChange={onSpeedChange}
-              onBlur={onSpeedChangeEnd}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  onSpeedChangeEnd();
-                }
-              }}
+        <div className="ml-auto flex min-w-max items-center gap-2 pl-2">
+          <Popover.Root>
+            <Popover.Trigger
+              type="button"
               disabled={!selectedSlice}
-              className="w-12 rounded border border-slate-700 bg-slate-900 px-1.5 py-0.5 text-sm text-white outline-none transition-colors focus:border-cyan-500 disabled:opacity-30 sm:w-16 sm:px-2 sm:py-1 sm:text-xs"
-              placeholder="1.0"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-800 bg-slate-950 px-2.5 text-[10px] font-medium text-slate-200 transition hover:border-cyan-500/60 hover:bg-slate-900 hover:text-white disabled:opacity-30 sm:text-[11px]"
               aria-label="Slice speed"
-            />
-          </div>
+            >
+              <Gauge size={14} className="text-slate-400" />
+              <span>x{selectedSlice ? selectedSlice.speed.toFixed(1) : '1.0'}</span>
+            </Popover.Trigger>
+            <Popover.Portal>
+              <Popover.Positioner side="bottom" align="end" sideOffset={8} className="z-[120]">
+                <Popover.Popup className="z-[120] w-44 rounded-xl border border-slate-800 bg-slate-950/98 p-3 shadow-2xl backdrop-blur">
+                  <div className="mb-2 text-[11px] font-medium tracking-wide text-slate-400">Playback speed</div>
+                  <label htmlFor="slice-speed" className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-2 focus-within:border-cyan-500">
+                    <Gauge size={14} className="shrink-0 text-slate-400" />
+                    <input
+                      id="slice-speed"
+                      name="slice-speed"
+                      type="number"
+                      inputMode="decimal"
+                      min={0.1}
+                      step={0.1}
+                      value={speedDraft}
+                      onChange={handleSpeedInputChange}
+                      onBlur={commitSpeedDraft}
+                      onKeyDown={handleSpeedInputKeyDown}
+                      disabled={!selectedSlice}
+                      placeholder="1.0"
+                      className="w-full border-0 bg-transparent text-sm text-white outline-none [appearance:textfield] disabled:opacity-30 [&::-webkit-inner-spin-button]:appearance-auto [&::-webkit-outer-spin-button]:appearance-auto"
+                    />
+                  </label>
+                </Popover.Popup>
+              </Popover.Positioner>
+            </Popover.Portal>
+          </Popover.Root>
 
           <div className="flex items-center gap-1.5 rounded-md border border-slate-800 bg-slate-950 px-2 py-1 sm:gap-2 sm:px-3">
             <ZoomIn size={14} className="text-slate-400" />
@@ -179,7 +237,7 @@ function EditorToolbar({
                   setZoomSlider(value);
                 }
               }}
-              className="w-14 sm:w-20"
+              className="w-14 sm:w-24"
             >
               <Slider.Control className="relative flex h-4 w-full items-center">
                 <Slider.Track className="relative h-1.5 w-full rounded-full bg-slate-700">
@@ -192,14 +250,8 @@ function EditorToolbar({
               </Slider.Control>
             </Slider.Root>
           </div>
-        </Toolbar.Group>
-
-        <div className="ml-auto flex min-w-max shrink-0 flex-col items-end">
-          <div className="mt-0.5 font-mono text-[10px] tracking-wider text-slate-500">
-            <span className="text-slate-200">{currentTime.toFixed(2)}s</span> / {totalDuration.toFixed(2)}s
-          </div>
         </div>
-      </Toolbar.Root>
+      </div>
     </div>
   );
 }
@@ -341,10 +393,11 @@ function SliceTrack({
                     )}
                   </div>
                   <div
-                    className={`text-sm font-bold tracking-wider text-white drop-shadow ${
+                    className={`flex items-center gap-1 text-sm font-bold tracking-wider text-white drop-shadow ${
                       isOpeningScene ? 'self-start text-left' : 'text-center'
                     }`}
                   >
+                    {slice.crop ? <Crop size={13} className="shrink-0 text-amber-200" /> : null}
                     Scene#{index + 1}
                   </div>
                   <div
@@ -615,13 +668,12 @@ export default function SliceEditorTimeline({
     onSlicesCommit(nextSlices, null);
   }, [onSlicesCommit, selectedSliceId, slices]);
 
-  const handleSpeedChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      if (!selectedSliceId) {
+  const handleSpeedValueChange = useCallback(
+    (nextSpeed: number | null) => {
+      if (!selectedSliceId || nextSpeed === null) {
         return;
       }
 
-      const nextSpeed = Number.parseFloat(event.target.value);
       if (!Number.isFinite(nextSpeed) || nextSpeed <= 0) {
         return;
       }
@@ -644,7 +696,7 @@ export default function SliceEditorTimeline({
     [onSlicesPreview, selectedSliceId, slices],
   );
 
-  const handleSpeedChangeEnd = useCallback(() => {
+  const handleSpeedValueCommit = useCallback(() => {
     commitPendingSlices();
   }, [commitPendingSlices]);
 
@@ -723,13 +775,11 @@ export default function SliceEditorTimeline({
         onDelete={handleDeleteSelected}
         canDelete={selectedSliceId !== null}
         selectedSlice={selectedSlice}
-        onSpeedChange={handleSpeedChange}
-        onSpeedChangeEnd={handleSpeedChangeEnd}
+        onSpeedValueChange={handleSpeedValueChange}
+        onSpeedValueCommit={handleSpeedValueCommit}
         zoomSlider={zoomSlider}
         setZoomSlider={setZoomSlider}
         zoom={zoom}
-        currentTime={currentTime}
-        totalDuration={totalDuration}
       />
 
       <div ref={scrollContainerRef} className="timeline-scrollbar relative flex-1 overflow-x-auto overflow-y-hidden bg-slate-950">

@@ -87,8 +87,8 @@ export const useEditorStore = create<EditorStoreState>((set, get) => ({
   future: [],
 
   setVideo: (video) => {
-    const initialWidth = Math.min(DEFAULT_EXPORT_SETTINGS.width, video.width);
-    const initialHeight = Math.max(16, Math.round((initialWidth * video.height) / Math.max(1, video.width)));
+    const initialWidth = Math.max(1, Math.round(video.width));
+    const initialHeight = Math.max(1, Math.round(video.height));
 
     const initialSlice: SliceModel = {
       id: crypto.randomUUID(),

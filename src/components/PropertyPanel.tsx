@@ -157,9 +157,8 @@ export default function PropertyPanel({
   onExport,
 }: PropertyPanelProps) {
   const scaleMin = Math.max(0.1, INPUT_SIZE_MIN / Math.max(1, baseCrop.w));
-  const scaleMax = Math.min(4, INPUT_SIZE_MAX / Math.max(1, baseCrop.w));
+  const scaleMax = Math.min(1.5, INPUT_SIZE_MAX / Math.max(1, baseCrop.w));
   const outputScale = clampFloat(exportSettings.width / Math.max(1, baseCrop.w), scaleMin, scaleMax);
-  const outputScalePercent = Math.round(outputScale * 100);
 
   return (
     <aside
@@ -242,7 +241,7 @@ export default function PropertyPanel({
                 type="range"
                 min={scaleMin}
                 max={scaleMax}
-                step={0.05}
+                step={0.01}
                 value={outputScale}
                 onChange={(event) => {
                   const nextScale = clampFloat(Number.parseFloat(event.target.value), scaleMin, scaleMax);
@@ -257,7 +256,6 @@ export default function PropertyPanel({
               />
               <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
                 <span>{Math.round(scaleMin * 100)}%</span>
-                <span>{outputScalePercent}%</span>
                 <span>{Math.round(scaleMax * 100)}%</span>
               </div>
             </div>
