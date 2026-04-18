@@ -41,7 +41,9 @@ export default function AppHeader({
             alt=""
             className="h-9 w-9 rounded-xl border border-slate-700/80 bg-slate-900/70 p-1.5 shadow-[0_0_24px_rgba(34,211,238,0.12)]"
           />
-          <h1 className="font-['Space_Grotesk',sans-serif] text-base sm:text-xl font-bold">ScreenCast Editor</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-base font-bold sm:text-xl">ScreenCast Editor<sup className="text-cyan-300/80">β</sup></h1>
+          </div>
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-2">

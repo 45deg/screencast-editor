@@ -61,7 +61,7 @@ export default function VideoDropzone({
       <div className={`relative w-full ${isEmbedded ? 'mx-auto max-w-5xl' : 'mx-auto max-w-xl'}`}>
         <div className="space-y-6">
           <div className="space-y-2 text-center">
-            <h1 className="font-['Space_Grotesk',sans-serif] text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+            <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
               {isLoading ? t('dropzone.loadingTitle') : t('dropzone.idleTitle')}
             </h1>
             <p className="text-sm leading-relaxed text-slate-400 sm:text-base">{t('dropzone.formats')}</p>
@@ -101,7 +101,7 @@ export default function VideoDropzone({
                 </div>
 
                 <div className="space-y-2">
-                  <h2 className="font-['Space_Grotesk',sans-serif] text-xl font-semibold tracking-tight text-white sm:text-2xl">
+                  <h2 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">
                     {t('dropzone.selectVideos')}
                   </h2>
                   <p className="text-sm leading-relaxed text-slate-400">{t('dropzone.openFromDisk')}</p>
@@ -147,7 +147,7 @@ export default function VideoDropzone({
                   </div>
 
                   <div className="space-y-2">
-                    <h2 className="font-['Space_Grotesk',sans-serif] text-xl font-semibold tracking-tight text-white sm:text-2xl">
+                    <h2 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">
                       {screenCapture?.isRecording ? t('dropzone.recordingTitle') : t('dropzone.captureTitle')}
                     </h2>
                     <p className="text-sm leading-relaxed text-slate-400">
