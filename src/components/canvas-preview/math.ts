@@ -45,7 +45,7 @@ export function createCropVideoStyle(video: VideoMeta, crop: CropRect): CSSPrope
   const safeW = Math.max(1, crop.w);
   const safeH = Math.max(1, crop.h);
 
-  return {
+  const style: CSSProperties = {
     position: 'absolute',
     width: `${(video.width / safeW) * 100}%`,
     height: `${(video.height / safeH) * 100}%`,
@@ -54,6 +54,8 @@ export function createCropVideoStyle(video: VideoMeta, crop: CropRect): CSSPrope
     maxWidth: 'none',
     maxHeight: 'none',
   };
+
+  return style;
 }
 
 export function computeDisplayLayout(video: VideoMeta, baseCrop: CropRect, sceneCrop: CropRect | null): DisplayLayout {

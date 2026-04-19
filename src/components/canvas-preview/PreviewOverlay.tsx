@@ -1,4 +1,4 @@
-import type { RefObject } from 'react';
+import { useEffect, useMemo, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { createCropVideoStyle, type DisplayLayout } from './math';
@@ -38,6 +38,8 @@ interface PreviewOverlayProps {
     mode: ImageResizeMode,
   ) => void;
   previewScale: number;
+  overlayWidth: number;
+  overlayHeight: number;
   overlayOffsetX: number;
   overlayOffsetY: number;
 }
@@ -64,10 +66,29 @@ export default function PreviewOverlay({
   selectedImageAnnotation,
   beginImageResize,
   previewScale,
+  overlayWidth,
+  overlayHeight,
   overlayOffsetX,
   overlayOffsetY,
 }: PreviewOverlayProps) {
   const { t } = useTranslation();
+  const videoStyle = useMemo(() => createCropVideoStyle(video, displayLayout.contentCrop), [displayLayout.contentCrop, video]);
+
+  useEffect(() => {
+    if (!hasActiveVideoSlice) {
+      return;
+    }
+
+    console.debug('[crop-debug] preview video placement', {
+      baseCrop: `x=${baseCrop.x}, y=${baseCrop.y}, w=${baseCrop.w}, h=${baseCrop.h}`,
+      contentCrop: `x=${displayLayout.contentCrop.x}, y=${displayLayout.contentCrop.y}, w=${displayLayout.contentCrop.w}, h=${displayLayout.contentCrop.h}`,
+      padBox: displayLayout.padBox,
+      videoStyle,
+      previewScale,
+      overlayOffsetX,
+      overlayOffsetY,
+    });
+  }, [baseCrop, displayLayout.contentCrop, displayLayout.padBox, hasActiveVideoSlice, overlayOffsetX, overlayOffsetY, previewScale, videoStyle]);
 
   return (
     <>
@@ -91,11 +112,19 @@ export default function PreviewOverlay({
               controls={false}
               preload="auto"
               className="absolute"
-              style={createCropVideoStyle(video, displayLayout.contentCrop)}
+              style={videoStyle}
             />
           </div>
         ) : (
-          <div className="absolute inset-0 overflow-hidden">
+          <div
+            className="absolute overflow-hidden"
+            style={{
+              left: `${overlayOffsetX}px`,
+              top: `${overlayOffsetY}px`,
+              width: `${overlayWidth}px`,
+              height: `${overlayHeight}px`,
+            }}
+          >
             <video
               ref={videoRef}
               src={video.objectUrl}
@@ -104,7 +133,7 @@ export default function PreviewOverlay({
               preload="auto"
               className="absolute"
               onLoadedMetadata={onVideoLoadedMetadata}
-              style={createCropVideoStyle(video, displayLayout.contentCrop)}
+              style={videoStyle}
             />
           </div>
         )

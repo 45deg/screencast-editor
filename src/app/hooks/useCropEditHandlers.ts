@@ -3,6 +3,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { clampCropToVideo, findSliceIdAtTimelineTime, normalizeCropForStorage } from '../appUtils';
 import type { CropRect, SliceModel, VideoMeta } from '../../types/editor';
 
+function formatCropRect(crop: CropRect | null) {
+  if (!crop) {
+    return null;
+  }
+
+  return `x=${crop.x}, y=${crop.y}, w=${crop.w}, h=${crop.h}`;
+}
+
 interface UseCropEditHandlersArgs {
   video: VideoMeta | null;
   videoObjectUrl: string | undefined;
@@ -104,6 +112,17 @@ export function useCropEditHandlers({
     }
 
     const nextCrop = normalizeCropForStorage(effectiveEditCrop, video);
+
+    console.debug('[crop-debug] confirm requested', {
+      mode: cropEditMode,
+      sceneCropTargetSliceId,
+      videoSize: `${video.width}x${video.height}`,
+      globalCrop: formatCropRect(globalCrop),
+      baseCrop: formatCropRect(baseCrop),
+      fullCrop: formatCropRect(fullCrop),
+      effectiveEditCrop: formatCropRect(effectiveEditCrop),
+      nextCrop: formatCropRect(nextCrop),
+    });
 
     if (cropEditMode === 'crop') {
       setGlobalCropCommit(nextCrop);

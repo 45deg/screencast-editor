@@ -152,7 +152,31 @@ async function getSupportedAvcEncoderConfig(
   bitrate: number,
   framerate: number,
 ): Promise<VideoEncoderConfig | null> {
-  const codecCandidates = ['avc1.42001f', 'avc1.42E01E', 'avc1.4D401F', 'avc1.64001F'];
+  // Try modern/high-level profiles first so large exports (e.g. >1080p) can negotiate support.
+  const codecCandidates = [
+    'avc1.640034',
+    'avc1.640033',
+    'avc1.640032',
+    'avc1.64002A',
+    'avc1.640029',
+    'avc1.640028',
+    'avc1.4D4034',
+    'avc1.4D4033',
+    'avc1.4D4032',
+    'avc1.4D402A',
+    'avc1.4D4029',
+    'avc1.4D4028',
+    'avc1.42E034',
+    'avc1.42E033',
+    'avc1.42E032',
+    'avc1.42E02A',
+    'avc1.42E029',
+    'avc1.42E028',
+    'avc1.42001f',
+    'avc1.42E01E',
+    'avc1.4D401F',
+    'avc1.64001F',
+  ];
 
   for (const codec of codecCandidates) {
     const config: VideoEncoderConfig = {

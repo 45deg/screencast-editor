@@ -52,8 +52,21 @@ export function useCanvasViewport({
     }
 
     const update = () => {
-      setViewport(measureViewport(element, video));
       const rect = element.getBoundingClientRect();
+      const nextViewport = measureViewport(element, video);
+
+      console.debug('[crop-debug] viewport measured', {
+        videoSize: `${video.width}x${video.height}`,
+        hostWidth: rect.width,
+        hostHeight: rect.height,
+        viewportScale: nextViewport.scale,
+        viewportWidth: nextViewport.width,
+        viewportHeight: nextViewport.height,
+        viewportOffsetX: nextViewport.offsetX,
+        viewportOffsetY: nextViewport.offsetY,
+      });
+
+      setViewport(nextViewport);
       setFrameSize({
         width: Math.max(1, rect.width),
         height: Math.max(1, rect.height),
@@ -76,7 +89,18 @@ export function useCanvasViewport({
   const handleVideoLoadedMetadata = useCallback(() => {
     const host = viewportRef.current;
     if (host) {
-      setViewport(measureViewport(host, video));
+      const nextViewport = measureViewport(host, video);
+      console.debug('[crop-debug] viewport measured from metadata', {
+        videoSize: `${video.width}x${video.height}`,
+        hostWidth: host.getBoundingClientRect().width,
+        hostHeight: host.getBoundingClientRect().height,
+        viewportScale: nextViewport.scale,
+        viewportWidth: nextViewport.width,
+        viewportHeight: nextViewport.height,
+        viewportOffsetX: nextViewport.offsetX,
+        viewportOffsetY: nextViewport.offsetY,
+      });
+      setViewport(nextViewport);
     }
     syncVideoTime(videoRef.current);
   }, [syncVideoTime, video]);

@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 
 import CanvasPreviewHeader from './canvas-preview/CanvasPreviewHeader';
 import CropEditOverlay from './canvas-preview/CropEditOverlay';
@@ -10,6 +10,14 @@ import { useCanvasViewport } from './canvas-preview/useCanvasViewport';
 import { useCropDragHandler } from './canvas-preview/useCropDragHandler';
 import { useTextAnnotationEditor } from './canvas-preview/useTextAnnotationEditor';
 import type { AnnotationModel, AnnotationTextStyle, CropRect, TextAnnotation, VideoMeta } from '../types/editor';
+
+function formatCropRect(crop: CropRect | null) {
+  if (!crop) {
+    return null;
+  }
+
+  return `x=${crop.x}, y=${crop.y}, w=${crop.w}, h=${crop.h}`;
+}
 
 interface CanvasPreviewProps {
   video: VideoMeta;
@@ -90,6 +98,40 @@ export default function CanvasPreview({
     return computeDisplayLayout(video, baseCrop, activeSceneCrop);
   }, [activeSceneCrop, baseCrop, video]);
 
+  useEffect(() => {
+    if (editMode !== 'idle') {
+      return;
+    }
+
+    const sceneRelativeToBase = activeSceneCrop
+      ? {
+          x: activeSceneCrop.x - baseCrop.x,
+          y: activeSceneCrop.y - baseCrop.y,
+          w: activeSceneCrop.w,
+          h: activeSceneCrop.h,
+        }
+      : null;
+    const sceneWithinBase = activeSceneCrop
+      ? activeSceneCrop.x >= baseCrop.x &&
+        activeSceneCrop.y >= baseCrop.y &&
+        activeSceneCrop.x + activeSceneCrop.w <= baseCrop.x + baseCrop.w &&
+        activeSceneCrop.y + activeSceneCrop.h <= baseCrop.y + baseCrop.h
+      : null;
+
+    console.debug('[crop-debug] preview layout input', {
+      currentTime,
+      sourceTime,
+      videoSize: `${video.width}x${video.height}`,
+      baseCrop: formatCropRect(baseCrop),
+      activeSceneCrop: formatCropRect(activeSceneCrop),
+      sceneRelativeToBase: formatCropRect(sceneRelativeToBase),
+      sceneWithinBase,
+      frameCrop: formatCropRect(displayLayout.frameCrop),
+      contentCrop: formatCropRect(displayLayout.contentCrop),
+      padBox: displayLayout.padBox,
+    });
+  }, [activeSceneCrop, baseCrop, currentTime, displayLayout, editMode, sourceTime, video]);
+
   const safeEditCrop = useMemo(() => {
     const initial = editCrop ?? {
       x: 0,
@@ -167,6 +209,35 @@ export default function CanvasPreview({
   const overlayHeight = baseCrop.h * previewScale;
   const overlayOffsetX = (frameSize.width - overlayWidth) / 2;
   const overlayOffsetY = (frameSize.height - overlayHeight) / 2;
+
+  useEffect(() => {
+    console.debug('[crop-debug] canvas frame metrics', {
+      editMode,
+      videoSize: `${video.width}x${video.height}`,
+      baseCrop: formatCropRect(baseCrop),
+      frameSize,
+      viewport,
+      previewScale,
+      overlayWidth,
+      overlayHeight,
+      overlayOffsetX,
+      overlayOffsetY,
+      displayCrop,
+    });
+  }, [
+    baseCrop,
+    displayCrop,
+    editMode,
+    frameSize,
+    overlayHeight,
+    overlayOffsetX,
+    overlayOffsetY,
+    overlayWidth,
+    previewScale,
+    video,
+    viewport,
+  ]);
+
   const selectedImageAnnotation = activeAnnotations.find(
     (annotation): annotation is Extract<AnnotationModel, { kind: 'image' }> =>
       annotation.id === selectedAnnotationId && annotation.kind === 'image',
@@ -258,6 +329,8 @@ export default function CanvasPreview({
               selectedImageAnnotation={selectedImageAnnotation}
               beginImageResize={beginImageResize}
               previewScale={previewScale}
+              overlayWidth={overlayWidth}
+              overlayHeight={overlayHeight}
               overlayOffsetX={overlayOffsetX}
               overlayOffsetY={overlayOffsetY}
             />

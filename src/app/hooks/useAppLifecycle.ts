@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { revokeAnnotationImageUrls } from '../appUtils';
 import { revokeVideoObjectUrl } from '../../lib/video';
@@ -20,19 +20,47 @@ export function useAppLifecycle({
   exportSettings,
   updateExportSettings,
 }: UseAppLifecycleArgs) {
+  const previousBaseCropRef = useRef<CropRect | null>(baseCrop);
+
   useEffect(() => {
     resetPendingAnnotationPreview();
   }, [resetPendingAnnotationPreview, videoObjectUrl]);
 
   useEffect(() => {
     if (!baseCrop) {
+      previousBaseCropRef.current = baseCrop;
       return;
     }
 
-    const nextHeight = Math.max(
-      64,
-      Math.min(4096, Math.round((exportSettings.width * baseCrop.h) / Math.max(1, baseCrop.w))),
-    );
+    const previousBaseCrop = previousBaseCropRef.current;
+    const cropChanged =
+      !previousBaseCrop ||
+      previousBaseCrop.x !== baseCrop.x ||
+      previousBaseCrop.y !== baseCrop.y ||
+      previousBaseCrop.w !== baseCrop.w ||
+      previousBaseCrop.h !== baseCrop.h;
+
+    if (cropChanged && previousBaseCrop) {
+      const previousScale = exportSettings.width / Math.max(1, previousBaseCrop.w);
+      const nextWidth = Math.max(64, Math.min(4096, Math.round(baseCrop.w * previousScale)));
+      const nextHeight = Math.max(64, Math.min(4096, Math.round((nextWidth * baseCrop.h) / Math.max(1, baseCrop.w))));
+
+      previousBaseCropRef.current = baseCrop;
+
+      if (nextWidth !== exportSettings.width || nextHeight !== exportSettings.height) {
+        updateExportSettings({
+          width: nextWidth,
+          height: nextHeight,
+          keepAspectRatio: true,
+        });
+      }
+
+      return;
+    }
+
+    previousBaseCropRef.current = baseCrop;
+
+    const nextHeight = Math.max(64, Math.min(4096, Math.round((exportSettings.width * baseCrop.h) / Math.max(1, baseCrop.w))));
     if (nextHeight !== exportSettings.height) {
       updateExportSettings({ height: nextHeight, keepAspectRatio: true });
     }

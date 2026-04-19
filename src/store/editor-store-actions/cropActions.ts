@@ -2,6 +2,14 @@ import { cloneCrop, cloneSlices, cropEquals } from '../../types/editor';
 import { snapshotFromState } from '../editorStoreHelpers';
 import type { CropActions, EditorStoreSet } from './types';
 
+function formatCropRect(crop: { x: number; y: number; w: number; h: number } | null) {
+  if (!crop) {
+    return null;
+  }
+
+  return `x=${crop.x}, y=${crop.y}, w=${crop.w}, h=${crop.h}`;
+}
+
 export function createCropActions(set: EditorStoreSet): CropActions {
   return {
     setGlobalCropPreview: (crop) => {
@@ -13,6 +21,11 @@ export function createCropActions(set: EditorStoreSet): CropActions {
         if (cropEquals(state.globalCrop, crop)) {
           return state;
         }
+
+        console.debug('[crop-debug] global crop committed', {
+          previousCrop: formatCropRect(state.globalCrop),
+          nextCrop: formatCropRect(crop),
+        });
 
         return {
           past: [...state.past, snapshotFromState(state)],
@@ -50,6 +63,12 @@ export function createCropActions(set: EditorStoreSet): CropActions {
         if (!currentSlice || cropEquals(currentSlice.crop, crop)) {
           return state;
         }
+
+        console.debug('[crop-debug] scene crop committed', {
+          sliceId,
+          previousCrop: formatCropRect(currentSlice.crop),
+          nextCrop: formatCropRect(crop),
+        });
 
         const nextSlices = cloneSlices(state.slices).map((slice) => {
           if (slice.id !== sliceId) {
