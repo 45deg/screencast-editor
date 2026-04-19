@@ -24,3 +24,8 @@ dist-ssr
 *.sw?
 
 certs
+public/web-demuxer-mini.wasm
+public/web-demuxer.wasm
+
+.agents
+skills-lock.json

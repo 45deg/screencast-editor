@@ -81,7 +81,7 @@ export default function ExportStatusSection({
       {exportRuntimeError ? (
         <p className="mt-2 rounded-md border border-rose-300/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-100">{exportRuntimeError}</p>
       ) : null}
-      {exportError ? (
+      {exportError && exportError !== exportRuntimeError ? (
         <p className="mt-2 rounded-md border border-rose-300/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-100">{exportError}</p>
       ) : null}
     </>

@@ -20,7 +20,7 @@ export const jaTranslation = {
   dropzone: {
     loadingTitle: '動画を読み込み中',
     idleTitle: '動画をアップロード',
-    formats: 'MP4, WebM, MOV, AVI',
+    formats: 'MP4, WebM, MOV',
     readingFile: 'ファイルを読み込み中...',
     selectVideos: '動画を選択',
     openFromDisk: '既存の動画ファイルを開くか、ここへドラッグ＆ドロップします。',
