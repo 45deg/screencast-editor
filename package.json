@@ -9,24 +9,23 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run",
-    "test:ffmpeg": "vitest run tests/ffmpeg.integration.test.ts"
+    "test": "vitest run"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.0",
-    "@ffmpeg/ffmpeg": "0.12.10",
-    "@ffmpeg/util": "0.12.1",
     "@tailwindcss/vite": "^4.2.2",
     "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
     "i18next": "^26.0.5",
     "lucide-react": "^1.8.0",
+    "mp4box": "^2.3.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-i18next": "^17.0.4",
     "react-resizable-panels": "^4.10.0",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.2",
+    "web-demuxer": "^4.0.0",
     "zustand": "^5.0.12"
   },
   "devDependencies": {

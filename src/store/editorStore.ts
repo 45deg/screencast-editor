@@ -11,7 +11,7 @@ import type {
 import { createEditorStoreActions } from './editorStoreActions';
 import { DEFAULT_EXPORT_SETTINGS, MIN_SLICE_DURATION } from './editorStoreHelpers';
 
-export type FfmpegStatus = 'idle' | 'loading' | 'ready' | 'error';
+export type ExportRuntimeStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 export interface EditorStoreState {
   video: VideoMeta | null;
@@ -22,8 +22,8 @@ export interface EditorStoreState {
   selectedAnnotationId: string | null;
   globalCrop: CropRect | null;
   exportSettings: ExportSettings;
-  ffmpegStatus: FfmpegStatus;
-  ffmpegError: string | null;
+  exportRuntimeStatus: ExportRuntimeStatus;
+  exportRuntimeError: string | null;
   past: EditorSnapshot[];
   future: EditorSnapshot[];
   setVideo: (video: VideoMeta) => void;
@@ -44,7 +44,7 @@ export interface EditorStoreState {
   setSliceCropPreview: (sliceId: string, crop: CropRect | null) => void;
   setSliceCropCommit: (sliceId: string, crop: CropRect | null) => void;
   updateExportSettings: (next: Partial<ExportSettings>) => void;
-  setFfmpegStatus: (status: FfmpegStatus, error?: string | null) => void;
+  setExportRuntimeStatus: (status: ExportRuntimeStatus, error?: string | null) => void;
   undo: () => void;
   redo: () => void;
 }
@@ -58,8 +58,8 @@ export const useEditorStore = create<EditorStoreState>((set, get) => ({
   selectedAnnotationId: null,
   globalCrop: null,
   exportSettings: DEFAULT_EXPORT_SETTINGS,
-  ffmpegStatus: 'idle',
-  ffmpegError: null,
+  exportRuntimeStatus: 'idle',
+  exportRuntimeError: null,
   past: [],
   future: [],
   ...createEditorStoreActions(set, get),

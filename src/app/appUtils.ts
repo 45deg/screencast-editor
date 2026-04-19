@@ -12,6 +12,20 @@ export function toErrorMessage(error: unknown): string {
     return error.message;
   }
 
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  if (error && typeof error === 'object') {
+    if ('message' in error && typeof error.message === 'string' && error.message.trim()) {
+      return error.message;
+    }
+
+    if ('reason' in error && typeof error.reason === 'string' && error.reason.trim()) {
+      return error.reason;
+    }
+  }
+
   return i18n.t('app.unknownError');
 }
 
@@ -147,7 +161,7 @@ export function getFileExtension(fileName: string, fallback: string): string {
   return fileName.slice(index + 1).replace(/[^a-zA-Z0-9]/g, '') || fallback;
 }
 
-export function getSafeDownloadName(fileName: string, format: 'gif' | 'mp4'): string {
+export function getSafeDownloadName(fileName: string, format: 'mp4'): string {
   const base = fileName.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '');
   return `${base || 'export'}-edited.${format}`;
 }

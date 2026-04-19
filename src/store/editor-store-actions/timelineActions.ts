@@ -208,8 +208,8 @@ export function createTimelineActions(set: EditorStoreSet): TimelineActions {
       }));
     },
 
-    setFfmpegStatus: (status, error = null) => {
-      set({ ffmpegStatus: status, ffmpegError: error });
+    setExportRuntimeStatus: (status, error = null) => {
+      set({ exportRuntimeStatus: status, exportRuntimeError: error });
     },
   };
 }

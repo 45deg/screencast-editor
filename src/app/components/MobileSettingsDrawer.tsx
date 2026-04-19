@@ -9,8 +9,8 @@ interface MobileSettingsDrawerProps {
   isVisible: boolean;
   baseCrop: CropRect;
   exportSettings: ExportSettings;
-  ffmpegStatus: 'idle' | 'loading' | 'ready' | 'error';
-  ffmpegError: string | null;
+  exportRuntimeStatus: 'idle' | 'loading' | 'ready' | 'error';
+  exportRuntimeError: string | null;
   isExporting: boolean;
   isCancelling: boolean;
   exportProgress: number | null;
@@ -25,8 +25,8 @@ export default function MobileSettingsDrawer({
   isVisible,
   baseCrop,
   exportSettings,
-  ffmpegStatus,
-  ffmpegError,
+  exportRuntimeStatus,
+  exportRuntimeError,
   isExporting,
   isCancelling,
   exportProgress,
@@ -63,8 +63,8 @@ export default function MobileSettingsDrawer({
             <PropertyPanel
               baseCrop={baseCrop}
               exportSettings={exportSettings}
-              ffmpegStatus={ffmpegStatus}
-              ffmpegError={ffmpegError}
+              exportRuntimeStatus={exportRuntimeStatus}
+              exportRuntimeError={exportRuntimeError}
               isExporting={isExporting}
               isCancelling={isCancelling}
               exportProgress={exportProgress}

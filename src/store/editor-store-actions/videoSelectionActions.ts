@@ -33,8 +33,8 @@ export function createVideoSelectionActions(
           width: initialWidth,
           height: initialHeight,
         },
-        ffmpegStatus: 'idle',
-        ffmpegError: null,
+        exportRuntimeStatus: 'idle',
+        exportRuntimeError: null,
         past: [],
         future: [],
       });
@@ -50,8 +50,8 @@ export function createVideoSelectionActions(
         selectedAnnotationId: null,
         globalCrop: null,
         exportSettings: DEFAULT_EXPORT_SETTINGS,
-        ffmpegStatus: 'idle',
-        ffmpegError: null,
+        exportRuntimeStatus: 'idle',
+        exportRuntimeError: null,
         past: [],
         future: [],
       });

@@ -20,7 +20,7 @@ interface UseMediaImportHandlersArgs {
   setSelectedSliceId: (sliceId: string | null) => void;
   setSelectedAnnotationId: (annotationId: string | null) => void;
   clearVideo: () => void;
-  ensureFfmpegRuntimeReady: () => Promise<boolean>;
+  ensureExportRuntimeReady: () => Promise<boolean>;
   resetExportState: () => void;
   t: (key: string) => string;
 }
@@ -35,7 +35,7 @@ export function useMediaImportHandlers({
   setSelectedSliceId,
   setSelectedAnnotationId,
   clearVideo,
-  ensureFfmpegRuntimeReady,
+  ensureExportRuntimeReady,
   resetExportState,
   t,
 }: UseMediaImportHandlersArgs) {
@@ -57,14 +57,14 @@ export function useMediaImportHandlers({
         revokeAnnotationImageUrls(annotations);
 
         setVideo(nextVideo);
-        void ensureFfmpegRuntimeReady();
+        void ensureExportRuntimeReady();
       } catch (error) {
         setImportError(toErrorMessage(error));
       } finally {
         setIsImporting(false);
       }
     },
-    [annotations, ensureFfmpegRuntimeReady, resetExportState, setVideo, video],
+    [annotations, ensureExportRuntimeReady, resetExportState, setVideo, video],
   );
 
   const handleReturnToLanding = useCallback(() => {

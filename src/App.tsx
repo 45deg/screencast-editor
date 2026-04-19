@@ -39,8 +39,8 @@ export default function App() {
     selectedAnnotationId,
     globalCrop,
     exportSettings,
-    ffmpegStatus,
-    ffmpegError,
+    exportRuntimeStatus,
+    exportRuntimeError,
     past,
     future,
     setVideo,
@@ -55,7 +55,7 @@ export default function App() {
     setGlobalCropCommit,
     setSliceCropCommit,
     updateExportSettings,
-    setFfmpegStatus,
+    setExportRuntimeStatus,
     undo,
     redo,
   } = useEditorStore();
@@ -110,11 +110,11 @@ export default function App() {
     exportProgress,
     exportProgressLabel,
     exportError,
-    ensureFfmpegRuntimeReady,
+    ensureExportRuntimeReady,
     handleExport,
     cancelExport,
     resetExportState,
-    syncFfmpegStatusRef,
+    syncExportRuntimeStatusRef,
   } = useExportHandler({
     video,
     slices,
@@ -124,16 +124,16 @@ export default function App() {
     exportSettings,
     totalDuration,
     t: (key, options) => t(key, options),
-    setFfmpegStatus,
+    setExportRuntimeStatus,
   });
 
   useEffect(() => {
-    syncFfmpegStatusRef(ffmpegStatus);
-  }, [ffmpegStatus, syncFfmpegStatusRef]);
+    syncExportRuntimeStatusRef(exportRuntimeStatus);
+  }, [exportRuntimeStatus, syncExportRuntimeStatusRef]);
 
   useEffect(() => {
-    void ensureFfmpegRuntimeReady();
-  }, [ensureFfmpegRuntimeReady]);
+    void ensureExportRuntimeReady();
+  }, [ensureExportRuntimeReady]);
 
   const {
     cropEditMode,
@@ -179,7 +179,7 @@ export default function App() {
     setSelectedSliceId,
     setSelectedAnnotationId,
     clearVideo,
-    ensureFfmpegRuntimeReady,
+    ensureExportRuntimeReady,
     resetExportState,
     t: (key) => t(key),
   });
@@ -268,8 +268,8 @@ export default function App() {
               onUndo={undo}
               onRedo={redo}
               exportSettings={exportSettings}
-              ffmpegStatus={ffmpegStatus}
-              ffmpegError={ffmpegError}
+              exportRuntimeStatus={exportRuntimeStatus}
+              exportRuntimeError={exportRuntimeError}
               isExporting={isExporting}
               isCancelling={isCancelling}
               exportProgress={exportProgress}
@@ -301,8 +301,8 @@ export default function App() {
             isVisible={!isDesktopViewport}
             baseCrop={baseCrop}
             exportSettings={exportSettings}
-            ffmpegStatus={ffmpegStatus}
-            ffmpegError={ffmpegError}
+            exportRuntimeStatus={exportRuntimeStatus}
+            exportRuntimeError={exportRuntimeError}
             isExporting={isExporting}
             isCancelling={isCancelling}
             exportProgress={exportProgress}

@@ -6,8 +6,8 @@ import type { ExportSettings } from '../../types/editor';
 
 interface ExportStatusSectionProps {
   exportSettings: ExportSettings;
-  ffmpegStatus: 'idle' | 'loading' | 'ready' | 'error';
-  ffmpegError: string | null;
+  exportRuntimeStatus: 'idle' | 'loading' | 'ready' | 'error';
+  exportRuntimeError: string | null;
   isExporting: boolean;
   isCancelling: boolean;
   exportProgress: number | null;
@@ -19,8 +19,8 @@ interface ExportStatusSectionProps {
 
 export default function ExportStatusSection({
   exportSettings,
-  ffmpegStatus,
-  ffmpegError,
+  exportRuntimeStatus,
+  exportRuntimeError,
   isExporting,
   isCancelling,
   exportProgress,
@@ -75,11 +75,11 @@ export default function ExportStatusSection({
       </div>
 
       <p className="mt-2 text-[11px] text-slate-500">
-        {t('propertyPanel.ffmpegStatus')}: <span className="font-mono text-slate-300">{ffmpegStatus}</span>
+        {t('propertyPanel.runtimeStatus')}: <span className="font-mono text-slate-300">{exportRuntimeStatus}</span>
       </p>
 
-      {ffmpegError ? (
-        <p className="mt-2 rounded-md border border-rose-300/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-100">{ffmpegError}</p>
+      {exportRuntimeError ? (
+        <p className="mt-2 rounded-md border border-rose-300/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-100">{exportRuntimeError}</p>
       ) : null}
       {exportError ? (
         <p className="mt-2 rounded-md border border-rose-300/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-100">{exportError}</p>

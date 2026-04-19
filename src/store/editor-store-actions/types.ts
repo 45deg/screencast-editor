@@ -29,7 +29,7 @@ export type EditorStoreActions = Pick<
   | 'setSliceCropPreview'
   | 'setSliceCropCommit'
   | 'updateExportSettings'
-  | 'setFfmpegStatus'
+  | 'setExportRuntimeStatus'
   | 'undo'
   | 'redo'
 >;
@@ -50,7 +50,7 @@ export type TimelineActions = Pick<
   | 'deleteSelectedAnnotation'
   | 'setSliceSpeedCommit'
   | 'updateExportSettings'
-  | 'setFfmpegStatus'
+  | 'setExportRuntimeStatus'
 >;
 
 export type CropActions = Pick<

@@ -10,13 +10,10 @@ import {
 } from '../types/editor';
 
 const DEFAULT_EXPORT_SETTINGS_VALUE: ExportSettings = {
-  format: 'gif',
+  format: 'mp4',
   width: 640,
   height: 360,
   keepAspectRatio: true,
-  gifFps: 10,
-  paletteMode: 'global',
-  dither: 'none',
   mp4Fps: 30,
   mp4Preset: 'medium',
 };

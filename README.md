@@ -1,8 +1,8 @@
 # Screencast Editor
 
-Screencast Editor is a browser-based video editor for short screen recordings and product walkthroughs. It focuses on a small set of editing operations that are common in screencast workflows: cutting a recording into scenes, adjusting timing, applying crop regions, placing text or image overlays, and exporting the result as `GIF` or `MP4`.
+Screencast Editor is a browser-based video editor for short screen recordings and product walkthroughs. It focuses on a small set of editing operations that are common in screencast workflows: cutting a recording into scenes, adjusting timing, applying crop regions, placing text or image overlays, and exporting the result as `MP4`.
 
-The application runs entirely in the browser. Source media is imported locally, previewed in the UI, and exported with WebAssembly FFmpeg.
+The application runs entirely in the browser. Source media is imported locally, previewed in the UI, and exported with `web-demuxer`, `WebCodecs`, and `MP4Box`.
 
 ## Features
 
@@ -15,7 +15,7 @@ The application runs entirely in the browser. Source media is imported locally, 
 - Add text overlays
 - Add image overlays
 - Preview edits directly in the browser
-- Export to `GIF` or `MP4`
+- Export to `MP4`
 - Undo and redo editor operations
 - Use the UI in English or Japanese
 
@@ -27,7 +27,7 @@ The application runs entirely in the browser. Source media is imported locally, 
 - Zustand for editor state management
 - Tailwind CSS 4 for styling
 - Framer Motion for timeline and UI motion
-- `@ffmpeg/ffmpeg` and `@ffmpeg/util` for in-browser export
+- `web-demuxer`, `WebCodecs`, and `MP4Box` for in-browser export
 - `i18next` and `react-i18next` for localization
 - Vitest for unit and integration tests
 
@@ -39,7 +39,8 @@ The application runs entirely in the browser. Source media is imported locally, 
   - `MediaRecorder`
   - `getDisplayMedia`
   - `WebAssembly`
-- Network access at runtime to download the FFmpeg core from jsDelivr
+  - `VideoDecoder`
+  - `VideoEncoder`
 
 ## Development
 
@@ -70,25 +71,19 @@ pnpm build
 pnpm preview
 pnpm lint
 pnpm test
-pnpm test:ffmpeg
 pnpm -s tsc -p tsconfig.app.json --noEmit
 ```
 
-`pnpm test:ffmpeg` requires a system `ffmpeg` binary. The application itself does not depend on a system FFmpeg installation during normal use; it loads the browser runtime on demand.
-
 ## Export
 
-The export pipeline is built around FFmpeg filter generation in the browser.
+The export pipeline demuxes the source video in-browser, decodes frames with `WebCodecs`, re-renders the edited timeline onto a canvas, and muxes the encoded H.264 stream into `MP4`.
 
 Supported output settings include:
 
-- Format: `GIF` or `MP4`
+- Format: `MP4`
 - Output width and height
-- GIF FPS
-- GIF palette mode
-- GIF dithering mode
 - MP4 FPS
-- MP4 encoding preset
+- MP4 quality preset
 
 Blank regions on the timeline are rendered as black frames in the exported output.
 
@@ -100,7 +95,7 @@ src/app/hooks/useScreenCapture.ts    Browser screen recording flow
 src/components/SliceEditor.tsx       Timeline editor container
 src/components/PropertyPanel.tsx     Export settings UI
 src/store/editorStore.ts             Zustand editor state
-src/lib/ffmpegCommand.ts             FFmpeg command and filter generation
+src/lib/browserExport.ts             Browser-native export pipeline
 src/i18n.ts                          i18n initialization
 src/i18n/resources/*                 Translation dictionaries
 ```
@@ -120,12 +115,6 @@ Recommended verification:
 ```bash
 pnpm -s tsc -p tsconfig.app.json --noEmit
 pnpm test
-```
-
-If you modify export behavior, it is also useful to run:
-
-```bash
-pnpm test:ffmpeg
 ```
 
 ## License
