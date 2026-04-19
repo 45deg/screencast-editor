@@ -12,6 +12,13 @@ import {
 } from './exportVideoUtils';
 import { loadMp4BoxModule } from './mp4boxClient';
 
+export interface BrowserExportDiagnostics {
+  beforeRuntimeReady?: (signal?: AbortSignal) => Promise<void> | void;
+  beforeDemuxerLoad?: (signal?: AbortSignal) => Promise<void> | void;
+  onDemuxerCreated?: () => void;
+  onDemuxerDestroyed?: () => void;
+}
+
 interface ExportVideoToMp4Input {
   video: VideoMeta;
   slices: SliceModel[];
@@ -21,6 +28,7 @@ interface ExportVideoToMp4Input {
   totalDuration: number;
   signal?: AbortSignal;
   onProgress?: (progress: number) => void;
+  diagnostics?: BrowserExportDiagnostics;
 }
 
 interface FrameTarget {
@@ -187,205 +195,212 @@ export async function exportVideoToMp4({
   totalDuration,
   signal,
   onProgress,
+  diagnostics,
 }: ExportVideoToMp4Input): Promise<Blob> {
+  await diagnostics?.beforeRuntimeReady?.(signal);
   await ensureBrowserExportRuntimeReady(signal);
   throwIfAborted(signal);
   onProgress?.(14);
 
   const mp4box = await loadMp4BoxModule(signal);
   const demuxer = new WebDemuxer({ wasmFilePath: getWebDemuxerWasmUrl() });
-  await demuxer.load(video.file);
-  throwIfAborted(signal);
-  onProgress?.(28);
+  diagnostics?.onDemuxerCreated?.();
 
-  const decoderConfig = await demuxer.getDecoderConfig('video');
-  if (!decoderConfig) {
-    throw new Error('The imported file does not contain a supported video track.');
-  }
+  let annotationAssets: Awaited<ReturnType<typeof prepareAnnotationAssets>> | null = null;
+  let encoder: VideoEncoder | null = null;
+  try {
+    await diagnostics?.beforeDemuxerLoad?.(signal);
+    await demuxer.load(video.file);
+    throwIfAborted(signal);
+    onProgress?.(28);
 
-  const outputWidth = toEvenDimension(exportSettings.width);
-  const outputHeight = toEvenDimension(exportSettings.height);
-  const fps = Math.max(1, Math.round(exportSettings.mp4Fps));
-  const frameDurationUs = getOutputFrameDurationUs(fps);
-  const totalFrameCount = getTotalFrameCount(totalDuration, fps);
-  const sortedSlices = getSortedSlices(slices);
-  const baseCrop = getBaseCrop(video, globalCrop);
-  const annotationAssets = await prepareAnnotationAssets(annotations);
-  const canvas = createCanvas(outputWidth, outputHeight);
-  const context = getCanvasContext(canvas);
+    const decoderConfig = await demuxer.getDecoderConfig('video');
+    if (!decoderConfig) {
+      throw new Error('The imported file does not contain a supported video track.');
+    }
 
-  let nextOutputFrameIndex = 0;
+    const outputWidth = toEvenDimension(exportSettings.width);
+    const outputHeight = toEvenDimension(exportSettings.height);
+    const fps = Math.max(1, Math.round(exportSettings.mp4Fps));
+    const frameDurationUs = getOutputFrameDurationUs(fps);
+    const totalFrameCount = getTotalFrameCount(totalDuration, fps);
+    const sortedSlices = getSortedSlices(slices);
+    const baseCrop = getBaseCrop(video, globalCrop);
+    annotationAssets = await prepareAnnotationAssets(annotations);
+    const canvas = createCanvas(outputWidth, outputHeight);
+    const context = getCanvasContext(canvas);
 
-  const targetBitrate = getTargetBitrate(outputWidth, outputHeight, fps, exportSettings.mp4Preset);
-  const encoderConfig = await getSupportedAvcEncoderConfig(outputWidth, outputHeight, targetBitrate, fps);
-  if (!encoderConfig) {
-    throw new Error(
-      `H.264 WebCodecs encoding is not supported in this browser for ${outputWidth}x${outputHeight} at ${fps} fps.`,
-    );
-  }
+    let nextOutputFrameIndex = 0;
 
-  const outputSamples: Array<{ bytes: Uint8Array; timestamp: number; key: boolean }> = [];
-  const mp4 = mp4box.createFile();
-  let trackId: number | null = null;
-  let deferredError: Error | null = null;
+    const targetBitrate = getTargetBitrate(outputWidth, outputHeight, fps, exportSettings.mp4Preset);
+    const encoderConfig = await getSupportedAvcEncoderConfig(outputWidth, outputHeight, targetBitrate, fps);
+    if (!encoderConfig) {
+      throw new Error(
+        `H.264 WebCodecs encoding is not supported in this browser for ${outputWidth}x${outputHeight} at ${fps} fps.`,
+      );
+    }
 
-  const encoder = new VideoEncoder({
-    output: (chunk, metadata) => {
-      if (deferredError) {
-        return;
-      }
+    const outputSamples: Array<{ bytes: Uint8Array; timestamp: number; key: boolean }> = [];
+    const mp4 = mp4box.createFile();
+    let trackId: number | null = null;
+    let deferredError: Error | null = null;
 
-      const bytes = new Uint8Array(chunk.byteLength);
-      chunk.copyTo(bytes);
-
-      if (!trackId) {
-        const description = metadata?.decoderConfig?.description;
-        if (!description) {
-          deferredError = new Error('Failed to build the MP4 output. The browser encoder did not provide MP4 initialization data.');
+    encoder = new VideoEncoder({
+      output: (chunk, metadata) => {
+        if (deferredError) {
           return;
         }
 
-        trackId = mp4.addTrack({
-          timescale: 1_000_000,
-          width: outputWidth,
-          height: outputHeight,
-          hdlr: 'vide',
-          type: 'avc1',
-          name: 'screencast-editor',
-          avcDecoderConfigRecord: toBufferSource(description),
-        });
-      }
+        const bytes = new Uint8Array(chunk.byteLength);
+        chunk.copyTo(bytes);
 
-      outputSamples.push({
-        bytes,
-        timestamp: chunk.timestamp,
-        key: chunk.type === 'key',
-      });
-    },
-    error: (error) => {
-      deferredError = error instanceof Error ? error : new Error(String(error));
-    },
-  });
+        if (!trackId) {
+          const description = metadata?.decoderConfig?.description;
+          if (!description) {
+            deferredError = new Error('Failed to build the MP4 output. The browser encoder did not provide MP4 initialization data.');
+            return;
+          }
 
-  encoder.configure(encoderConfig);
-
-  const emitFrame = async (frame: VideoFrame | null, sceneCrop: CropRect, outputTimeSec: number) => {
-    throwIfAborted(signal);
-    renderFrameToCanvas({
-      context,
-      frame,
-      baseCrop,
-      sceneCrop,
-      outputWidth,
-      outputHeight,
-      annotations,
-      timeSec: outputTimeSec,
-      assets: annotationAssets,
-    });
-
-    const timestamp = nextOutputFrameIndex * frameDurationUs;
-    const encodedFrame = new VideoFrame(canvas, {
-      timestamp,
-      duration: frameDurationUs,
-    });
-
-    try {
-      encoder.encode(encodedFrame, { keyFrame: nextOutputFrameIndex % Math.max(1, fps) === 0 });
-    } finally {
-      encodedFrame.close();
-    }
-
-    nextOutputFrameIndex += 1;
-    onProgress?.(36 + (nextOutputFrameIndex / Math.max(1, totalFrameCount)) * 54);
-  };
-
-  const emitGapFrames = async (endSec: number) => {
-    while (nextOutputFrameIndex / fps < endSec - 1e-9) {
-      await emitFrame(null, baseCrop, nextOutputFrameIndex / fps);
-    }
-  };
-
-  const encodeSliceTargets = async (slice: SliceModel, sceneCrop: CropRect, targets: FrameTarget[]) => {
-    if (!targets.length) {
-      return;
-    }
-
-    let targetIndex = 0;
-    let heldFrame: VideoFrame | null = null;
-    let processing = Promise.resolve();
-    const decoder = new VideoDecoder({
-      output: (frame) => {
-        processing = processing
-          .then(async () => {
-            if (deferredError) {
-              frame.close();
-              return;
-            }
-
-            if (!heldFrame) {
-              heldFrame = frame;
-              return;
-            }
-
-            while (targetIndex < targets.length && targets[targetIndex].sourceTimeUs < frame.timestamp) {
-              await emitFrame(heldFrame, sceneCrop, targets[targetIndex].outputTimeSec);
-              targetIndex += 1;
-            }
-
-            heldFrame.close();
-            heldFrame = frame;
-          })
-          .catch((error) => {
-            deferredError = error instanceof Error ? error : new Error(String(error));
-            frame.close();
+          trackId = mp4.addTrack({
+            timescale: 1_000_000,
+            width: outputWidth,
+            height: outputHeight,
+            hdlr: 'vide',
+            type: 'avc1',
+            name: 'screencast-editor',
+            avcDecoderConfigRecord: toBufferSource(description),
           });
+        }
+
+        outputSamples.push({
+          bytes,
+          timestamp: chunk.timestamp,
+          key: chunk.type === 'key',
+        });
       },
       error: (error) => {
         deferredError = error instanceof Error ? error : new Error(String(error));
       },
     });
 
-    const reader = demuxer.read('video', slice.sourceStart, slice.sourceEnd).getReader();
+    encoder.configure(encoderConfig);
 
-    try {
-      decoder.configure(decoderConfig);
+    const emitFrame = async (frame: VideoFrame | null, sceneCrop: CropRect, outputTimeSec: number) => {
+      throwIfAborted(signal);
+      renderFrameToCanvas({
+        context,
+        frame,
+        baseCrop,
+        sceneCrop,
+        outputWidth,
+        outputHeight,
+        annotations,
+        timeSec: outputTimeSec,
+        assets: annotationAssets!,
+      });
 
-      while (true) {
-        throwIfAborted(signal);
-        const { done, value } = await reader.read();
-        if (done) {
-          break;
+      const timestamp = nextOutputFrameIndex * frameDurationUs;
+      const encodedFrame = new VideoFrame(canvas, {
+        timestamp,
+        duration: frameDurationUs,
+      });
+
+      try {
+        encoder!.encode(encodedFrame, { keyFrame: nextOutputFrameIndex % Math.max(1, fps) === 0 });
+      } finally {
+        encodedFrame.close();
+      }
+
+      nextOutputFrameIndex += 1;
+      onProgress?.(36 + (nextOutputFrameIndex / Math.max(1, totalFrameCount)) * 54);
+    };
+
+    const emitGapFrames = async (endSec: number) => {
+      while (nextOutputFrameIndex / fps < endSec - 1e-9) {
+        await emitFrame(null, baseCrop, nextOutputFrameIndex / fps);
+      }
+    };
+
+    const encodeSliceTargets = async (slice: SliceModel, sceneCrop: CropRect, targets: FrameTarget[]) => {
+      if (!targets.length) {
+        return;
+      }
+
+      let targetIndex = 0;
+      let heldFrame: VideoFrame | null = null;
+      let processing = Promise.resolve();
+      const decoder = new VideoDecoder({
+        output: (frame) => {
+          processing = processing
+            .then(async () => {
+              if (deferredError) {
+                frame.close();
+                return;
+              }
+
+              if (!heldFrame) {
+                heldFrame = frame;
+                return;
+              }
+
+              while (targetIndex < targets.length && targets[targetIndex].sourceTimeUs < frame.timestamp) {
+                await emitFrame(heldFrame, sceneCrop, targets[targetIndex].outputTimeSec);
+                targetIndex += 1;
+              }
+
+              heldFrame.close();
+              heldFrame = frame;
+            })
+            .catch((error) => {
+              deferredError = error instanceof Error ? error : new Error(String(error));
+              frame.close();
+            });
+        },
+        error: (error) => {
+          deferredError = error instanceof Error ? error : new Error(String(error));
+        },
+      });
+
+      const reader = demuxer.read('video', slice.sourceStart, slice.sourceEnd).getReader();
+
+      try {
+        decoder.configure(decoderConfig);
+
+        while (true) {
+          throwIfAborted(signal);
+          const { done, value } = await reader.read();
+          if (done) {
+            break;
+          }
+          if (deferredError) {
+            throw deferredError;
+          }
+          if (value) {
+            decoder.decode(toEncodedVideoChunk(value as EncodedVideoChunk | Record<string, unknown>));
+          }
         }
+
+        await decoder.flush();
+        await processing;
+
         if (deferredError) {
           throw deferredError;
         }
-        if (value) {
-          decoder.decode(toEncodedVideoChunk(value as EncodedVideoChunk | Record<string, unknown>));
+        if (!heldFrame) {
+          throw new Error('Failed to decode frames for one of the timeline slices.');
         }
-      }
 
-      await decoder.flush();
-      await processing;
-
-      if (deferredError) {
-        throw deferredError;
+        while (targetIndex < targets.length) {
+          await emitFrame(heldFrame, sceneCrop, targets[targetIndex].outputTimeSec);
+          targetIndex += 1;
+        }
+      } finally {
+        reader.releaseLock();
+        (heldFrame as VideoFrame | null)?.close();
+        decoder.close();
       }
-      if (!heldFrame) {
-        throw new Error('Failed to decode frames for one of the timeline slices.');
-      }
+    };
 
-      while (targetIndex < targets.length) {
-        await emitFrame(heldFrame, sceneCrop, targets[targetIndex].outputTimeSec);
-        targetIndex += 1;
-      }
-    } finally {
-      reader.releaseLock();
-      (heldFrame as VideoFrame | null)?.close();
-      decoder.close();
-    }
-  };
-
-  try {
     let cursor = 0;
 
     for (const slice of sortedSlices) {
@@ -441,7 +456,11 @@ export async function exportVideoToMp4({
 
     return new Blob([arrayBuffer], { type: 'video/mp4' });
   } finally {
-    encoder.close();
-    releaseAnnotationAssets(annotationAssets);
+    encoder?.close();
+    if (annotationAssets) {
+      releaseAnnotationAssets(annotationAssets);
+    }
+    demuxer.destroy();
+    diagnostics?.onDemuxerDestroyed?.();
   }
 }

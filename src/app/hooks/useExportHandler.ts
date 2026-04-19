@@ -21,6 +21,7 @@ interface UseExportHandlerArgs {
   totalDuration: number;
   t: (key: string, options?: Record<string, unknown>) => string;
   setExportRuntimeStatus: (status: ExportRuntimeStatus, error?: string | null) => void;
+  exportVideo?: typeof exportVideoToMp4;
 }
 
 export function useExportHandler({
@@ -33,6 +34,7 @@ export function useExportHandler({
   totalDuration,
   t,
   setExportRuntimeStatus,
+  exportVideo = exportVideoToMp4,
 }: UseExportHandlerArgs) {
   const runtimeStatusRef = useRef<ExportRuntimeStatus>('idle');
   const exportAbortControllerRef = useRef<AbortController | null>(null);
@@ -106,6 +108,8 @@ export function useExportHandler({
     const downloadName = getSafeDownloadName(video.file.name, 'mp4');
     const exportAbortController = new AbortController();
     const { signal } = exportAbortController;
+    const runtimeWasReadyAtStart = runtimeStatusRef.current === 'ready';
+    let runtimeReadyForReuse = runtimeWasReadyAtStart;
 
     const updateExportProgress = (nextProgress: number, label: string) => {
       const safeProgress = Math.max(0, Math.min(100, Math.round(nextProgress)));
@@ -123,9 +127,10 @@ export function useExportHandler({
 
     try {
       setExportRuntimeStatus('loading', null);
+      runtimeStatusRef.current = 'loading';
       updateExportProgress(12, t('app.exportStageLoadingRuntime'));
 
-      const blob = await exportVideoToMp4({
+      const blob = await exportVideo({
         video,
         slices,
         annotations,
@@ -134,6 +139,9 @@ export function useExportHandler({
         totalDuration,
         signal,
         onProgress: (progress) => {
+          if (progress >= 14) {
+            runtimeReadyForReuse = true;
+          }
           if (progress < 30) {
             updateExportProgress(progress, t('app.exportStageLoadingRuntime'));
             return;
@@ -158,6 +166,7 @@ export function useExportHandler({
       }
 
       setExportRuntimeStatus('ready', null);
+      runtimeStatusRef.current = 'ready';
       updateExportProgress(100, t('app.exportStageDone'));
 
       const blobUrl = URL.createObjectURL(blob);
@@ -170,7 +179,9 @@ export function useExportHandler({
     } catch (error) {
       if (isAbortError(error)) {
         setExportError(null);
-        setExportRuntimeStatus('ready', null);
+        const nextStatus = runtimeReadyForReuse ? 'ready' : 'idle';
+        setExportRuntimeStatus(nextStatus, null);
+        runtimeStatusRef.current = nextStatus;
       } else {
         console.error('[export][mp4] failed', {
           error,
@@ -183,6 +194,7 @@ export function useExportHandler({
         const message = toErrorMessage(error);
         setExportError(message);
         setExportRuntimeStatus('error', message);
+        runtimeStatusRef.current = 'error';
       }
       setExportProgress(null);
       setExportProgressLabel(null);
@@ -209,6 +221,7 @@ export function useExportHandler({
     t,
     totalDuration,
     video,
+    exportVideo,
   ]);
 
   return {
