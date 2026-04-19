@@ -1,5 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+const MAX_CAPTURE_DIMENSION = 4096;
+const MAX_CAPTURE_FPS = 30;
+
+const CAPTURE_VIDEO_CONSTRAINTS: MediaTrackConstraints = {
+  width: { max: MAX_CAPTURE_DIMENSION },
+  height: { max: MAX_CAPTURE_DIMENSION },
+  frameRate: { ideal: MAX_CAPTURE_FPS, max: MAX_CAPTURE_FPS },
+};
+
+function canRetryWithoutCaptureConstraints(error: unknown): boolean {
+  if (error instanceof TypeError) {
+    return true;
+  }
+
+  if (error instanceof DOMException) {
+    return error.name === 'OverconstrainedError' || error.name === 'ConstraintNotSatisfiedError';
+  }
+
+  return false;
+}
+
 interface UseScreenCaptureArgs {
   supportsScreenCapture: boolean;
   onPrepareStart: () => void;
@@ -86,10 +107,32 @@ export function useScreenCapture({
     setScreenCaptureState('starting');
 
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: false,
-      });
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getDisplayMedia({
+          video: CAPTURE_VIDEO_CONSTRAINTS,
+          audio: false,
+        });
+      } catch (error) {
+        if (!canRetryWithoutCaptureConstraints(error)) {
+          throw error;
+        }
+
+        stream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+          audio: false,
+        });
+      }
+
+      const [videoTrack] = stream.getVideoTracks();
+      if (videoTrack && typeof videoTrack.applyConstraints === 'function') {
+        try {
+          await videoTrack.applyConstraints(CAPTURE_VIDEO_CONSTRAINTS);
+        } catch {
+          // Some browsers ignore or reject display-track constraints. Keep recording with defaults.
+        }
+      }
+
       const mimeType = getScreenRecordingMimeType();
       const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
 
@@ -97,7 +140,6 @@ export function useScreenCapture({
       captureStreamRef.current = stream;
       captureRecorderRef.current = recorder;
 
-      const [videoTrack] = stream.getVideoTracks();
       if (videoTrack) {
         videoTrack.onended = () => {
           const activeRecorder = captureRecorderRef.current;
