@@ -5,9 +5,9 @@ import { prepareAnnotationAssets, releaseAnnotationAssets, renderFrameToCanvas }
 import {
   clampCrop,
   getBaseCrop,
+  getConfiguredBitrate,
   getOutputFrameDurationUs,
   getSortedSlices,
-  getTargetBitrate,
   getTotalFrameCount,
 } from './exportVideoUtils';
 import { loadMp4BoxModule } from './mp4boxClient';
@@ -232,7 +232,10 @@ export async function exportVideoToMp4({
 
     let nextOutputFrameIndex = 0;
 
-    const targetBitrate = getTargetBitrate(outputWidth, outputHeight, fps, exportSettings.mp4Preset);
+    const targetBitrate = getConfiguredBitrate(outputWidth, outputHeight, {
+      ...exportSettings,
+      mp4Fps: fps,
+    });
     const encoderConfig = await getSupportedAvcEncoderConfig(outputWidth, outputHeight, targetBitrate, fps);
     if (!encoderConfig) {
       throw new Error(

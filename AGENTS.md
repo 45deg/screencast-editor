@@ -14,24 +14,50 @@ Use it to avoid unnecessary file exploration and to identify the target scope as
 ## Task Routing
 - Change the overall app layout:
   - src/App.tsx
-- Change pure function logic in App:
+- Change the main app shell/header/landing/editor workspace layout:
+  - src/app/components/AppHeader.tsx
+  - src/app/components/LandingWorkspace.tsx
+  - src/app/components/EditorWorkspace.tsx
+  - src/app/components/MobileSettingsDrawer.tsx
+- Change pure function logic shared by App:
   - src/app/appUtils.ts
-- Change screen recording start/stop/capture behavior:
+- Change app lifecycle, derived state, responsive layout, or global DnD behavior:
+  - src/app/hooks/useAppLifecycle.ts
+  - src/app/hooks/useAppDerivedState.ts
+  - src/app/hooks/useResponsiveSettingsDrawer.ts
+  - src/app/hooks/useGlobalDragAndDrop.ts
+- Change media import, export, crop, annotation, or app-level screen capture wiring:
+  - src/app/hooks/useMediaImportHandlers.ts
+  - src/app/hooks/useExportHandler.ts
+  - src/app/hooks/useCropEditHandlers.ts
+  - src/app/hooks/useAnnotationHandlers.ts
+  - src/app/hooks/useAppScreenCapture.ts
+- Change low-level screen recording start/stop/capture behavior:
   - src/app/hooks/useScreenCapture.ts
 - Change canvas rendering or annotation dragging:
   - src/components/CanvasPreview.tsx
   - src/components/canvas-preview/math.ts
+  - src/components/canvas-preview/annotationMath.ts
+  - src/components/canvas-preview/*
+- Change annotation text editing UI:
+  - src/components/annotation/TextStyleToolbar.tsx
 - Change the overall timeline editor:
   - src/components/SliceEditor.tsx
+  - src/components/slice-editor/EditorToolbar.tsx
   - src/components/slice-editor/useSliceEditorHandlers.ts
   - src/components/slice-editor/useSliceEditorMutationHandlers.ts
   - src/components/slice-editor/useSliceEditorPointerHandlers.ts
+  - src/components/slice-editor/useSliceEditorThumbnails.ts
+  - src/components/slice-editor/sliceMutations.ts
 - Change individual timeline UI elements (tracks/blocks/ruler/playhead):
   - src/components/slice-editor/TimelineTracks.tsx
   - src/components/slice-editor/TimelineSliceBlock.tsx
   - src/components/slice-editor/AnnotationLayerBlock.tsx
   - src/components/slice-editor/TimelineRuler.tsx
   - src/components/slice-editor/TimelinePlayhead.tsx
+  - src/components/slice-editor/timelineTracksConstants.ts
+- Change video import/dropzone UI:
+  - src/components/VideoDropzone.tsx
 - Change the output settings UI:
   - src/components/PropertyPanel.tsx
   - src/components/property-panel/*
@@ -42,39 +68,74 @@ Use it to avoid unnecessary file exploration and to identify the target scope as
   - src/store/editor-store-actions/*
 - Change FFmpeg command generation:
   - src/lib/ffmpegCommand.ts
+- Change browser export pipeline or export rendering:
+  - src/lib/browserExport.ts
+  - src/lib/exportRenderer.ts
+  - src/lib/exportVideoUtils.ts
+- Change video/image parsing, thumbnails, or mp4 helpers:
+  - src/lib/video.ts
+  - src/lib/videoThumbnail.ts
+  - src/lib/image.ts
+  - src/lib/mp4boxClient.ts
+- Change annotation timeline helpers or rectangle math:
+  - src/lib/annotationTimeline.ts
+  - src/lib/containRect.ts
 - Change i18n:
   - src/i18n.ts
   - src/i18n/resources/en.ts
   - src/i18n/resources/ja.ts
+- Change shared editor data types:
+  - src/types/editor.ts
+- Change export sanity entry points:
+  - src/exportSanityMain.tsx
+  - src/exportSanityPage.tsx
 
 ## File Structure Overview
 - src/App.tsx:
-  - The overall screen layout and wiring between feature components.
-  - The entry point that ties together the editor store and each hook.
+  - The top-level app shell.
+  - Wires together the editor store, app hooks, and lazy-loaded workspaces.
+- src/app/components/*:
+  - App-level layout pieces for the header, landing screen, editor workspace, and mobile settings drawer.
 - src/app/appUtils.ts:
-  - Pure utility functions used by App, such as crop, annotation clamping, file/size formatting, and DnD helpers.
+  - Pure utility functions used by App and app hooks, such as crop, annotation clamping, formatting, and DnD helpers.
+- src/app/hooks/*:
+  - App-level orchestration hooks for lifecycle, derived state, import/export, crop editing, annotation editing, screen capture, responsiveness, and drag-and-drop.
 - src/app/hooks/useScreenCapture.ts:
   - Manages the lifecycle of getDisplayMedia + MediaRecorder.
 - src/components/CanvasPreview.tsx:
   - Renders preview playback, crop editing UI, and annotation editing UI, and handles events.
-- src/components/canvas-preview/math.ts:
-  - Pure functions for display calculations, coordinate calculations, and style calculations used by CanvasPreview.
+- src/components/canvas-preview/*:
+  - Split preview rendering helpers, overlays, viewport logic, crop dragging, playback syncing, and annotation transform handlers.
+- src/components/annotation/*:
+  - Annotation-specific editing controls such as text style tools.
 - src/components/SliceEditor.tsx:
   - The container for the timeline editing screen.
 - src/components/slice-editor/*:
-  - Split implementations for timeline UI parts and operation hooks.
+  - Split implementations for the timeline UI, toolbar, thumbnails, pointer handlers, and slice mutation helpers.
+- src/components/VideoDropzone.tsx:
+  - Drag-and-drop surface for bringing media into the editor.
 - src/components/PropertyPanel.tsx:
   - The container for the output settings panel.
 - src/components/property-panel/*:
   - Section-level UI for the output settings panel.
 - src/store/editorStore.ts:
   - Store state definitions and action composition.
+- src/store/editorStoreHelpers.ts:
+  - Shared helper logic used by store actions.
+- src/store/editorStoreActions.ts:
+  - Store action composition entry point.
 - src/store/editor-store-actions/*:
   - Implementations that split actions by responsibility.
 - src/lib/ffmpegCommand.ts:
   - FFmpeg argument and filter construction for export execution.
+- src/lib/*:
+  - Focused media/export utilities for browser export, renderer orchestration, thumbnail extraction, MP4 parsing, image/video helpers, and geometry/timeline helpers.
 - src/i18n.ts, src/i18n/resources/*:
   - i18next initialization and language-specific dictionaries.
+- src/types/editor.ts:
+  - Shared editor domain types.
+- src/exportSanityMain.tsx, src/exportSanityPage.tsx:
+  - Alternate entry point and page for export sanity testing.
 
 ## Minimum Change Workflow
 1. Decide the target in the "Task Routing" section of this file.

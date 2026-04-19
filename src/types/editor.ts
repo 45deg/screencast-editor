@@ -1,5 +1,6 @@
 export type OutputFormat = 'mp4';
 export type Mp4Preset = 'ultrafast' | 'superfast' | 'veryfast' | 'faster' | 'fast' | 'medium' | 'slow' | 'slower' | 'veryslow';
+export type Mp4BitrateMode = 'auto' | 'manual';
 
 export interface CropRect {
   x: number;
@@ -80,6 +81,8 @@ export interface ExportSettings {
   keepAspectRatio: boolean;
   mp4Fps: number;
   mp4Preset: Mp4Preset;
+  mp4BitrateMode: Mp4BitrateMode;
+  mp4BitrateKbps: number;
 }
 
 export interface TimelineScrollInfo {

@@ -1,4 +1,4 @@
-import type { CropRect, ExportSettings } from '../../types/editor';
+import type { CropRect, ExportSettings, Mp4BitrateMode } from '../../types/editor';
 
 export const INPUT_SIZE_MIN = 64;
 export const INPUT_SIZE_MAX = 4096;
@@ -7,7 +7,8 @@ export const FORMAT_OPTIONS: Array<{ value: ExportSettings['format']; label: str
   { value: 'mp4', label: 'MP4' },
 ];
 
-export type Mp4PresetKey = 'size' | 'balance' | 'high_quality';
+export type Mp4PresetKey = 'size' | 'balance' | 'high_quality' | 'manual';
+export type Mp4BitrateModeKey = Mp4BitrateMode;
 
 export const MP4_PROFILE_OPTIONS: Array<{
   value: Mp4PresetKey;
@@ -41,6 +42,10 @@ export function clampFloat(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
+export function clampBitrateKbps(value: number): number {
+  return clampInt(value, 250, 100_000);
+}
+
 export function computeHeightFromWidth(width: number, crop: CropRect): number {
   return clampInt((width * crop.h) / Math.max(1, crop.w), INPUT_SIZE_MIN, INPUT_SIZE_MAX);
 }
@@ -50,6 +55,10 @@ export function computeWidthFromHeight(height: number, crop: CropRect): number {
 }
 
 export function getMatchingMp4Preset(exportSettings: ExportSettings): Mp4PresetKey | null {
+  if (exportSettings.mp4BitrateMode === 'manual') {
+    return 'manual';
+  }
+
   const matched = MP4_PROFILE_OPTIONS.find((preset) => preset.settings.mp4Preset === exportSettings.mp4Preset);
   return matched?.value ?? null;
 }

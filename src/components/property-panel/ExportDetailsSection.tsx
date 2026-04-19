@@ -1,8 +1,10 @@
 import { Gauge, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { getConfiguredBitrate } from '../../lib/exportVideoUtils';
 import type { ExportSettings } from '../../types/editor';
 import {
+  clampBitrateKbps,
   clampInt,
   getMatchingMp4Preset,
   MP4_PROFILE_OPTIONS,
@@ -21,10 +23,14 @@ export default function ExportDetailsSection({
 }: ExportDetailsSectionProps) {
   const { t } = useTranslation();
   const activeMp4Preset = getMatchingMp4Preset(exportSettings);
+  const estimatedBitrateKbps = Math.round(
+    getConfiguredBitrate(exportSettings.width, exportSettings.height, exportSettings) / 1_000,
+  );
   const mp4PresetOptions: Array<{ value: Mp4PresetKey; label: string }> = [
-    { value: 'size', label: t('propertyPanel.lightweight') },
-    { value: 'balance', label: t('propertyPanel.balance') },
-    { value: 'high_quality', label: t('propertyPanel.highQuality') },
+    { value: 'size', label: t('propertyPanel.fileSizeFocused') },
+    { value: 'balance', label: 'Balanced' },
+    { value: 'high_quality', label: t('propertyPanel.qualityFocused') },
+    { value: 'manual', label: 'Manual' },
   ];
 
   return (
@@ -39,12 +45,21 @@ export default function ExportDetailsSection({
           value={activeMp4Preset}
           options={mp4PresetOptions}
           onChange={(presetKey) => {
+            if (presetKey === 'manual') {
+              onChangeExportSettings({ mp4BitrateMode: 'manual' });
+              return;
+            }
+
             const preset = MP4_PROFILE_OPTIONS.find((option) => option.value === presetKey);
             if (preset) {
-              onChangeExportSettings(preset.settings);
+              onChangeExportSettings({
+                ...preset.settings,
+                mp4BitrateMode: 'auto',
+              });
             }
           }}
         />
+        <p className="text-[11px] text-slate-500">{t('propertyPanel.mp4PresetHint')}</p>
 
         <label className="block text-xs text-slate-300">
           <span className="mb-1 inline-flex items-center gap-1 text-slate-400">
@@ -65,6 +80,39 @@ export default function ExportDetailsSection({
             className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-500"
           />
         </label>
+
+        <div className="space-y-2">
+          <span className="inline-flex items-center gap-1 text-xs text-slate-400">
+            <Gauge size={13} />
+            {t('propertyPanel.videoBitrate')}
+          </span>
+
+          {exportSettings.mp4BitrateMode === 'manual' ? (
+            <label className="block text-xs text-slate-300">
+              <span className="mb-1 inline-flex items-center gap-1 text-slate-400">
+                {t('propertyPanel.videoBitrateKbps')}
+              </span>
+              <input
+                type="number"
+                min={250}
+                max={100000}
+                step={250}
+                value={exportSettings.mp4BitrateKbps}
+                onChange={(event) => {
+                  const bitrateKbps = Number.parseInt(event.target.value, 10);
+                  if (Number.isFinite(bitrateKbps)) {
+                    onChangeExportSettings({ mp4BitrateKbps: clampBitrateKbps(bitrateKbps) });
+                  }
+                }}
+                className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-500"
+              />
+            </label>
+          ) : (
+            <p className="text-[11px] text-slate-500">
+              {t('propertyPanel.autoBitrateEstimate', { bitrate: estimatedBitrateKbps.toLocaleString() })}
+            </p>
+          )}
+        </div>
       </div>
     </section>
   );

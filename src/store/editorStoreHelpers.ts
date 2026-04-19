@@ -16,6 +16,8 @@ const DEFAULT_EXPORT_SETTINGS_VALUE: ExportSettings = {
   keepAspectRatio: true,
   mp4Fps: 30,
   mp4Preset: 'medium',
+  mp4BitrateMode: 'auto',
+  mp4BitrateKbps: 4_000,
 };
 
 export const MIN_SLICE_DURATION = 0.5;
