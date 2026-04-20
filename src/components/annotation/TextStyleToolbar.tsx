@@ -1,12 +1,10 @@
 import { Switch } from '@base-ui/react/switch';
 import { Popover } from '@base-ui/react/popover';
-import { Tooltip } from '@base-ui/react/tooltip';
 import { Toolbar } from '@base-ui/react/toolbar';
 import {
   Bold,
   BringToFront,
   ChevronDown,
-  GripVertical,
   Italic,
   PaintBucket,
   PenLine,
@@ -15,7 +13,7 @@ import {
   Type,
   TypeOutline,
 } from 'lucide-react';
-import { type ReactElement, type ReactNode, useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { HexAlphaColorPicker } from 'react-colorful';
 import { useTranslation } from 'react-i18next';
 
@@ -25,6 +23,12 @@ import {
   resolveAnnotationFontLabel,
 } from '../../lib/annotationFonts';
 import type { AnnotationTextStyle, TextAnnotation } from '../../types/editor';
+import {
+  AnnotationToolbarDragHandle,
+  AnnotationToolbarRoot,
+  AnnotationToolbarSeparator,
+  ToolbarTooltip,
+} from './AnnotationToolbarPrimitives';
 
 interface TextStyleToolbarProps {
   selectedTextAnnotation: TextAnnotation | null;
@@ -136,27 +140,6 @@ function ColorPopoverField({
   );
 }
 
-function ToolbarTooltip({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactElement;
-}) {
-  return (
-    <Tooltip.Root>
-      <Tooltip.Trigger render={children} />
-      <Tooltip.Portal>
-        <Tooltip.Positioner side="top" sideOffset={8} className="z-[130]">
-          <Tooltip.Popup className="rounded-md border border-slate-700 bg-slate-950/98 px-2 py-1 text-[11px] text-slate-100 shadow-xl backdrop-blur">
-            {label}
-          </Tooltip.Popup>
-        </Tooltip.Positioner>
-      </Tooltip.Portal>
-    </Tooltip.Root>
-  );
-}
-
 function FontFamilySelect({
   value,
   ariaLabel,
@@ -248,20 +231,8 @@ export default function TextStyleToolbar({
   const maxDisplayOutlineWidth = Math.max(24, Math.round(24 * outlinePreviewScaleY));
 
   return (
-    <Toolbar.Root
-      aria-label={t('canvas.textToolbar')}
-      className="timeline-scrollbar inline-flex max-w-[min(92vw,820px)] flex-wrap items-center justify-end gap-1 rounded-lg border border-slate-700/90 bg-slate-950/95 p-1.5 shadow-xl backdrop-blur"
-    >
-      <ToolbarTooltip label={t('canvas.moveToolbar')}>
-        <div
-          className={`${dragHandleClassName ?? ''} inline-flex h-8 w-8 cursor-move touch-none select-none items-center justify-center rounded-md border border-slate-700 bg-slate-900 text-slate-400 transition hover:border-slate-500 hover:text-slate-200`}
-          aria-label={t('canvas.moveToolbar')}
-          role="presentation"
-        >
-          <GripVertical size={14} />
-        </div>
-      </ToolbarTooltip>
-      <Toolbar.Separator className="mx-1 h-5 w-px bg-slate-800" />
+    <AnnotationToolbarRoot ariaLabel={t('canvas.textToolbar')}>
+      <AnnotationToolbarDragHandle ariaLabel={t('canvas.moveToolbar')} className={dragHandleClassName} />
 
       <ToolbarTooltip label={t('canvas.boldTooltip')}>
         <Toolbar.Button
@@ -380,7 +351,7 @@ export default function TextStyleToolbar({
 
       {showLayerMoveControls ? (
         <>
-          <Toolbar.Separator className="mx-1 h-5 w-px bg-slate-800" />
+          <AnnotationToolbarSeparator />
           {canBringToFront && onBringToFront ? (
             <ToolbarTooltip label={t('canvas.bringToFront')}>
               <Toolbar.Button
@@ -408,7 +379,7 @@ export default function TextStyleToolbar({
 
       {onDelete ? (
         <>
-          <Toolbar.Separator className="mx-1 h-5 w-px bg-slate-800" />
+          <AnnotationToolbarSeparator />
           <ToolbarTooltip label={t('canvas.deleteTextLayerTooltip')}>
             <Toolbar.Button
               aria-label={t('sliceEditor.deleteSelected')}
@@ -420,6 +391,6 @@ export default function TextStyleToolbar({
           </ToolbarTooltip>
         </>
       ) : null}
-    </Toolbar.Root>
+    </AnnotationToolbarRoot>
   );
 }
