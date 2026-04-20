@@ -4,10 +4,8 @@ import CanvasPreviewHeader from './canvas-preview/CanvasPreviewHeader';
 import CropEditOverlay from './canvas-preview/CropEditOverlay';
 import PreviewOverlay from './canvas-preview/PreviewOverlay';
 import { clampRectToVideo, computeDisplayLayout } from './canvas-preview/math';
-import { useAnnotationTransformHandlers } from './canvas-preview/useAnnotationTransformHandlers';
 import { useCanvasPlayback } from './canvas-preview/useCanvasPlayback';
 import { useCanvasViewport } from './canvas-preview/useCanvasViewport';
-import { useCropDragHandler } from './canvas-preview/useCropDragHandler';
 import { useTextAnnotationEditor } from './canvas-preview/useTextAnnotationEditor';
 import type { AnnotationModel, AnnotationTextStyle, CropRect, TextAnnotation, VideoMeta } from '../types/editor';
 
@@ -145,31 +143,12 @@ export default function CanvasPreview({
 
   const displayCrop = useMemo(() => {
     return {
-      left: viewport.offsetX + safeEditCrop.x * viewport.scale,
-      top: viewport.offsetY + safeEditCrop.y * viewport.scale,
+      x: safeEditCrop.x * viewport.scale,
+      y: safeEditCrop.y * viewport.scale,
       width: safeEditCrop.w * viewport.scale,
       height: safeEditCrop.h * viewport.scale,
     };
   }, [safeEditCrop, viewport]);
-
-  const { beginDrag } = useCropDragHandler({
-    isEditing,
-    safeEditCrop,
-    viewportScale: viewport.scale,
-    video,
-    onEditCropPreview,
-  });
-
-  const { setAnnotationDragging, setAnnotationResizing, beginAnnotationDrag, beginImageResize } =
-    useAnnotationTransformHandlers({
-      isEditing,
-      frameSize,
-      baseCrop,
-      onSelectedAnnotationIdChange,
-      onAnnotationPositionPreview,
-      onAnnotationImageResizePreview,
-      onAnnotationPositionCommit,
-    });
 
   const {
     inlineEditorRef,
@@ -185,11 +164,6 @@ export default function CanvasPreview({
     isEditing,
     onSelectedAnnotationIdChange,
     onTextAnnotationChange,
-    beginAnnotationDrag,
-    onStartInlineEdit: () => {
-      setAnnotationDragging(false);
-      setAnnotationResizing(false);
-    },
   });
 
   const { isPlaying, handleTogglePlay, handleRestart, stopPlayback } = useCanvasPlayback({
@@ -237,19 +211,6 @@ export default function CanvasPreview({
     video,
     viewport,
   ]);
-
-  const selectedImageAnnotation = activeAnnotations.find(
-    (annotation): annotation is Extract<AnnotationModel, { kind: 'image' }> =>
-      annotation.id === selectedAnnotationId && annotation.kind === 'image',
-  );
-  const selectedImageFrame = selectedImageAnnotation
-    ? {
-        left: overlayOffsetX + selectedImageAnnotation.x * previewScale,
-        top: overlayOffsetY + selectedImageAnnotation.y * previewScale,
-        width: selectedImageAnnotation.width * previewScale,
-        height: selectedImageAnnotation.height * previewScale,
-      }
-    : null;
 
   return (
     <section
@@ -301,9 +262,15 @@ export default function CanvasPreview({
               videoObjectUrl={video.objectUrl}
               videoRef={videoRef}
               isSceneCrop={editMode === 'scene'}
-              displayCrop={displayCrop}
+              videoFrame={{
+                left: viewport.offsetX,
+                top: viewport.offsetY,
+                width: viewport.width,
+                height: viewport.height,
+              }}
               safeEditCrop={safeEditCrop}
-              beginDrag={beginDrag}
+              viewportScale={viewport.scale}
+              onEditCropPreview={onEditCropPreview}
               onLoadedMetadata={handleVideoLoadedMetadata}
             />
           ) : (
@@ -324,10 +291,10 @@ export default function CanvasPreview({
               cancelInlineTextEdit={cancelInlineTextEdit}
               handleTextPointerDown={handleTextPointerDown}
               startInlineTextEdit={startInlineTextEdit}
-              beginAnnotationDrag={beginAnnotationDrag}
-              selectedImageFrame={selectedImageFrame}
-              selectedImageAnnotation={selectedImageAnnotation}
-              beginImageResize={beginImageResize}
+              onSelectedAnnotationIdChange={onSelectedAnnotationIdChange}
+              onAnnotationPositionPreview={onAnnotationPositionPreview}
+              onAnnotationImageResizePreview={onAnnotationImageResizePreview}
+              onAnnotationPositionCommit={onAnnotationPositionCommit}
               previewScale={previewScale}
               overlayWidth={overlayWidth}
               overlayHeight={overlayHeight}

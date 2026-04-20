@@ -9,7 +9,6 @@ interface UseTextAnnotationEditorArgs {
   isEditing: boolean;
   onSelectedAnnotationIdChange: (annotationId: string | null) => void;
   onTextAnnotationChange: (annotationId: string, text: string) => void;
-  beginAnnotationDrag: (event: ReactPointerEvent, annotation: AnnotationModel) => void;
   onStartInlineEdit?: () => void;
 }
 
@@ -18,7 +17,6 @@ export function useTextAnnotationEditor({
   isEditing,
   onSelectedAnnotationIdChange,
   onTextAnnotationChange,
-  beginAnnotationDrag,
   onStartInlineEdit,
 }: UseTextAnnotationEditorArgs) {
   const inlineEditorRef = useRef<HTMLTextAreaElement | null>(null);
@@ -115,9 +113,9 @@ export function useTextAnnotationEditor({
         };
       }
 
-      beginAnnotationDrag(event, annotation);
+      onSelectedAnnotationIdChange(annotation.id);
     },
-    [beginAnnotationDrag, editingTextAnnotationId, startInlineTextEdit],
+    [editingTextAnnotationId, onSelectedAnnotationIdChange, startInlineTextEdit],
   );
 
   return {

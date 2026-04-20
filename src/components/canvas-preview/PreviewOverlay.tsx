@@ -1,8 +1,10 @@
 import { useEffect, useMemo, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Rnd } from 'react-rnd';
 
 import { createCropVideoStyle, type DisplayLayout } from './math';
-import { toTextStyle, type ImageResizeMode } from './annotationMath';
+import { toTextStyle } from './annotationMath';
+import { clampAnnotationPosition, clampImageAnnotationRect } from '../../app/appUtils';
 import type { AnnotationModel, CropRect, VideoMeta } from '../../types/editor';
 
 interface PreviewOverlayProps {
@@ -22,21 +24,16 @@ interface PreviewOverlayProps {
   cancelInlineTextEdit: () => void;
   handleTextPointerDown: (event: React.PointerEvent, annotation: Extract<AnnotationModel, { kind: 'text' }>) => void;
   startInlineTextEdit: (annotation: Extract<AnnotationModel, { kind: 'text' }>) => void;
-  beginAnnotationDrag: (event: React.PointerEvent, annotation: AnnotationModel) => void;
-  selectedImageFrame:
-    | {
-        left: number;
-        top: number;
-        width: number;
-        height: number;
-      }
-    | null;
-  selectedImageAnnotation: Extract<AnnotationModel, { kind: 'image' }> | undefined;
-  beginImageResize: (
-    event: React.PointerEvent,
-    annotation: Extract<AnnotationModel, { kind: 'image' }>,
-    mode: ImageResizeMode,
+  onSelectedAnnotationIdChange: (annotationId: string | null) => void;
+  onAnnotationPositionPreview: (annotationId: string, x: number, y: number) => void;
+  onAnnotationImageResizePreview: (
+    annotationId: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
   ) => void;
+  onAnnotationPositionCommit: () => void;
   previewScale: number;
   overlayWidth: number;
   overlayHeight: number;
@@ -61,10 +58,10 @@ export default function PreviewOverlay({
   cancelInlineTextEdit,
   handleTextPointerDown,
   startInlineTextEdit,
-  beginAnnotationDrag,
-  selectedImageFrame,
-  selectedImageAnnotation,
-  beginImageResize,
+  onSelectedAnnotationIdChange,
+  onAnnotationPositionPreview,
+  onAnnotationImageResizePreview,
+  onAnnotationPositionCommit,
   previewScale,
   overlayWidth,
   overlayHeight,
@@ -73,6 +70,18 @@ export default function PreviewOverlay({
 }: PreviewOverlayProps) {
   const { t } = useTranslation();
   const videoStyle = useMemo(() => createCropVideoStyle(video, displayLayout.contentCrop), [displayLayout.contentCrop, video]);
+  const imageResizeHandles = {
+    top: false,
+    right: false,
+    bottom: false,
+    left: false,
+    topLeft: true,
+    topRight: true,
+    bottomLeft: true,
+    bottomRight: true,
+  } as const;
+  const imageHandleClassName =
+    'absolute h-4 w-4 rounded-full border border-cyan-200 bg-slate-950 shadow-[0_0_0_1px_rgba(15,23,42,0.55)]';
 
   useEffect(() => {
     if (!hasActiveVideoSlice) {
@@ -167,6 +176,7 @@ export default function PreviewOverlay({
                     inlineEditorRef.current = node;
                   }}
                   value={editingTextValue}
+                  wrap="off"
                   onChange={(event) => setEditingTextValue(event.target.value)}
                   onBlur={commitInlineTextEdit}
                   onPointerDown={(event) => {
@@ -184,12 +194,11 @@ export default function PreviewOverlay({
                       cancelInlineTextEdit();
                     }
                   }}
-                  className="absolute max-w-[94%] border border-cyan-200 bg-slate-900/95 text-left outline-none ring-2 ring-cyan-300/80 ring-offset-2 ring-offset-black"
+                  className="absolute overflow-x-auto overflow-y-hidden border border-cyan-200 bg-slate-900/95 text-left outline-none ring-2 ring-cyan-300/80 ring-offset-2 ring-offset-black"
                   style={{
                     left: `${left}px`,
                     top: `${top}px`,
                     minWidth: `${Math.min(Math.max(140, baseCrop.w * 0.24), baseCrop.w * 0.94)}px`,
-                    maxWidth: `${baseCrop.w * 0.94}px`,
                     minHeight: `${Math.max(44, baseCrop.h * 0.06)}px`,
                     resize: 'none',
                     ...toTextStyle(annotation.style, 1),
@@ -200,23 +209,40 @@ export default function PreviewOverlay({
             }
 
             return (
-              <button
+              <Rnd
                 key={annotation.id}
-                data-annotation-box="true"
-                type="button"
-                onPointerDown={(event) => handleTextPointerDown(event, annotation)}
-                onDoubleClick={() => startInlineTextEdit(annotation)}
-                className={`absolute max-w-[94%] cursor-move select-none text-left transition ${
-                  selected ? 'ring-2 ring-cyan-300/80 ring-offset-2 ring-offset-black' : ''
-                }`}
-                style={{
-                  left: `${left}px`,
-                  top: `${top}px`,
-                  ...toTextStyle(annotation.style, 1),
+                bounds="parent"
+                enableResizing={false}
+                dragHandleClassName="annotation-rnd__drag"
+                scale={previewScale}
+                position={{ x: left, y: top }}
+                size={{ width: 'auto', height: 'auto' }}
+                onDragStart={() => {
+                  onSelectedAnnotationIdChange(annotation.id);
+                }}
+                onDrag={(_, data) => {
+                  const clamped = clampAnnotationPosition(annotation, data.x, data.y, baseCrop);
+                  onAnnotationPositionPreview(annotation.id, clamped.x, clamped.y);
+                }}
+                onDragStop={(_, data) => {
+                  const clamped = clampAnnotationPosition(annotation, data.x, data.y, baseCrop);
+                  onAnnotationPositionPreview(annotation.id, clamped.x, clamped.y);
+                  onAnnotationPositionCommit();
                 }}
               >
-                {annotation.text || t('canvas.textPlaceholder')}
-              </button>
+                <button
+                  data-annotation-box="true"
+                  type="button"
+                  onPointerDown={(event) => handleTextPointerDown(event, annotation)}
+                  onDoubleClick={() => startInlineTextEdit(annotation)}
+                  className={`annotation-rnd__drag block cursor-move select-none text-left transition ${
+                    selected ? 'ring-2 ring-cyan-300/80 ring-offset-2 ring-offset-black' : ''
+                  }`}
+                  style={toTextStyle(annotation.style, 1)}
+                >
+                  {annotation.text || t('canvas.textPlaceholder')}
+                </button>
+              </Rnd>
             );
           }
 
@@ -224,67 +250,86 @@ export default function PreviewOverlay({
           const height = annotation.height;
 
           return (
-            <div
+            <Rnd
               key={annotation.id}
-              data-annotation-box="true"
-              className="absolute"
-              style={{
-                left: `${left}px`,
-                top: `${top}px`,
-                width: `${Math.max(10, width)}px`,
-                height: `${Math.max(10, height)}px`,
+              bounds="parent"
+              scale={previewScale}
+              lockAspectRatio
+              dragHandleClassName="annotation-rnd__drag"
+              enableResizing={selected ? imageResizeHandles : false}
+              position={{ x: left, y: top }}
+              size={{ width: Math.max(24, width), height: Math.max(24, height) }}
+              resizeHandleComponent={{
+                topLeft: <span aria-hidden="true" className={`${imageHandleClassName} -left-2 -top-2`} />,
+                topRight: <span aria-hidden="true" className={`${imageHandleClassName} -right-2 -top-2`} />,
+                bottomLeft: <span aria-hidden="true" className={`${imageHandleClassName} -bottom-2 -left-2`} />,
+                bottomRight: <span aria-hidden="true" className={`${imageHandleClassName} -bottom-2 -right-2`} />,
+              }}
+              onDragStart={() => {
+                onSelectedAnnotationIdChange(annotation.id);
+              }}
+              onDrag={(_, data) => {
+                const clamped = clampAnnotationPosition(annotation, data.x, data.y, baseCrop);
+                onAnnotationPositionPreview(annotation.id, clamped.x, clamped.y);
+              }}
+              onDragStop={(_, data) => {
+                const clamped = clampAnnotationPosition(annotation, data.x, data.y, baseCrop);
+                onAnnotationPositionPreview(annotation.id, clamped.x, clamped.y);
+                onAnnotationPositionCommit();
+              }}
+              onResizeStart={() => {
+                onSelectedAnnotationIdChange(annotation.id);
+              }}
+              onResize={(_, __, ref, ___, position) => {
+                const clamped = clampImageAnnotationRect(
+                  baseCrop,
+                  annotation,
+                  position.x,
+                  position.y,
+                  ref.offsetWidth,
+                  ref.offsetHeight,
+                );
+                onAnnotationImageResizePreview(
+                  annotation.id,
+                  clamped.x,
+                  clamped.y,
+                  clamped.width,
+                  clamped.height,
+                );
+              }}
+              onResizeStop={(_, __, ref, ___, position) => {
+                const clamped = clampImageAnnotationRect(
+                  baseCrop,
+                  annotation,
+                  position.x,
+                  position.y,
+                  ref.offsetWidth,
+                  ref.offsetHeight,
+                );
+                onAnnotationImageResizePreview(
+                  annotation.id,
+                  clamped.x,
+                  clamped.y,
+                  clamped.width,
+                  clamped.height,
+                );
+                onAnnotationPositionCommit();
               }}
             >
               <button
+                data-annotation-box="true"
                 type="button"
-                onPointerDown={(event) => beginAnnotationDrag(event, annotation)}
-                className={`h-full w-full cursor-move select-none overflow-hidden border transition ${
+                onPointerDown={() => onSelectedAnnotationIdChange(annotation.id)}
+                className={`annotation-rnd__drag h-full w-full cursor-move select-none overflow-hidden rounded-md border bg-slate-950/20 transition ${
                   selected ? 'border-cyan-200' : 'border-slate-200/50'
                 }`}
               >
                 <img src={annotation.imageUrl} alt="" className="h-full w-full object-contain" />
               </button>
-            </div>
+            </Rnd>
           );
         })}
       </div>
-
-      {selectedImageFrame && selectedImageAnnotation ? (
-        <div
-          className="pointer-events-none absolute border-2 border-cyan-300/90 ring-1 ring-cyan-200/60"
-          style={{
-            left: `${selectedImageFrame.left}px`,
-            top: `${selectedImageFrame.top}px`,
-            width: `${Math.max(10, selectedImageFrame.width)}px`,
-            height: `${Math.max(10, selectedImageFrame.height)}px`,
-          }}
-        >
-          <button
-            type="button"
-            onPointerDown={(event) => beginImageResize(event, selectedImageAnnotation, 'nw')}
-            className="pointer-events-auto absolute -left-2 -top-2 h-4 w-4 cursor-nwse-resize rounded-full border border-cyan-200 bg-slate-950"
-            aria-label={t('canvas.resizeNorthWest')}
-          />
-          <button
-            type="button"
-            onPointerDown={(event) => beginImageResize(event, selectedImageAnnotation, 'ne')}
-            className="pointer-events-auto absolute -right-2 -top-2 h-4 w-4 cursor-nesw-resize rounded-full border border-cyan-200 bg-slate-950"
-            aria-label={t('canvas.resizeNorthEast')}
-          />
-          <button
-            type="button"
-            onPointerDown={(event) => beginImageResize(event, selectedImageAnnotation, 'sw')}
-            className="pointer-events-auto absolute -bottom-2 -left-2 h-4 w-4 cursor-nesw-resize rounded-full border border-cyan-200 bg-slate-950"
-            aria-label={t('canvas.resizeSouthWest')}
-          />
-          <button
-            type="button"
-            onPointerDown={(event) => beginImageResize(event, selectedImageAnnotation, 'se')}
-            className="pointer-events-auto absolute -bottom-2 -right-2 h-4 w-4 cursor-nwse-resize rounded-full border border-cyan-200 bg-slate-950"
-            aria-label={t('canvas.resizeSouthEast')}
-          />
-        </div>
-      ) : null}
     </>
   );
 }
