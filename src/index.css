@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Dela+Gothic+One&family=Google+Sans+Flex:wght@100..900&family=Inter:wght@400;500;600;700&family=Kaisei+Opti:wght@400;500;700&family=Montserrat:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&family=Oswald:wght@400;500;600;700&family=Roboto:wght@400;500;700&family=Roboto+Flex:wght@100..1000&family=Yusei+Magic&family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap");
 @import "tailwindcss";
 
 :root {
@@ -22,7 +22,7 @@ body,
 
 body {
 	margin: 0;
-	font-family: "IBM Plex Sans JP", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+	font-family: "Inter", "Noto Sans JP", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
 	background: linear-gradient(170deg, var(--bg-deep) 0%, var(--bg-mid) 45%, var(--bg-soft) 100%);
 	color: #e2e8f0;
 }
@@ -33,5 +33,5 @@ h3,
 h4,
 h5,
 h6 {
-	font-family: "Space Grotesk", "IBM Plex Sans JP", sans-serif;
+	font-family: "Montserrat", "Noto Sans JP", sans-serif;
 }

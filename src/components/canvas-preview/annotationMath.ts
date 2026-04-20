@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 
+import { resolveAnnotationFontFamily } from '../../lib/annotationFonts';
 import type { AnnotationTextStyle } from '../../types/editor';
 
 interface ToTextStyleOptions {
@@ -22,6 +23,7 @@ export function toTextStyle(style: AnnotationTextStyle, scaleYOrOptions: number 
 
   return {
     color: style.textColor,
+    fontFamily: resolveAnnotationFontFamily(style.fontFamily),
     fontWeight: style.bold ? 700 : 500,
     fontStyle: style.italic ? 'italic' : 'normal',
     fontSize: `${fontSize}px`,

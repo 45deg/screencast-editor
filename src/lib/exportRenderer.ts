@@ -1,3 +1,4 @@
+import { resolveAnnotationFontFamily } from './annotationFonts';
 import type { AnnotationModel, AnnotationTextStyle, CropRect } from '../types/editor';
 
 interface PreparedAnnotationAssets {
@@ -31,7 +32,7 @@ function drawTextOverlay(
   const fontSize = Math.max(8, Math.round(style.fontSize * scaleY));
   const fontWeight = style.bold ? '700' : '500';
   const fontStyle = style.italic ? 'italic' : 'normal';
-  const fontFamily = '"IBM Plex Sans JP", "Hiragino Kaku Gothic ProN", sans-serif';
+  const fontFamily = resolveAnnotationFontFamily(style.fontFamily);
   const lineHeight = Math.max(Math.round(fontSize * 1.25), fontSize + 2);
   const paddingX = Math.max(4, Math.round(fontSize * 0.24));
   const paddingY = Math.max(2, Math.round(fontSize * 0.14));

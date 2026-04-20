@@ -115,6 +115,7 @@ export const enTranslation = {
     defaultText: 'New text',
     bold: 'Bold',
     italic: 'Italic',
+    fontFamily: 'Font family',
     fontSize: 'Font size',
     fontColor: 'Font color',
     toggleBox: 'Toggle text background',

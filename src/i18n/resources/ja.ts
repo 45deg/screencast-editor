@@ -115,6 +115,7 @@ export const jaTranslation = {
     defaultText: '新しいテキスト',
     bold: '太字',
     italic: '斜体',
+    fontFamily: 'フォント',
     fontSize: 'フォントサイズ',
     fontColor: '文字色',
     toggleBox: '背景表示の切り替え',

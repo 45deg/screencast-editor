@@ -1,6 +1,20 @@
 export type OutputFormat = 'mp4';
 export type Mp4Preset = 'ultrafast' | 'superfast' | 'veryfast' | 'faster' | 'fast' | 'medium' | 'slow' | 'slower' | 'veryslow';
 export type Mp4BitrateMode = 'auto' | 'manual';
+export type AnnotationFontFamily =
+  | 'bebas-neue'
+  | 'anton'
+  | 'dela-gothic-one'
+  | 'roboto'
+  | 'roboto-flex'
+  | 'inter'
+  | 'noto-sans-jp'
+  | 'zen-maru-gothic'
+  | 'montserrat'
+  | 'oswald'
+  | 'yusei-magic'
+  | 'kaisei-opti'
+  | 'google-sans-flex';
 
 export interface CropRect {
   x: number;
@@ -39,6 +53,7 @@ export interface AnnotationTextStyle {
   textColor: string;
   bold: boolean;
   italic: boolean;
+  fontFamily: AnnotationFontFamily;
   fontSize: number;
   outlineWidth: number;
   outlineColor: string;
@@ -104,10 +119,32 @@ export const DEFAULT_TEXT_ANNOTATION_STYLE: AnnotationTextStyle = {
   textColor: '#ffffff',
   bold: false,
   italic: false,
+  fontFamily: 'noto-sans-jp',
   fontSize: 44,
   outlineWidth: 0,
   outlineColor: '#000000',
 };
+
+function normalizeAnnotationFontFamily(fontFamily: string | undefined): AnnotationFontFamily {
+  switch (fontFamily) {
+    case 'bebas-neue':
+    case 'anton':
+    case 'dela-gothic-one':
+    case 'roboto':
+    case 'roboto-flex':
+    case 'inter':
+    case 'noto-sans-jp':
+    case 'zen-maru-gothic':
+    case 'montserrat':
+    case 'oswald':
+    case 'yusei-magic':
+    case 'kaisei-opti':
+    case 'google-sans-flex':
+      return fontFamily;
+    default:
+      return DEFAULT_TEXT_ANNOTATION_STYLE.fontFamily;
+  }
+}
 
 export function cloneCrop(crop: CropRect | null): CropRect | null {
   if (!crop) {
@@ -129,6 +166,7 @@ export function cloneSlices(slices: SliceModel[]): SliceModel[] {
 export function cloneAnnotationStyle(style: AnnotationTextStyle): AnnotationTextStyle {
   return {
     ...style,
+    fontFamily: normalizeAnnotationFontFamily(style.fontFamily),
     fontSize: Math.max(8, Math.round(style.fontSize)),
     outlineWidth: Math.max(0, style.outlineWidth),
   };
