@@ -93,6 +93,7 @@ export default function App() {
     handleAnnotationPositionCommit,
     handleTextAnnotationChange,
     handleTextAnnotationStyleChange,
+    handleDeleteSelectedAnnotation,
   } = useAnnotationHandlers({
     annotations,
     baseCrop,
@@ -252,6 +253,7 @@ export default function App() {
               onAnnotationPositionCommit={handleAnnotationPositionCommit}
               onTextAnnotationChange={handleTextAnnotationChange}
               onTextAnnotationStyleChange={handleTextAnnotationStyleChange}
+              onDeleteSelectedAnnotation={handleDeleteSelectedAnnotation}
               slices={slices}
               annotations={annotations}
               canUndo={past.length > 0}

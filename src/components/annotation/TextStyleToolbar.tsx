@@ -1,17 +1,21 @@
 import { Toolbar } from '@base-ui/react/toolbar';
-import { Bold, Italic, PaintBucket, PenLine, RectangleHorizontal, Type, TypeOutline } from 'lucide-react';
+import { Bold, Italic, PaintBucket, PenLine, RectangleHorizontal, Trash2, Type, TypeOutline } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { AnnotationTextStyle, TextAnnotation } from '../../types/editor';
 
 interface TextStyleToolbarProps {
   selectedTextAnnotation: TextAnnotation | null;
+  outlinePreviewScaleY?: number;
   onStyleChange: (next: Partial<AnnotationTextStyle>) => void;
+  onDelete?: () => void;
 }
 
 export default function TextStyleToolbar({
   selectedTextAnnotation,
+  outlinePreviewScaleY = 1,
   onStyleChange,
+  onDelete,
 }: TextStyleToolbarProps) {
   const { t } = useTranslation();
 
@@ -20,6 +24,8 @@ export default function TextStyleToolbar({
   }
 
   const style = selectedTextAnnotation.style;
+  const displayOutlineWidth = Math.max(0, Math.round(style.outlineWidth * outlinePreviewScaleY));
+  const maxDisplayOutlineWidth = Math.max(24, Math.round(24 * outlinePreviewScaleY));
 
   return (
     <Toolbar.Root
@@ -67,7 +73,6 @@ export default function TextStyleToolbar({
           className="w-14 border-0 bg-transparent text-right text-[11px] text-white outline-none"
           aria-label={t('canvas.fontSize')}
         />
-        px
       </label>
 
       <label className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px] text-slate-200">
@@ -111,19 +116,19 @@ export default function TextStyleToolbar({
         <input
           type="number"
           min={0}
-          max={24}
+          max={maxDisplayOutlineWidth}
           step={1}
-          value={style.outlineWidth}
+          value={displayOutlineWidth}
           onChange={(event) => {
             const next = Number.parseInt(event.target.value, 10);
             if (Number.isFinite(next)) {
-              onStyleChange({ outlineWidth: Math.max(0, Math.min(24, next)) });
+              const clamped = Math.max(0, Math.min(maxDisplayOutlineWidth, next));
+              onStyleChange({ outlineWidth: clamped / Math.max(0.0001, outlinePreviewScaleY) });
             }
           }}
           className="w-10 border-0 bg-transparent text-right text-[11px] text-white outline-none"
           aria-label={t('canvas.outlineWidth')}
         />
-        px 
         <input
           type="color"
           value={style.outlineColor}
@@ -132,6 +137,19 @@ export default function TextStyleToolbar({
           aria-label={t('canvas.outlineColor')}
         />
       </label>
+
+      {onDelete ? (
+        <>
+          <Toolbar.Separator className="mx-1 h-5 w-px bg-slate-800" />
+          <Toolbar.Button
+            aria-label={t('sliceEditor.deleteSelected')}
+            onClick={onDelete}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-rose-300/40 bg-rose-400/10 text-rose-100 transition hover:bg-rose-400/20"
+          >
+            <Trash2 size={14} />
+          </Toolbar.Button>
+        </>
+      ) : null}
     </Toolbar.Root>
   );
 }

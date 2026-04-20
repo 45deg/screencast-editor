@@ -3,9 +3,7 @@ import { Toolbar } from '@base-ui/react/toolbar';
 import { Check, Crop, Pause, Play, RotateCcw, SkipBack, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import TextStyleToolbar from '../annotation/TextStyleToolbar';
 import { formatSeconds } from './math';
-import type { AnnotationTextStyle, TextAnnotation } from '../../types/editor';
 
 interface CanvasPreviewHeaderProps {
   fileName: string;
@@ -19,8 +17,6 @@ interface CanvasPreviewHeaderProps {
   onRestart: () => void;
   onTogglePlay: () => void;
   onStartCrop: () => void;
-  selectedTextAnnotation: TextAnnotation | null;
-  onTextAnnotationStyleChange: (next: Partial<AnnotationTextStyle>) => void;
 }
 
 export default function CanvasPreviewHeader({
@@ -35,94 +31,83 @@ export default function CanvasPreviewHeader({
   onRestart,
   onTogglePlay,
   onStartCrop,
-  selectedTextAnnotation,
-  onTextAnnotationStyleChange,
 }: CanvasPreviewHeaderProps) {
   const { t } = useTranslation();
 
   return (
-    <div className="mb-2 flex flex-col gap-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="sr-only">{t('canvas.title')}</h2>
+    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+      <h2 className="sr-only">{t('canvas.title')}</h2>
 
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <p className="min-w-0 max-w-[52vw] truncate text-xs text-slate-400 sm:max-w-[360px]" title={fileName}>
-            {fileName}
-          </p>
-        </div>
-
-        {isEditing ? (
-          <div className="inline-flex items-center gap-2">
-            <Button
-              type="button"
-              onClick={onResetEdit}
-              className="inline-flex items-center gap-1 rounded-md border border-slate-600 bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-slate-100 transition hover:border-cyan-400/60 hover:text-cyan-100"
-            >
-              <RotateCcw size={13} />
-              {t('canvas.reset')}
-            </Button>
-            <Button
-              type="button"
-              onClick={onCancelEdit}
-              className="inline-flex items-center gap-1 rounded-md border border-rose-300/40 bg-rose-400/10 px-2.5 py-1.5 text-xs font-medium text-rose-100 transition hover:bg-rose-400/20"
-            >
-              <X size={13} />
-              {t('canvas.cancel')}
-            </Button>
-            <Button
-              type="button"
-              onClick={onConfirmEdit}
-              className="inline-flex items-center gap-1 rounded-md border border-emerald-300/40 bg-emerald-400/10 px-2.5 py-1.5 text-xs font-medium text-emerald-100 transition hover:bg-emerald-400/20"
-            >
-              <Check size={13} />
-              {t('canvas.confirm')}
-            </Button>
-          </div>
-        ) : (
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Toolbar.Root
-              aria-label={t('canvas.previewControls')}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-950/90 p-1"
-            >
-              <Toolbar.Group className="inline-flex items-center gap-1">
-                <Toolbar.Button
-                  aria-label={t('canvas.restartPreview')}
-                  onClick={onRestart}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-300 transition hover:bg-slate-800 hover:text-white"
-                >
-                  <SkipBack size={14} />
-                </Toolbar.Button>
-                <Toolbar.Button
-                  aria-label={isPlaying ? t('canvas.pausePreview') : t('canvas.playPreview')}
-                  onClick={onTogglePlay}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-100 transition hover:bg-cyan-500/15 hover:text-cyan-100"
-                >
-                  {isPlaying ? <Pause size={14} /> : <Play size={14} className="ml-0.5" />}
-                </Toolbar.Button>
-              </Toolbar.Group>
-              <Toolbar.Separator className="mx-1 h-5 w-px bg-slate-800" />
-              <div className="min-w-[110px] px-2 text-right font-mono text-[11px] text-slate-300">
-                {formatSeconds(currentTime)} / {formatSeconds(totalDuration)}
-              </div>
-            </Toolbar.Root>
-            <Button
-              type="button"
-              onClick={onStartCrop}
-              className="inline-flex items-center gap-1 rounded-md border border-cyan-300/40 bg-cyan-400/10 px-2.5 py-1.5 text-xs font-medium text-cyan-100 transition hover:bg-cyan-400/20"
-            >
-              <Crop size={13} />
-              {t('sliceEditor.crop')}
-            </Button>
-          </div>
-        )}
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <p className="min-w-0 max-w-[52vw] truncate text-xs text-slate-400 sm:max-w-[360px]" title={fileName}>
+          {fileName}
+        </p>
       </div>
 
+      {isEditing ? (
+        <div className="inline-flex items-center gap-2">
+          <Button
+            type="button"
+            onClick={onResetEdit}
+            className="inline-flex items-center gap-1 rounded-md border border-slate-600 bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-slate-100 transition hover:border-cyan-400/60 hover:text-cyan-100"
+          >
+            <RotateCcw size={13} />
+            {t('canvas.reset')}
+          </Button>
+          <Button
+            type="button"
+            onClick={onCancelEdit}
+            className="inline-flex items-center gap-1 rounded-md border border-rose-300/40 bg-rose-400/10 px-2.5 py-1.5 text-xs font-medium text-rose-100 transition hover:bg-rose-400/20"
+          >
+            <X size={13} />
+            {t('canvas.cancel')}
+          </Button>
+          <Button
+            type="button"
+            onClick={onConfirmEdit}
+            className="inline-flex items-center gap-1 rounded-md border border-emerald-300/40 bg-emerald-400/10 px-2.5 py-1.5 text-xs font-medium text-emerald-100 transition hover:bg-emerald-400/20"
+          >
+            <Check size={13} />
+            {t('canvas.confirm')}
+          </Button>
+        </div>
+      ) : null}
+
       {!isEditing ? (
-        <div className="flex justify-end">
-          <TextStyleToolbar
-            selectedTextAnnotation={selectedTextAnnotation}
-            onStyleChange={onTextAnnotationStyleChange}
-          />
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Toolbar.Root
+            aria-label={t('canvas.previewControls')}
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-950/90 p-1"
+          >
+            <Toolbar.Group className="inline-flex items-center gap-1">
+              <Toolbar.Button
+                aria-label={t('canvas.restartPreview')}
+                onClick={onRestart}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-300 transition hover:bg-slate-800 hover:text-white"
+              >
+                <SkipBack size={14} />
+              </Toolbar.Button>
+              <Toolbar.Button
+                aria-label={isPlaying ? t('canvas.pausePreview') : t('canvas.playPreview')}
+                onClick={onTogglePlay}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-100 transition hover:bg-cyan-500/15 hover:text-cyan-100"
+              >
+                {isPlaying ? <Pause size={14} /> : <Play size={14} className="ml-0.5" />}
+              </Toolbar.Button>
+            </Toolbar.Group>
+            <Toolbar.Separator className="mx-1 h-5 w-px bg-slate-800" />
+            <div className="min-w-[110px] px-2 text-right font-mono text-[11px] text-slate-300">
+              {formatSeconds(currentTime)} / {formatSeconds(totalDuration)}
+            </div>
+          </Toolbar.Root>
+          <Button
+            type="button"
+            onClick={onStartCrop}
+            className="inline-flex items-center gap-1 rounded-md border border-cyan-300/40 bg-cyan-400/10 px-2.5 py-1.5 text-xs font-medium text-cyan-100 transition hover:bg-cyan-400/20"
+          >
+            <Crop size={13} />
+            {t('sliceEditor.crop')}
+          </Button>
         </div>
       ) : null}
     </div>

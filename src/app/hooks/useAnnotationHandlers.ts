@@ -153,6 +153,17 @@ export function useAnnotationHandlers({
     [annotations, replaceAnnotationsCommit, selectedTextAnnotation],
   );
 
+  const handleDeleteSelectedAnnotation = useCallback(() => {
+    if (!selectedAnnotationId) {
+      return;
+    }
+
+    const nextAnnotations = annotations.filter((annotation) => annotation.id !== selectedAnnotationId);
+    pendingAnnotationPreviewRef.current = null;
+    replaceAnnotationsCommit(nextAnnotations, null);
+    setSelectedAnnotationId(null);
+  }, [annotations, replaceAnnotationsCommit, selectedAnnotationId, setSelectedAnnotationId]);
+
   return {
     pendingAnnotationPreviewRef,
     resetPendingAnnotationPreview,
@@ -162,5 +173,6 @@ export function useAnnotationHandlers({
     handleAnnotationPositionCommit,
     handleTextAnnotationChange,
     handleTextAnnotationStyleChange,
+    handleDeleteSelectedAnnotation,
   };
 }

@@ -2,9 +2,20 @@ import type { CSSProperties } from 'react';
 
 import type { AnnotationTextStyle } from '../../types/editor';
 
-export function toTextStyle(style: AnnotationTextStyle, scaleY: number): CSSProperties {
-  const fontSize = Math.max(8, Math.round(style.fontSize * scaleY));
-  const outlineWidth = Math.max(0, Math.round(style.outlineWidth * scaleY));
+interface ToTextStyleOptions {
+  fontScaleY?: number;
+  outlineScaleY?: number;
+}
+
+export function toTextStyle(style: AnnotationTextStyle, scaleYOrOptions: number | ToTextStyleOptions): CSSProperties {
+  const options =
+    typeof scaleYOrOptions === 'number'
+      ? { fontScaleY: scaleYOrOptions, outlineScaleY: scaleYOrOptions }
+      : scaleYOrOptions;
+  const fontScaleY = options.fontScaleY ?? 1;
+  const outlineScaleY = options.outlineScaleY ?? fontScaleY;
+  const fontSize = Math.max(8, Math.round(style.fontSize * fontScaleY));
+  const outlineWidth = Math.max(0, Math.round(style.outlineWidth * outlineScaleY));
   const lineHeight = Math.max(Math.round(fontSize * 1.25), fontSize + 2);
   const paddingX = Math.max(4, Math.round(fontSize * 0.24));
   const paddingY = Math.max(2, Math.round(fontSize * 0.14));

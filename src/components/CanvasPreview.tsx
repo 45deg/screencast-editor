@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useMemo } from 'react';
+import { Button } from '@base-ui/react/button';
+import { Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import CanvasPreviewHeader from './canvas-preview/CanvasPreviewHeader';
 import CropEditOverlay from './canvas-preview/CropEditOverlay';
 import PreviewOverlay from './canvas-preview/PreviewOverlay';
+import TextStyleToolbar from './annotation/TextStyleToolbar';
 import { clampRectToVideo, computeDisplayLayout } from './canvas-preview/math';
 import { useCanvasPlayback } from './canvas-preview/useCanvasPlayback';
 import { useCanvasViewport } from './canvas-preview/useCanvasViewport';
@@ -49,6 +53,8 @@ interface CanvasPreviewProps {
   onAnnotationPositionCommit: () => void;
   onTextAnnotationChange: (annotationId: string, text: string) => void;
   onTextAnnotationStyleChange: (next: Partial<AnnotationTextStyle>) => void;
+  onDeleteSelectedAnnotation: () => void;
+  outputHeight: number;
   className?: string;
   fillHeight?: boolean;
 }
@@ -79,9 +85,12 @@ export default function CanvasPreview({
   onAnnotationPositionCommit,
   onTextAnnotationChange,
   onTextAnnotationStyleChange,
+  onDeleteSelectedAnnotation,
+  outputHeight,
   className,
   fillHeight = false,
 }: CanvasPreviewProps) {
+  const { t } = useTranslation();
   const isEditing = editMode !== 'idle';
 
   const { videoRef, viewportRef, viewport, frameSize, syncVideoTime, handleVideoLoadedMetadata } =
@@ -95,6 +104,13 @@ export default function CanvasPreview({
   const displayLayout = useMemo(() => {
     return computeDisplayLayout(video, baseCrop, activeSceneCrop);
   }, [activeSceneCrop, baseCrop, video]);
+  const selectedImageAnnotation = useMemo(() => {
+    const selected = activeAnnotations.find((annotation) => annotation.id === selectedAnnotationId);
+    return selected?.kind === 'image' ? selected : null;
+  }, [activeAnnotations, selectedAnnotationId]);
+  const outlinePreviewScaleY = useMemo(() => {
+    return outputHeight / Math.max(1, baseCrop.h);
+  }, [baseCrop.h, outputHeight]);
 
   useEffect(() => {
     if (editMode !== 'idle') {
@@ -230,8 +246,6 @@ export default function CanvasPreview({
         onRestart={handleRestart}
         onTogglePlay={handleTogglePlay}
         onStartCrop={handleStartCropClick}
-        selectedTextAnnotation={selectedTextAnnotation}
-        onTextAnnotationStyleChange={onTextAnnotationStyleChange}
       />
 
       <div className="flex flex-1 items-center justify-center overflow-hidden rounded-md border border-slate-800 bg-black/95 p-1">
@@ -302,6 +316,46 @@ export default function CanvasPreview({
               overlayOffsetY={overlayOffsetY}
             />
           )}
+
+          {!isEditing && selectedTextAnnotation ? (
+            <div className="pointer-events-none absolute bottom-3 right-3 z-20 flex max-w-[calc(100%-1.5rem)] justify-end">
+              <div
+                data-annotation-box="true"
+                className="pointer-events-auto"
+                onPointerDown={(event) => {
+                  event.stopPropagation();
+                }}
+              >
+                <TextStyleToolbar
+                  selectedTextAnnotation={selectedTextAnnotation}
+                  outlinePreviewScaleY={outlinePreviewScaleY}
+                  onStyleChange={onTextAnnotationStyleChange}
+                  onDelete={onDeleteSelectedAnnotation}
+                />
+              </div>
+            </div>
+          ) : null}
+
+          {!isEditing && !selectedTextAnnotation && selectedImageAnnotation ? (
+            <div className="pointer-events-none absolute bottom-3 right-3 z-20 flex max-w-[calc(100%-1.5rem)] justify-end">
+              <div
+                data-annotation-box="true"
+                className="pointer-events-auto"
+                onPointerDown={(event) => {
+                  event.stopPropagation();
+                }}
+              >
+                <Button
+                  type="button"
+                  aria-label={t('sliceEditor.deleteSelected')}
+                  onClick={onDeleteSelectedAnnotation}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-rose-300/40 bg-slate-950/95 text-rose-100 shadow-xl backdrop-blur transition hover:bg-rose-400/20"
+                >
+                  <Trash2 size={16} />
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </section>

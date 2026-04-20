@@ -46,6 +46,7 @@ interface EditorWorkspaceProps {
   onAnnotationPositionCommit: () => void;
   onTextAnnotationChange: (annotationId: string, text: string) => void;
   onTextAnnotationStyleChange: (next: Partial<AnnotationTextStyle>) => void;
+  onDeleteSelectedAnnotation: () => void;
   slices: SliceModel[];
   annotations: AnnotationModel[];
   canUndo: boolean;
@@ -101,6 +102,7 @@ export default function EditorWorkspace({
   onAnnotationPositionCommit,
   onTextAnnotationChange,
   onTextAnnotationStyleChange,
+  onDeleteSelectedAnnotation,
   slices,
   annotations,
   canUndo,
@@ -160,6 +162,8 @@ export default function EditorWorkspace({
                 onAnnotationPositionCommit={onAnnotationPositionCommit}
                 onTextAnnotationChange={onTextAnnotationChange}
                 onTextAnnotationStyleChange={onTextAnnotationStyleChange}
+                onDeleteSelectedAnnotation={onDeleteSelectedAnnotation}
+                outputHeight={exportSettings.height}
                 className="h-full"
                 fillHeight
               />
