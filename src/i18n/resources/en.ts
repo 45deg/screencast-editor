@@ -116,6 +116,8 @@ export const enTranslation = {
     addTextLayerTooltip: 'Insert a new text layer. You can fine-tune its position and duration later on the timeline.',
     addImageLayer: 'Add image',
     addImageLayerTooltip: 'Insert an image layer. Place it in the preview and adjust its timing from the timeline afterward.',
+    addMovieLayer: 'Add movie',
+    addMovieLayerTooltip: 'Append a new movie source as a single scene at the end of the timeline.',
     layerUp: 'Move layer up',
     layerDown: 'Move layer down',
     playbackSpeed: 'Playback speed',

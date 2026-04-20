@@ -12,6 +12,7 @@ export type EditorStoreGet = () => EditorStoreState;
 export type EditorStoreActions = Pick<
   EditorStoreState,
   | 'setVideo'
+  | 'addVideoSource'
   | 'clearVideo'
   | 'setCurrentTime'
   | 'setSelectedSliceId'
@@ -36,7 +37,7 @@ export type EditorStoreActions = Pick<
 
 export type VideoSelectionActions = Pick<
   EditorStoreActions,
-  'setVideo' | 'clearVideo' | 'setCurrentTime' | 'setSelectedSliceId' | 'setSelectedAnnotationId'
+  'setVideo' | 'addVideoSource' | 'clearVideo' | 'setCurrentTime' | 'setSelectedSliceId' | 'setSelectedAnnotationId'
 >;
 
 export type TimelineActions = Pick<

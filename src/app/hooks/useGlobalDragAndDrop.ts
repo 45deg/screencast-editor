@@ -1,21 +1,18 @@
 import { useEffect } from 'react';
 
 import { getFirstImageFile, getFirstVideoFile } from '../appUtils';
-import type { VideoMeta } from '../../types/editor';
 
 interface UseGlobalDragAndDropArgs {
   hasVideo: boolean;
-  video: VideoMeta | null;
-  t: (key: string) => string;
   onImportVideo: (file: File) => Promise<void>;
+  onAddVideoSource: (file: File) => Promise<void>;
   onCreateImageAnnotation: (file: File) => void | Promise<void>;
 }
 
 export function useGlobalDragAndDrop({
   hasVideo,
-  video,
-  t,
   onImportVideo,
+  onAddVideoSource,
   onCreateImageAnnotation,
 }: UseGlobalDragAndDropArgs) {
   useEffect(() => {
@@ -54,12 +51,12 @@ export function useGlobalDragAndDrop({
         return;
       }
 
-      if (video && !window.confirm(t('app.replaceVideoConfirm'))) {
-        return;
-      }
-
       if (nextFile) {
-        void onImportVideo(nextFile);
+        if (hasVideo) {
+          void onAddVideoSource(nextFile);
+        } else {
+          void onImportVideo(nextFile);
+        }
       }
     };
 
@@ -70,5 +67,5 @@ export function useGlobalDragAndDrop({
       window.removeEventListener('dragover', handleWindowDragOver);
       window.removeEventListener('drop', handleWindowDrop);
     };
-  }, [hasVideo, onCreateImageAnnotation, onImportVideo, t, video]);
+  }, [hasVideo, onAddVideoSource, onCreateImageAnnotation, onImportVideo]);
 }

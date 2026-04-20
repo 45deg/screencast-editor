@@ -116,6 +116,7 @@ export function useSliceEditorMutationHandlers({
 
     const leftSlice: SliceModel = {
       id: nanoid(),
+      sourceId: target.sourceId,
       timelineStart: target.start,
       sourceStart: target.sourceStart,
       sourceEnd: splitSource,
@@ -124,6 +125,7 @@ export function useSliceEditorMutationHandlers({
     };
     const rightSlice: SliceModel = {
       id: nanoid(),
+      sourceId: target.sourceId,
       timelineStart: currentTime,
       sourceStart: splitSource,
       sourceEnd: target.sourceEnd,

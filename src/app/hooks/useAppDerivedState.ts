@@ -2,7 +2,9 @@ import { useMemo } from 'react';
 
 import { clampCropToVideo, formatDurationLabel, formatFileSize, getDefaultCrop } from '../appUtils';
 import {
+  findVideoSourceById,
   findSliceAtTimelineTime,
+  getActiveVideoSourceAtTimelineTime,
   getActiveAnnotationsAtTimelineTime,
   getSourceTimeAtTimelineTime,
   getTotalDuration,
@@ -16,7 +18,7 @@ import {
 } from '../../types/editor';
 
 interface UseAppDerivedStateArgs {
-  video: VideoMeta | null;
+  sources: VideoMeta[];
   globalCrop: CropRect | null;
   slices: SliceModel[];
   annotations: AnnotationModel[];
@@ -26,7 +28,7 @@ interface UseAppDerivedStateArgs {
 }
 
 export function useAppDerivedState({
-  video,
+  sources,
   globalCrop,
   slices,
   annotations,
@@ -34,6 +36,16 @@ export function useAppDerivedState({
   selectedAnnotationId,
   exportSettings,
 }: UseAppDerivedStateArgs) {
+  const previewSlice = useMemo(() => findSliceAtTimelineTime(slices, currentTime), [currentTime, slices]);
+  const video = useMemo(() => {
+    if (previewSlice) {
+      return findVideoSourceById(sources, previewSlice.sourceId) ?? sources[0] ?? null;
+    }
+
+    return getActiveVideoSourceAtTimelineTime(sources, slices, currentTime);
+  }, [currentTime, previewSlice, slices, sources]);
+  const primaryVideo = sources[0] ?? null;
+
   const fullCrop = useMemo(() => {
     if (!video) {
       return null;
@@ -49,8 +61,6 @@ export function useAppDerivedState({
 
     return globalCrop ?? fullCrop;
   }, [fullCrop, globalCrop, video]);
-
-  const previewSlice = useMemo(() => findSliceAtTimelineTime(slices, currentTime), [currentTime, slices]);
 
   const activeSceneCrop = useMemo(() => {
     if (!previewSlice?.crop || !video) {
@@ -83,7 +93,7 @@ export function useAppDerivedState({
     return selected as ImageAnnotation;
   }, [activeAnnotations, selectedAnnotationId]);
 
-  const hasVideo = Boolean(video && baseCrop);
+  const hasVideo = Boolean(primaryVideo && baseCrop);
   const totalDuration = useMemo(() => getTotalDuration(slices, annotations), [annotations, slices]);
   const previewSourceTime = useMemo(() => getSourceTimeAtTimelineTime(slices, currentTime), [currentTime, slices]);
   const videoInfoItems = useMemo(() => {
@@ -106,6 +116,8 @@ export function useAppDerivedState({
   return {
     fullCrop,
     baseCrop,
+    video,
+    primaryVideo,
     previewSlice,
     activeSceneCrop,
     activeAnnotations,

@@ -12,7 +12,7 @@ import type { ExportRuntimeStatus } from '../../store/editorStore';
 import { getSafeDownloadName, toErrorMessage } from '../appUtils';
 
 interface UseExportHandlerArgs {
-  video: VideoMeta | null;
+  sources: VideoMeta[];
   slices: SliceModel[];
   annotations: AnnotationModel[];
   baseCrop: CropRect | null;
@@ -25,7 +25,7 @@ interface UseExportHandlerArgs {
 }
 
 export function useExportHandler({
-  video,
+  sources,
   slices,
   annotations,
   baseCrop,
@@ -97,7 +97,9 @@ export function useExportHandler({
   }, [setExportRuntimeStatus]);
 
   const handleExport = useCallback(async () => {
-    if (!video || !slices.length || !baseCrop) {
+    const primaryVideo = sources[0] ?? null;
+
+    if (!primaryVideo || !slices.length || !baseCrop) {
       return;
     }
 
@@ -105,7 +107,7 @@ export function useExportHandler({
       return;
     }
 
-    const downloadName = getSafeDownloadName(video.file.name, 'mp4');
+    const downloadName = getSafeDownloadName(primaryVideo.file.name, 'mp4');
     const exportAbortController = new AbortController();
     const { signal } = exportAbortController;
     const runtimeWasReadyAtStart = runtimeStatusRef.current === 'ready';
@@ -131,7 +133,7 @@ export function useExportHandler({
       updateExportProgress(12, t('app.exportStageLoadingRuntime'));
 
       const blob = await exportVideo({
-        video,
+        sources,
         slices,
         annotations,
         globalCrop,
@@ -185,7 +187,7 @@ export function useExportHandler({
       } else {
         console.error('[export][mp4] failed', {
           error,
-          videoName: video.file.name,
+          videoName: primaryVideo.file.name,
           exportSettings,
           sliceCount: slices.length,
           annotationCount: annotations.length,
@@ -220,7 +222,7 @@ export function useExportHandler({
     slices,
     t,
     totalDuration,
-    video,
+    sources,
     exportVideo,
   ]);
 

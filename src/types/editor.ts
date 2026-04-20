@@ -23,16 +23,29 @@ export interface CropRect {
   h: number;
 }
 
-export interface VideoMeta {
+interface SceneSourceBase {
+  id: string;
+  kind: 'video' | 'image';
   file: File;
   objectUrl: string;
   width: number;
   height: number;
+}
+
+export interface VideoMeta extends SceneSourceBase {
+  kind: 'video';
   duration: number;
 }
 
+export interface ImageSourceMeta extends SceneSourceBase {
+  kind: 'image';
+}
+
+export type SceneSource = VideoMeta | ImageSourceMeta;
+
 export interface SliceModel {
   id: string;
+  sourceId: string;
   timelineStart: number;
   sourceStart: number;
   sourceEnd: number;
@@ -107,6 +120,7 @@ export interface TimelineScrollInfo {
 }
 
 export interface EditorSnapshot {
+  sources: VideoMeta[];
   slices: SliceModel[];
   annotations: AnnotationModel[];
   globalCrop: CropRect | null;
@@ -153,6 +167,16 @@ export function cloneCrop(crop: CropRect | null): CropRect | null {
   }
 
   return { ...crop };
+}
+
+export function cloneVideoSource(source: VideoMeta): VideoMeta {
+  return {
+    ...source,
+  };
+}
+
+export function cloneVideoSources(sources: VideoMeta[]): VideoMeta[] {
+  return sources.map((source) => cloneVideoSource(source));
 }
 
 export function cloneSlices(slices: SliceModel[]): SliceModel[] {
@@ -253,6 +277,23 @@ export function deriveAnnotations(annotations: AnnotationModel[]): DerivedAnnota
 export function findSliceAtTimelineTime(slices: SliceModel[], time: number): DerivedSlice | null {
   const derived = deriveSlices(slices);
   return derived.find((slice) => time >= slice.start && time < slice.end) ?? null;
+}
+
+export function findVideoSourceById(sources: VideoMeta[], sourceId: string): VideoMeta | null {
+  return sources.find((source) => source.id === sourceId) ?? null;
+}
+
+export function getActiveVideoSourceAtTimelineTime(
+  sources: VideoMeta[],
+  slices: SliceModel[],
+  time: number,
+): VideoMeta | null {
+  const activeSlice = findSliceAtTimelineTime(slices, time);
+  if (!activeSlice) {
+    return sources[0] ?? null;
+  }
+
+  return findVideoSourceById(sources, activeSlice.sourceId) ?? sources[0] ?? null;
 }
 
 export function getSourceTimeAtTimelineTime(slices: SliceModel[], time: number): number {

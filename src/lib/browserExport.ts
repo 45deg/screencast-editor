@@ -20,7 +20,7 @@ export interface BrowserExportDiagnostics {
 }
 
 interface ExportVideoToMp4Input {
-  video: VideoMeta;
+  sources: VideoMeta[];
   slices: SliceModel[];
   annotations: AnnotationModel[];
   globalCrop: CropRect | null;
@@ -211,7 +211,7 @@ export async function ensureBrowserExportRuntimeReady(signal?: AbortSignal): Pro
 }
 
 export async function exportVideoToMp4({
-  video,
+  sources,
   slices,
   annotations,
   globalCrop,
@@ -227,21 +227,51 @@ export async function exportVideoToMp4({
   onProgress?.(14);
 
   const mp4box = await loadMp4BoxModule(signal);
-  const demuxer = new WebDemuxer({ wasmFilePath: getWebDemuxerWasmUrl() });
-  diagnostics?.onDemuxerCreated?.();
+  const sourcesById = new Map(sources.map((source) => [source.id, source]));
+  const demuxers = new Map<string, WebDemuxer>();
+  const decoderConfigs = new Map<string, Awaited<ReturnType<WebDemuxer['getDecoderConfig']>>>();
 
   let annotationAssets: Awaited<ReturnType<typeof prepareAnnotationAssets>> | null = null;
   let encoder: VideoEncoder | null = null;
   try {
-    await diagnostics?.beforeDemuxerLoad?.(signal);
-    await demuxer.load(video.file);
-    throwIfAborted(signal);
-    onProgress?.(28);
+    const getLoadedDemuxer = async (source: VideoMeta) => {
+      const existing = demuxers.get(source.id);
+      if (existing) {
+        return existing;
+      }
 
-    const decoderConfig = await demuxer.getDecoderConfig('video');
-    if (!decoderConfig) {
-      throw new Error('The imported file does not contain a supported video track.');
+      const demuxer = new WebDemuxer({ wasmFilePath: getWebDemuxerWasmUrl() });
+      diagnostics?.onDemuxerCreated?.();
+      await diagnostics?.beforeDemuxerLoad?.(signal);
+      await demuxer.load(source.file);
+      throwIfAborted(signal);
+      demuxers.set(source.id, demuxer);
+      return demuxer;
+    };
+
+    const getDecoderConfigForSource = async (source: VideoMeta) => {
+      const cached = decoderConfigs.get(source.id);
+      if (cached) {
+        return cached;
+      }
+
+      const demuxer = await getLoadedDemuxer(source);
+      const decoderConfig = await demuxer.getDecoderConfig('video');
+      if (!decoderConfig) {
+        throw new Error(`The imported file "${source.file.name}" does not contain a supported video track.`);
+      }
+
+      decoderConfigs.set(source.id, decoderConfig);
+      return decoderConfig;
+    };
+
+    const primarySource = sources[0];
+    if (!primarySource) {
+      throw new Error('There is nothing to export.');
     }
+
+    await getDecoderConfigForSource(primarySource);
+    onProgress?.(28);
 
     const outputWidth = toEvenDimension(exportSettings.width);
     const outputHeight = toEvenDimension(exportSettings.height);
@@ -249,7 +279,6 @@ export async function exportVideoToMp4({
     const frameDurationUs = getOutputFrameDurationUs(fps);
     const totalFrameCount = getTotalFrameCount(totalDuration, fps);
     const sortedSlices = getSortedSlices(slices);
-    const baseCrop = getBaseCrop(video, globalCrop);
     annotationAssets = await prepareAnnotationAssets(annotations);
     const canvas = createCanvas(outputWidth, outputHeight);
     const context = getCanvasContext(canvas);
@@ -312,7 +341,12 @@ export async function exportVideoToMp4({
 
     encoder.configure(encoderConfig);
 
-    const emitFrame = async (frame: VideoFrame | null, sceneCrop: CropRect, outputTimeSec: number) => {
+    const emitFrame = async (
+      frame: VideoFrame | null,
+      baseCrop: CropRect,
+      sceneCrop: CropRect,
+      outputTimeSec: number,
+    ) => {
       throwIfAborted(signal);
       renderFrameToCanvas({
         context,
@@ -343,12 +377,19 @@ export async function exportVideoToMp4({
     };
 
     const emitGapFrames = async (endSec: number) => {
+      const primaryBaseCrop = getBaseCrop(primarySource, globalCrop);
       while (nextOutputFrameIndex / fps < endSec - 1e-9) {
-        await emitFrame(null, baseCrop, nextOutputFrameIndex / fps);
+        await emitFrame(null, primaryBaseCrop, primaryBaseCrop, nextOutputFrameIndex / fps);
       }
     };
 
-    const encodeSliceTargets = async (slice: SliceModel, sceneCrop: CropRect, targets: FrameTarget[]) => {
+    const encodeSliceTargets = async (
+      source: VideoMeta,
+      slice: SliceModel,
+      baseCrop: CropRect,
+      sceneCrop: CropRect,
+      targets: FrameTarget[],
+    ) => {
       if (!targets.length) {
         return;
       }
@@ -371,7 +412,7 @@ export async function exportVideoToMp4({
               }
 
               while (targetIndex < targets.length && targets[targetIndex].sourceTimeUs < frame.timestamp) {
-                await emitFrame(heldFrame, sceneCrop, targets[targetIndex].outputTimeSec);
+                await emitFrame(heldFrame, baseCrop, sceneCrop, targets[targetIndex].outputTimeSec);
                 targetIndex += 1;
               }
 
@@ -388,6 +429,8 @@ export async function exportVideoToMp4({
         },
       });
 
+      const demuxer = await getLoadedDemuxer(source);
+      const decoderConfig = await getDecoderConfigForSource(source);
       const reader = demuxer.read('video', slice.sourceStart, slice.sourceEnd).getReader();
 
       try {
@@ -418,7 +461,7 @@ export async function exportVideoToMp4({
         }
 
         while (targetIndex < targets.length) {
-          await emitFrame(heldFrame, sceneCrop, targets[targetIndex].outputTimeSec);
+          await emitFrame(heldFrame, baseCrop, sceneCrop, targets[targetIndex].outputTimeSec);
           targetIndex += 1;
         }
       } finally {
@@ -434,7 +477,13 @@ export async function exportVideoToMp4({
       await emitGapFrames(slice.start);
       cursor = Math.max(cursor, slice.start);
 
-      const sceneCrop = clampCrop(slice.crop ?? baseCrop, video);
+      const source = sourcesById.get(slice.sourceId);
+      if (!source) {
+        throw new Error(`Missing source for slice ${slice.id}.`);
+      }
+
+      const baseCrop = getBaseCrop(source, globalCrop);
+      const sceneCrop = clampCrop(slice.crop ?? baseCrop, source);
       const targets: FrameTarget[] = [];
       let tempFrameIndex = nextOutputFrameIndex;
       while (tempFrameIndex / fps < slice.end - 1e-9) {
@@ -449,7 +498,7 @@ export async function exportVideoToMp4({
         tempFrameIndex += 1;
       }
 
-      await encodeSliceTargets(slice, sceneCrop, targets);
+      await encodeSliceTargets(source, slice, baseCrop, sceneCrop, targets);
       cursor = slice.end;
     }
 
@@ -487,7 +536,9 @@ export async function exportVideoToMp4({
     if (annotationAssets) {
       releaseAnnotationAssets(annotationAssets);
     }
-    demuxer.destroy();
-    diagnostics?.onDemuxerDestroyed?.();
+    for (const demuxer of demuxers.values()) {
+      demuxer.destroy();
+      diagnostics?.onDemuxerDestroyed?.();
+    }
   }
 }

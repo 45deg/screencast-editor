@@ -2,7 +2,7 @@ import { useCallback, useRef, type ChangeEvent, type KeyboardEvent as ReactKeybo
 import { Popover } from '@base-ui/react/popover';
 import { Slider } from '@base-ui/react/slider';
 import { Tooltip } from '@base-ui/react/tooltip';
-import { Crop, Gauge, ImagePlus, PlusSquare, Redo2, Scissors, Trash2, Undo2, ZoomIn } from 'lucide-react';
+import { Crop, Film, Gauge, ImagePlus, PlusSquare, Redo2, Scissors, Trash2, Undo2, ZoomIn } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { DerivedSlice } from '../../types/editor';
@@ -21,6 +21,7 @@ interface EditorToolbarProps {
   canDelete: boolean;
   onAddTextLayer: () => void;
   onAddImageLayer: () => void;
+  onAddMovieLayer: () => void;
   selectedSlice: DerivedSlice | undefined;
   onSpeedValueChange: (value: number | null) => void;
   onSpeedValueCommit: () => void;
@@ -64,6 +65,7 @@ export default function EditorToolbar({
   canDelete,
   onAddTextLayer,
   onAddImageLayer,
+  onAddMovieLayer,
   selectedSlice,
   onSpeedValueChange,
   onSpeedValueCommit,
@@ -215,6 +217,18 @@ export default function EditorToolbar({
             >
               <ImagePlus size={16} />
               <span className="hidden sm:inline">{t('sliceEditor.addImageLayer')}</span>
+            </button>
+          </ToolbarTooltip>
+
+          <ToolbarTooltip label={t('sliceEditor.addMovieLayerTooltip')}>
+            <button
+              type="button"
+              onClick={onAddMovieLayer}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium text-emerald-100 transition hover:bg-emerald-500/15 hover:text-white sm:gap-1.5 sm:px-2.5 sm:text-xs"
+              aria-label={t('sliceEditor.addMovieLayer')}
+            >
+              <Film size={16} />
+              <span className="hidden sm:inline">{t('sliceEditor.addMovieLayer')}</span>
             </button>
           </ToolbarTooltip>
 

@@ -32,6 +32,7 @@ function createSlices(video: VideoMeta | null): SliceModel[] {
   return [
     {
       id: 'sanity-slice',
+      sourceId: video.id,
       timelineStart: 0,
       sourceStart: 0,
       sourceEnd: video.duration,
@@ -144,7 +145,7 @@ export default function ExportSanityPage() {
     cancelExport,
     syncExportRuntimeStatusRef,
   } = useExportHandler({
-    video,
+    sources: video ? [video] : [],
     slices,
     annotations,
     baseCrop: video ? { x: 0, y: 0, w: video.width, h: video.height } : null,

@@ -1,30 +1,35 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { captureVideoThumbnail } from '../../lib/videoThumbnail';
-import type { CropRect, DerivedSlice } from '../../types/editor';
+import type { CropRect, DerivedSlice, VideoMeta } from '../../types/editor';
 
 interface UseSliceEditorThumbnailsArgs {
   slicesWithPos: DerivedSlice[];
-  videoObjectUrl: string;
-  baseCrop: CropRect;
+  sources: VideoMeta[];
+  baseCrop: CropRect | null;
   thumbnailWidth: number;
   thumbnailHeight: number;
 }
 
 export function useSliceEditorThumbnails({
   slicesWithPos,
-  videoObjectUrl,
+  sources,
   baseCrop,
   thumbnailWidth,
   thumbnailHeight,
 }: UseSliceEditorThumbnailsArgs) {
   const [thumbnailUrls, setThumbnailUrls] = useState<Record<string, string>>({});
   const cacheRef = useRef<Map<string, string>>(new Map());
+  const sourcesById = useMemo(
+    () => new Map(sources.map((source) => [source.id, source])),
+    [sources],
+  );
 
   const thumbnailDescriptors = useMemo(
     () =>
       slicesWithPos.map((slice) => ({
         id: slice.id,
+        sourceId: slice.sourceId,
         sourceStart: slice.sourceStart,
         crop: slice.crop,
       })),
@@ -35,17 +40,21 @@ export function useSliceEditorThumbnails({
     const serializeCrop = (crop: CropRect | null) => (crop ? `${crop.x},${crop.y},${crop.w},${crop.h}` : 'none');
 
     return JSON.stringify({
-      videoObjectUrl,
       thumbnailWidth,
       thumbnailHeight,
       baseCrop: serializeCrop(baseCrop),
       slices: thumbnailDescriptors.map((slice) => ({
         id: slice.id,
+        sourceId: slice.sourceId,
         sourceStart: slice.sourceStart,
         crop: serializeCrop(slice.crop),
       })),
+      sources: sources.map((source) => ({
+        id: source.id,
+        objectUrl: source.objectUrl,
+      })),
     });
-  }, [baseCrop, thumbnailDescriptors, thumbnailHeight, thumbnailWidth, videoObjectUrl]);
+  }, [baseCrop, sources, thumbnailDescriptors, thumbnailHeight, thumbnailWidth]);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,13 +67,18 @@ export function useSliceEditorThumbnails({
       }
 
       const serializeCrop = (crop: CropRect | null) => (crop ? `${crop.x},${crop.y},${crop.w},${crop.h}` : 'none');
-      const buildCacheKey = (sourceStart: number, crop: CropRect | null) =>
-        `${videoObjectUrl}|${thumbnailWidth}|${thumbnailHeight}|${serializeCrop(baseCrop)}|${sourceStart}|${serializeCrop(crop)}`;
+      const buildCacheKey = (source: VideoMeta, sourceStart: number, crop: CropRect | null) =>
+        `${source.objectUrl}|${thumbnailWidth}|${thumbnailHeight}|${serializeCrop(baseCrop)}|${sourceStart}|${serializeCrop(crop)}`;
       const nextThumbnailUrls: Record<string, string> = {};
-      const missingDescriptors = [];
+      const missingDescriptors: Array<(typeof thumbnailDescriptors)[number] & { cacheKey: string; source: VideoMeta }> = [];
 
       for (const slice of thumbnailDescriptors) {
-        const cacheKey = buildCacheKey(slice.sourceStart, slice.crop);
+        const source = sourcesById.get(slice.sourceId);
+        if (!source) {
+          continue;
+        }
+
+        const cacheKey = buildCacheKey(source, slice.sourceStart, slice.crop);
         const cachedThumbnailUrl = cacheRef.current.get(cacheKey);
 
         if (cachedThumbnailUrl) {
@@ -72,7 +86,7 @@ export function useSliceEditorThumbnails({
           continue;
         }
 
-        missingDescriptors.push({ ...slice, cacheKey });
+        missingDescriptors.push({ ...slice, cacheKey, source });
       }
 
       setThumbnailUrls(nextThumbnailUrls);
@@ -80,7 +94,7 @@ export function useSliceEditorThumbnails({
       for (const slice of missingDescriptors) {
         try {
           const thumbnailUrl = await captureVideoThumbnail({
-            videoUrl: videoObjectUrl,
+            videoUrl: slice.source.objectUrl,
             time: slice.sourceStart,
             width: thumbnailWidth,
             height: thumbnailHeight,
@@ -111,7 +125,7 @@ export function useSliceEditorThumbnails({
     return () => {
       cancelled = true;
     };
-  }, [baseCrop, generationKey, thumbnailDescriptors, thumbnailHeight, thumbnailWidth, videoObjectUrl]);
+  }, [baseCrop, generationKey, sourcesById, thumbnailDescriptors, thumbnailHeight, thumbnailWidth]);
 
   return thumbnailUrls;
 }

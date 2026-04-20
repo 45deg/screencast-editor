@@ -2,21 +2,22 @@ import { useCallback, useState } from 'react';
 import { nanoid } from 'nanoid';
 
 import { readImageMetaFromObjectUrl } from '../../lib/image';
-import { readVideoMetadata, revokeVideoObjectUrl } from '../../lib/video';
+import { readVideoMetadata } from '../../lib/video';
 import {
   DEFAULT_TEXT_ANNOTATION_STYLE,
   type AnnotationModel,
   type CropRect,
   type VideoMeta,
 } from '../../types/editor';
-import { revokeAnnotationImageUrls, toErrorMessage } from '../appUtils';
+import { revokeAnnotationImageUrls, revokeVideoSourceUrls, toErrorMessage } from '../appUtils';
 
 interface UseMediaImportHandlersArgs {
-  video: VideoMeta | null;
+  sources: VideoMeta[];
   annotations: AnnotationModel[];
   baseCrop: CropRect | null;
   currentTime: number;
   setVideo: (video: VideoMeta) => void;
+  addVideoSource: (video: VideoMeta) => void;
   replaceAnnotationsCommit: (annotations: AnnotationModel[], selectedAnnotationId?: string | null) => void;
   setSelectedSliceId: (sliceId: string | null) => void;
   setSelectedAnnotationId: (annotationId: string | null) => void;
@@ -36,11 +37,12 @@ function getResponsiveDefaultTextFontSize(baseCrop: CropRect): number {
 }
 
 export function useMediaImportHandlers({
-  video,
+  sources,
   annotations,
   baseCrop,
   currentTime,
   setVideo,
+  addVideoSource,
   replaceAnnotationsCommit,
   setSelectedSliceId,
   setSelectedAnnotationId,
@@ -60,10 +62,7 @@ export function useMediaImportHandlers({
 
       try {
         const nextVideo = await readVideoMetadata(file);
-
-        if (video) {
-          revokeVideoObjectUrl(video);
-        }
+        revokeVideoSourceUrls(sources);
         revokeAnnotationImageUrls(annotations);
 
         setVideo(nextVideo);
@@ -74,19 +73,36 @@ export function useMediaImportHandlers({
         setIsImporting(false);
       }
     },
-    [annotations, ensureExportRuntimeReady, resetExportState, setVideo, video],
+    [annotations, ensureExportRuntimeReady, resetExportState, setVideo, sources],
+  );
+
+  const handleAddVideoSource = useCallback(
+    async (file: File) => {
+      setIsImporting(true);
+      setImportError(null);
+      resetExportState();
+
+      try {
+        const nextVideo = await readVideoMetadata(file);
+        addVideoSource(nextVideo);
+        void ensureExportRuntimeReady();
+      } catch (error) {
+        setImportError(toErrorMessage(error));
+      } finally {
+        setIsImporting(false);
+      }
+    },
+    [addVideoSource, ensureExportRuntimeReady, resetExportState],
   );
 
   const handleReturnToLanding = useCallback(() => {
-    if (video) {
-      revokeVideoObjectUrl(video);
-    }
+    revokeVideoSourceUrls(sources);
     revokeAnnotationImageUrls(annotations);
 
     clearVideo();
     setImportError(null);
     resetExportState();
-  }, [annotations, clearVideo, resetExportState, video]);
+  }, [annotations, clearVideo, resetExportState, sources]);
 
   const handleCreateTextAnnotation = useCallback(() => {
     if (!baseCrop) {
@@ -188,6 +204,7 @@ export function useMediaImportHandlers({
     setImportError,
     isImporting,
     handleImportVideo,
+    handleAddVideoSource,
     handleReturnToLanding,
     handleCreateTextAnnotation,
     handleCreateImageAnnotation,

@@ -1,4 +1,4 @@
-import { useCallback, useRef, type ChangeEvent, type RefObject } from 'react';
+import { useCallback, useRef, type ChangeEvent, type DragEvent, type RefObject } from 'react';
 
 import type {
   AnnotationModel,
@@ -6,6 +6,7 @@ import type {
   DerivedSlice,
   SliceModel,
 } from '../../types/editor';
+import { getFirstImageFile, getFirstVideoFile } from '../../app/appUtils';
 import { useSliceEditorMutationHandlers } from './useSliceEditorMutationHandlers';
 import { useSliceEditorPointerHandlers } from './useSliceEditorPointerHandlers';
 
@@ -28,6 +29,7 @@ interface UseSliceEditorHandlersArgs {
   onAnnotationsPreview: (annotations: AnnotationModel[]) => void;
   onAnnotationsCommit: (annotations: AnnotationModel[], selectedAnnotationId?: string | null) => void;
   onCreateImageAnnotation: (file: File) => void;
+  onCreateVideoSource: (file: File) => Promise<void>;
   onUndo: () => void;
   onRedo: () => void;
 }
@@ -51,10 +53,12 @@ export function useSliceEditorHandlers({
   onAnnotationsPreview,
   onAnnotationsCommit,
   onCreateImageAnnotation,
+  onCreateVideoSource,
   onUndo,
   onRedo,
 }: UseSliceEditorHandlersArgs) {
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   const mutationHandlers = useSliceEditorMutationHandlers({
     slices,
@@ -90,6 +94,10 @@ export function useSliceEditorHandlers({
     imageInputRef.current?.click();
   }, []);
 
+  const triggerVideoInput = useCallback(() => {
+    videoInputRef.current?.click();
+  }, []);
+
   const handleImageInputChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0] ?? null;
@@ -104,11 +112,67 @@ export function useSliceEditorHandlers({
     [onCreateImageAnnotation],
   );
 
+  const handleVideoInputChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0] ?? null;
+      if (!file || !file.type.startsWith('video/')) {
+        event.target.value = '';
+        return;
+      }
+
+      void onCreateVideoSource(file);
+      event.target.value = '';
+    },
+    [onCreateVideoSource],
+  );
+
+  const handleTimelineDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes('Files')) {
+      return;
+    }
+
+    const imageFile = getFirstImageFile(event.dataTransfer.files);
+    const videoFile = getFirstVideoFile(event.dataTransfer.files);
+    if (!imageFile && !videoFile) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  }, []);
+
+  const handleTimelineDrop = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      const imageFile = getFirstImageFile(event.dataTransfer.files);
+      const videoFile = getFirstVideoFile(event.dataTransfer.files);
+      if (!imageFile && !videoFile) {
+        return;
+      }
+
+      event.preventDefault();
+
+      if (videoFile) {
+        void onCreateVideoSource(videoFile);
+        return;
+      }
+
+      if (imageFile) {
+        onCreateImageAnnotation(imageFile);
+      }
+    },
+    [onCreateImageAnnotation, onCreateVideoSource],
+  );
+
   return {
     imageInputRef,
+    videoInputRef,
     ...mutationHandlers,
     ...pointerHandlers,
     triggerImageInput,
+    triggerVideoInput,
     handleImageInputChange,
+    handleVideoInputChange,
+    handleTimelineDragOver,
+    handleTimelineDrop,
   };
 }

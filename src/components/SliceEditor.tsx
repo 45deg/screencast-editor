@@ -21,7 +21,7 @@ import { useSliceEditorThumbnails } from './slice-editor/useSliceEditorThumbnail
 const BASE_PIXELS_PER_SECOND = 60;
 
 interface SliceEditorProps {
-  video: VideoMeta;
+  sources: VideoMeta[];
   slices: SliceModel[];
   annotations: AnnotationModel[];
   baseCrop: CropRect;
@@ -43,6 +43,7 @@ interface SliceEditorProps {
   onAnnotationsCommit: (annotations: AnnotationModel[], selectedAnnotationId?: string | null) => void;
   onCreateTextAnnotation: () => void;
   onCreateImageAnnotation: (file: File) => void;
+  onCreateVideoSource: (file: File) => Promise<void>;
   onUndo: () => void;
   onRedo: () => void;
   className?: string;
@@ -50,7 +51,7 @@ interface SliceEditorProps {
 }
 
 export default function SliceEditorTimeline({
-  video,
+  sources,
   slices,
   annotations,
   baseCrop,
@@ -72,6 +73,7 @@ export default function SliceEditorTimeline({
   onAnnotationsCommit,
   onCreateTextAnnotation,
   onCreateImageAnnotation,
+  onCreateVideoSource,
   onUndo,
   onRedo,
   className,
@@ -99,7 +101,7 @@ export default function SliceEditorTimeline({
   );
   const thumbnailUrls = useSliceEditorThumbnails({
     slicesWithPos,
-    videoObjectUrl: video.objectUrl,
+    sources,
     baseCrop,
     thumbnailWidth,
     thumbnailHeight,
@@ -132,6 +134,7 @@ export default function SliceEditorTimeline({
 
   const {
     imageInputRef,
+    videoInputRef,
     canMoveAnnotationUp,
     canMoveAnnotationDown,
     draggingAnnotationId,
@@ -157,7 +160,11 @@ export default function SliceEditorTimeline({
     handleTimelinePointerDown,
     handleTimelinePan,
     triggerImageInput,
+    triggerVideoInput,
     handleImageInputChange,
+    handleVideoInputChange,
+    handleTimelineDragOver,
+    handleTimelineDrop,
   } = useSliceEditorHandlers({
     slices,
     slicesWithPos,
@@ -177,6 +184,7 @@ export default function SliceEditorTimeline({
     onAnnotationsPreview,
     onAnnotationsCommit,
     onCreateImageAnnotation,
+    onCreateVideoSource,
     onUndo,
     onRedo,
   });
@@ -199,6 +207,7 @@ export default function SliceEditorTimeline({
         canDelete={selectedSliceId !== null || selectedAnnotationId !== null}
         onAddTextLayer={onCreateTextAnnotation}
         onAddImageLayer={triggerImageInput}
+        onAddMovieLayer={triggerVideoInput}
         selectedSlice={selectedSlice}
         onSpeedValueChange={handleSpeedValueChange}
         onSpeedValueCommit={handleSpeedValueCommit}
@@ -214,6 +223,13 @@ export default function SliceEditorTimeline({
         className="hidden"
         onChange={handleImageInputChange}
       />
+      <input
+        ref={videoInputRef}
+        type="file"
+        accept="video/*"
+        className="hidden"
+        onChange={handleVideoInputChange}
+      />
 
       <div ref={scrollContainerRef} className="timeline-scrollbar relative flex-1 overflow-auto bg-slate-950">
         <motion.div
@@ -222,11 +238,13 @@ export default function SliceEditorTimeline({
           style={{
             width: `${Math.max(10, totalDuration) * pixelsPerSecond}px`,
             minWidth: '100%',
-            minHeight: '200px',
-            touchAction: 'pan-x',
-          }}
-          onPointerDown={handleTimelinePointerDown}
-          onPan={handleTimelinePan}
+              minHeight: '200px',
+              touchAction: 'pan-x',
+            }}
+            onPointerDown={handleTimelinePointerDown}
+            onPan={handleTimelinePan}
+            onDragOver={handleTimelineDragOver}
+            onDrop={handleTimelineDrop}
         >
           <TimelineRuler totalDuration={totalDuration} pixelsPerSecond={pixelsPerSecond} />
 

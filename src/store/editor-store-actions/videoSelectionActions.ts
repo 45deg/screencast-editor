@@ -1,6 +1,11 @@
 import { getTotalDuration, type SliceModel } from '../../types/editor';
 import { nanoid } from 'nanoid';
-import { DEFAULT_EXPORT_SETTINGS, normalizeSelectedAnnotationId, normalizeSelectedSliceId } from '../editorStoreHelpers';
+import {
+  DEFAULT_EXPORT_SETTINGS,
+  normalizeSelectedAnnotationId,
+  normalizeSelectedSliceId,
+  snapshotFromState,
+} from '../editorStoreHelpers';
 import type { EditorStoreGet, EditorStoreSet, VideoSelectionActions } from './types';
 
 export function createVideoSelectionActions(
@@ -14,6 +19,7 @@ export function createVideoSelectionActions(
 
       const initialSlice: SliceModel = {
         id: nanoid(),
+        sourceId: video.id,
         timelineStart: 0,
         sourceStart: 0,
         sourceEnd: video.duration,
@@ -22,7 +28,7 @@ export function createVideoSelectionActions(
       };
 
       set({
-        video,
+        sources: [video],
         slices: [initialSlice],
         annotations: [],
         currentTime: 0,
@@ -41,9 +47,33 @@ export function createVideoSelectionActions(
       });
     },
 
+    addVideoSource: (video) => {
+      set((state) => {
+        const timelineStart = getTotalDuration(state.slices, state.annotations);
+        const nextSlice: SliceModel = {
+          id: nanoid(),
+          sourceId: video.id,
+          timelineStart,
+          sourceStart: 0,
+          sourceEnd: video.duration,
+          duration: video.duration,
+          crop: null,
+        };
+
+        return {
+          past: [...state.past, snapshotFromState(state)],
+          future: [],
+          sources: [...state.sources, video],
+          slices: [...state.slices, nextSlice],
+          selectedSliceId: nextSlice.id,
+          selectedAnnotationId: null,
+        };
+      });
+    },
+
     clearVideo: () => {
       set({
-        video: null,
+        sources: [],
         slices: [],
         annotations: [],
         currentTime: 0,

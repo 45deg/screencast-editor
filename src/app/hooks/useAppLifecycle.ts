@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-import { revokeAnnotationImageUrls } from '../appUtils';
-import { revokeVideoObjectUrl } from '../../lib/video';
+import { revokeAnnotationImageUrls, revokeVideoSourceUrls } from '../appUtils';
 import { useEditorStore } from '../../store/editorStore';
 import type { CropRect, ExportSettings } from '../../types/editor';
 
@@ -69,7 +68,7 @@ export function useAppLifecycle({
   useEffect(() => {
     return () => {
       const state = useEditorStore.getState();
-      revokeVideoObjectUrl(state.video);
+      revokeVideoSourceUrls(state.sources);
       revokeAnnotationImageUrls(state.annotations);
     };
   }, []);

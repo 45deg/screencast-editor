@@ -102,6 +102,7 @@ export function createTimelineActions(set: EditorStoreSet): TimelineActions {
 
         const leftSlice: SliceModel = {
           id: nanoid(),
+          sourceId: target.sourceId,
           timelineStart: target.start,
           sourceStart: target.sourceStart,
           sourceEnd: splitSource,
@@ -110,6 +111,7 @@ export function createTimelineActions(set: EditorStoreSet): TimelineActions {
         };
         const rightSlice: SliceModel = {
           id: nanoid(),
+          sourceId: target.sourceId,
           timelineStart: state.currentTime,
           sourceStart: splitSource,
           sourceEnd: target.sourceEnd,

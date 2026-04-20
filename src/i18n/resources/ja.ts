@@ -116,6 +116,8 @@ export const jaTranslation = {
     addTextLayerTooltip: '新しいテキストレイヤーを追加します。タイムライン上で位置や長さをあとから調整できます。',
     addImageLayer: '画像追加',
     addImageLayerTooltip: '画像レイヤーを追加します。読み込んだ画像はプレビュー上で配置し、タイミングも編集できます。',
+    addMovieLayer: '動画追加',
+    addMovieLayerTooltip: '新しい動画ソースを 1 シーンとしてタイムライン末尾に追加します。',
     layerUp: 'レイヤーを上へ',
     layerDown: 'レイヤーを下へ',
     playbackSpeed: '再生速度',

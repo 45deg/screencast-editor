@@ -2,11 +2,13 @@ import {
   cloneAnnotations,
   cloneCrop,
   cloneSlices,
+  cloneVideoSources,
   type AnnotationModel,
   type CropRect,
   type EditorSnapshot,
   type ExportSettings,
   type SliceModel,
+  type VideoMeta,
 } from '../types/editor';
 
 const DEFAULT_EXPORT_SETTINGS_VALUE: ExportSettings = {
@@ -27,6 +29,7 @@ export const DEFAULT_EXPORT_SETTINGS: ExportSettings = {
 };
 
 interface SnapshotSource {
+  sources: VideoMeta[];
   slices: SliceModel[];
   annotations: AnnotationModel[];
   globalCrop: CropRect | null;
@@ -36,6 +39,7 @@ interface SnapshotSource {
 
 export function snapshotFromState(state: SnapshotSource): EditorSnapshot {
   return {
+    sources: cloneVideoSources(state.sources),
     slices: cloneSlices(state.slices),
     annotations: cloneAnnotations(state.annotations),
     globalCrop: cloneCrop(state.globalCrop),

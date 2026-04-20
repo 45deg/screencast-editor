@@ -31,7 +31,7 @@ export default function App() {
   const { t } = useTranslation();
 
   const {
-    video,
+    sources,
     slices,
     annotations,
     currentTime,
@@ -44,6 +44,7 @@ export default function App() {
     past,
     future,
     setVideo,
+    addVideoSource,
     clearVideo,
     setCurrentTime,
     setSelectedSliceId,
@@ -63,6 +64,7 @@ export default function App() {
   const {
     fullCrop,
     baseCrop,
+    video,
     previewSlice,
     activeSceneCrop,
     activeAnnotations,
@@ -74,7 +76,7 @@ export default function App() {
     videoInfoItems,
     outputAspectRatio,
   } = useAppDerivedState({
-    video,
+    sources,
     globalCrop,
     slices,
     annotations,
@@ -123,7 +125,7 @@ export default function App() {
     resetExportState,
     syncExportRuntimeStatusRef,
   } = useExportHandler({
-    video,
+    sources,
     slices,
     annotations,
     baseCrop,
@@ -173,15 +175,17 @@ export default function App() {
     setImportError,
     isImporting,
     handleImportVideo,
+    handleAddVideoSource,
     handleReturnToLanding,
     handleCreateTextAnnotation,
     handleCreateImageAnnotation,
   } = useMediaImportHandlers({
-    video,
+    sources,
     annotations,
     baseCrop,
     currentTime,
     setVideo,
+    addVideoSource,
     replaceAnnotationsCommit,
     setSelectedSliceId,
     setSelectedAnnotationId,
@@ -201,9 +205,8 @@ export default function App() {
 
   useGlobalDragAndDrop({
     hasVideo,
-    video,
-    t: (key) => t(key),
     onImportVideo: handleImportVideo,
+    onAddVideoSource: handleAddVideoSource,
     onCreateImageAnnotation: handleCreateImageAnnotation,
   });
 
@@ -234,6 +237,7 @@ export default function App() {
           <Suspense fallback={<EditorWorkspaceFallback />}>
             <EditorWorkspace
               video={video}
+              sources={sources}
               baseCrop={baseCrop}
               currentTime={currentTime}
               previewSourceTime={previewSourceTime}
@@ -278,6 +282,7 @@ export default function App() {
               onAnnotationsCommit={replaceAnnotationsCommit}
               onCreateTextAnnotation={handleCreateTextAnnotation}
               onCreateImageAnnotation={handleCreateImageAnnotation}
+              onCreateVideoSource={handleAddVideoSource}
               outputAspectRatio={outputAspectRatio}
               onUndo={undo}
               onRedo={redo}

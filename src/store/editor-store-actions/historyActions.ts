@@ -1,4 +1,4 @@
-import { cloneAnnotations, cloneCrop, cloneSlices, getTotalDuration } from '../../types/editor';
+import { cloneAnnotations, cloneCrop, cloneSlices, cloneVideoSources, getTotalDuration } from '../../types/editor';
 import {
   normalizeSelectedAnnotationId,
   normalizeSelectedSliceId,
@@ -21,6 +21,7 @@ export function createHistoryActions(set: EditorStoreSet): HistoryActions {
         return {
           past: state.past.slice(0, -1),
           future: [snapshotFromState(state), ...state.future],
+          sources: cloneVideoSources(previous.sources),
           slices: nextSlices,
           annotations: nextAnnotations,
           globalCrop: cloneCrop(previous.globalCrop),
@@ -44,6 +45,7 @@ export function createHistoryActions(set: EditorStoreSet): HistoryActions {
         return {
           past: [...state.past, snapshotFromState(state)],
           future: restFuture,
+          sources: cloneVideoSources(nextSnapshot.sources),
           slices: nextSlices,
           annotations: nextAnnotations,
           globalCrop: cloneCrop(nextSnapshot.globalCrop),

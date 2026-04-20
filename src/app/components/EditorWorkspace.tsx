@@ -16,6 +16,7 @@ import type { LayerEdgeDirection } from '../../lib/annotationTimeline';
 
 interface EditorWorkspaceProps {
   video: VideoMeta;
+  sources: VideoMeta[];
   baseCrop: CropRect;
   currentTime: number;
   previewSourceTime: number;
@@ -66,6 +67,7 @@ interface EditorWorkspaceProps {
   onAnnotationsCommit: (annotations: AnnotationModel[], selectedAnnotationId?: string | null) => void;
   onCreateTextAnnotation: () => void;
   onCreateImageAnnotation: (file: File) => void;
+  onCreateVideoSource: (file: File) => Promise<void>;
   outputAspectRatio: number;
   onUndo: () => void;
   onRedo: () => void;
@@ -84,6 +86,7 @@ interface EditorWorkspaceProps {
 
 export default function EditorWorkspace({
   video,
+  sources,
   baseCrop,
   currentTime,
   previewSourceTime,
@@ -128,6 +131,7 @@ export default function EditorWorkspace({
   onAnnotationsCommit,
   onCreateTextAnnotation,
   onCreateImageAnnotation,
+  onCreateVideoSource,
   outputAspectRatio,
   onUndo,
   onRedo,
@@ -197,7 +201,7 @@ export default function EditorWorkspace({
           <Panel defaultSize="42%" minSize="10rem" className="min-h-0">
             <div className="h-full min-h-0 px-0.5 pb-[calc(env(safe-area-inset-bottom)+2px)] pt-0 lg:pr-1">
               <SliceEditorTimeline
-                video={video}
+                sources={sources}
                 slices={slices}
                 annotations={annotations}
                 currentTime={currentTime}
@@ -217,6 +221,7 @@ export default function EditorWorkspace({
                 onAnnotationsCommit={onAnnotationsCommit}
                 onCreateTextAnnotation={onCreateTextAnnotation}
                 onCreateImageAnnotation={onCreateImageAnnotation}
+                onCreateVideoSource={onCreateVideoSource}
                 baseCrop={baseCrop}
                 outputAspectRatio={outputAspectRatio}
                 onUndo={onUndo}

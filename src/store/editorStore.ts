@@ -14,7 +14,7 @@ import { DEFAULT_EXPORT_SETTINGS, MIN_SLICE_DURATION } from './editorStoreHelper
 export type ExportRuntimeStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 export interface EditorStoreState {
-  video: VideoMeta | null;
+  sources: VideoMeta[];
   slices: SliceModel[];
   annotations: AnnotationModel[];
   currentTime: number;
@@ -27,6 +27,7 @@ export interface EditorStoreState {
   past: EditorSnapshot[];
   future: EditorSnapshot[];
   setVideo: (video: VideoMeta) => void;
+  addVideoSource: (video: VideoMeta) => void;
   clearVideo: () => void;
   setCurrentTime: (time: number) => void;
   setSelectedSliceId: (sliceId: string | null) => void;
@@ -50,7 +51,7 @@ export interface EditorStoreState {
 }
 
 export const useEditorStore = create<EditorStoreState>((set, get) => ({
-  video: null,
+  sources: [],
   slices: [],
   annotations: [],
   currentTime: 0,

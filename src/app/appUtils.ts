@@ -90,6 +90,12 @@ export function revokeAnnotationImageUrls(annotations: AnnotationModel[]): void 
   }
 }
 
+export function revokeVideoSourceUrls(sources: VideoMeta[]): void {
+  for (const source of sources) {
+    URL.revokeObjectURL(source.objectUrl);
+  }
+}
+
 export function clampAnnotationPosition(
   annotation: AnnotationModel,
   nextX: number,

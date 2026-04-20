@@ -1,5 +1,6 @@
 import type { VideoMeta } from '../types/editor';
 import { i18n } from '../i18n';
+import { nanoid } from 'nanoid';
 
 export async function readVideoMetadata(file: File): Promise<VideoMeta> {
   const objectUrl = URL.createObjectURL(file);
@@ -33,6 +34,8 @@ export async function readVideoMetadata(file: File): Promise<VideoMeta> {
     });
 
     return {
+      id: nanoid(),
+      kind: 'video',
       file,
       objectUrl,
       width: meta.width,
