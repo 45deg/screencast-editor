@@ -25,6 +25,15 @@ interface UseMediaImportHandlersArgs {
   t: (key: string) => string;
 }
 
+function getResponsiveDefaultTextFontSize(baseCrop: CropRect): number {
+  const viewportWidth = typeof window === 'undefined' ? baseCrop.w : window.innerWidth;
+  const referenceWidth = Math.min(baseCrop.w, viewportWidth * 2);
+  const responsiveScale = Math.max(1, Math.min(1.35, referenceWidth / 900));
+  const baseFontSize = DEFAULT_TEXT_ANNOTATION_STYLE.fontSize + 4;
+
+  return Math.max(36, Math.min(72, Math.round(baseFontSize * responsiveScale)));
+}
+
 export function useMediaImportHandlers({
   video,
   annotations,
@@ -84,11 +93,12 @@ export function useMediaImportHandlers({
     }
 
     const initialText = t('canvas.defaultText');
+    const responsiveFontSize = getResponsiveDefaultTextFontSize(baseCrop);
     const estimatedTextWidth = Math.max(
       120,
-      Math.round(initialText.length * DEFAULT_TEXT_ANNOTATION_STYLE.fontSize * 0.56 + 16),
+      Math.round(initialText.length * responsiveFontSize * 0.56 + 16),
     );
-    const estimatedTextHeight = Math.max(40, Math.round(DEFAULT_TEXT_ANNOTATION_STYLE.fontSize * 1.5 + 8));
+    const estimatedTextHeight = Math.max(40, Math.round(responsiveFontSize * 1.5 + 8));
     const annotationId = crypto.randomUUID();
     const nextAnnotation: AnnotationModel = {
       id: annotationId,
@@ -100,6 +110,7 @@ export function useMediaImportHandlers({
       text: initialText,
       style: {
         ...DEFAULT_TEXT_ANNOTATION_STYLE,
+        fontSize: responsiveFontSize,
       },
     };
 

@@ -89,7 +89,7 @@ export default function AnnotationLayerBlock({
         className={`absolute inset-y-0 left-0 w-full border px-2 pr-4 text-left text-xs transition ${
           selected ? selectedColorClass : baseColorClass
         }`}
-        style={{ touchAction: 'none' }}
+        style={{ touchAction: 'pan-x' }}
         onPointerDown={(event) => {
           if (event.currentTarget.setPointerCapture) {
             event.currentTarget.setPointerCapture(event.pointerId);
@@ -125,8 +125,8 @@ export default function AnnotationLayerBlock({
       </motion.button>
 
       <motion.div
-        className="group absolute inset-y-0 left-0 z-30 flex w-3 cursor-col-resize items-center justify-center"
-        style={{ touchAction: 'none' }}
+        className="group absolute inset-y-0 left-0 z-30 flex w-4 cursor-col-resize items-center justify-center"
+        style={{ touchAction: 'pan-x' }}
         onPointerDown={(event) => {
           event.stopPropagation();
           onSelect();
@@ -146,8 +146,8 @@ export default function AnnotationLayerBlock({
       />
 
       <motion.div
-        className="group absolute inset-y-0 right-0 z-30 flex w-3 cursor-col-resize items-center justify-center"
-        style={{ touchAction: 'none' }}
+        className="group absolute inset-y-0 right-0 z-30 flex w-4 cursor-col-resize items-center justify-center"
+        style={{ touchAction: 'pan-x' }}
         onPointerDown={(event) => {
           event.stopPropagation();
           onSelect();
@@ -167,7 +167,7 @@ export default function AnnotationLayerBlock({
       />
 
       {selected ? (
-        <div className="absolute -right-8 top-1/2 z-40 flex -translate-y-1/2 flex-col gap-1">
+        <div className="absolute -right-11 top-1/2 z-40 flex -translate-y-1/2 flex-col gap-1.5 sm:-right-9 sm:gap-1">
           <button
             type="button"
             onPointerDown={(event) => {
@@ -178,10 +178,10 @@ export default function AnnotationLayerBlock({
               onLayerMove('up');
             }}
             disabled={!canMoveUp}
-            className="inline-flex h-4 w-4 items-center justify-center rounded border border-slate-500/80 bg-slate-900/95 text-slate-100 transition hover:border-cyan-300/80 hover:text-cyan-100 disabled:opacity-30"
+            className="inline-flex h-8 w-8 touch-manipulation items-center justify-center rounded-md border border-slate-400/90 bg-slate-900/95 text-slate-100 shadow-lg transition hover:border-cyan-300/80 hover:text-cyan-100 disabled:opacity-30 sm:h-6 sm:w-6"
             aria-label={layerUpLabel}
           >
-            <ChevronUp size={10} />
+            <ChevronUp size={14} className="sm:h-3 sm:w-3" />
           </button>
           <button
             type="button"
@@ -193,10 +193,10 @@ export default function AnnotationLayerBlock({
               onLayerMove('down');
             }}
             disabled={!canMoveDown}
-            className="inline-flex h-4 w-4 items-center justify-center rounded border border-slate-500/80 bg-slate-900/95 text-slate-100 transition hover:border-cyan-300/80 hover:text-cyan-100 disabled:opacity-30"
+            className="inline-flex h-8 w-8 touch-manipulation items-center justify-center rounded-md border border-slate-400/90 bg-slate-900/95 text-slate-100 shadow-lg transition hover:border-cyan-300/80 hover:text-cyan-100 disabled:opacity-30 sm:h-6 sm:w-6"
             aria-label={layerDownLabel}
           >
-            <ChevronDown size={10} />
+            <ChevronDown size={14} className="sm:h-3 sm:w-3" />
           </button>
         </div>
       ) : null}

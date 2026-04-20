@@ -65,7 +65,7 @@ export default function TimelineSliceBlock({
         style={{
           left: `${startPx}px`,
           width: `${slice.duration * pixelsPerSecond}px`,
-          touchAction: 'none',
+          touchAction: 'pan-x',
         }}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {
@@ -84,11 +84,11 @@ export default function TimelineSliceBlock({
       >
         {isVisible ? (
           <div
-            className="pointer-events-none absolute inset-y-0 flex w-max -translate-x-1/2 flex-col items-center gap-1 px-1.5 py-2"
+            className="pointer-events-none absolute inset-y-0 flex w-max -translate-x-1/2 items-center gap-2 px-1.5 py-1.5 sm:flex-col sm:items-center sm:gap-1 sm:py-2"
             style={{ left: `${labelOffset}px` }}
           >
             <div
-              className="w-[118px] max-w-[calc(100%-4px)] overflow-hidden rounded-md border border-slate-700 bg-slate-950/85 shadow-lg"
+              className="w-14 shrink-0 overflow-hidden rounded-md border border-slate-700 bg-slate-950/85 shadow-lg sm:w-[118px]"
               style={{ aspectRatio: `${outputAspectRatio} / 1` }}
             >
               {thumbnailUrl ? (
@@ -97,22 +97,23 @@ export default function TimelineSliceBlock({
                 <div className="h-full w-full animate-pulse bg-slate-800/70" />
               )}
             </div>
-            <div className="flex items-center gap-1 text-sm font-bold tracking-wider text-white drop-shadow">
-              {slice.crop ? <Crop size={13} className="shrink-0 text-amber-200" /> : null}
-              {t('sliceEditor.sceneNumber', { index: index + 1 })}
-            </div>
-            <div className="font-mono text-[10px] leading-tight text-center text-cyan-100 drop-shadow">
-              <span className="text-white">{slice.duration.toFixed(1)}s</span>
-              <br />
-              <span className="text-amber-200">x{slice.speed.toFixed(2)}</span>
+            <div className="min-w-0 sm:text-center">
+              <div className="flex items-center gap-1 text-[11px] font-bold tracking-wide text-white drop-shadow sm:justify-center sm:text-sm sm:tracking-wider">
+                {slice.crop ? <Crop size={12} className="shrink-0 text-amber-200 sm:h-[13px] sm:w-[13px]" /> : null}
+                <span className="truncate">{t('sliceEditor.sceneNumber', { index: index + 1 })}</span>
+              </div>
+              <div className="font-mono text-[9px] leading-tight text-cyan-100 drop-shadow sm:text-[10px]">
+                <span className="text-white">{slice.duration.toFixed(1)}s</span>
+                <span className="ml-1 text-amber-200 sm:ml-0 sm:block">x{slice.speed.toFixed(2)}</span>
+              </div>
             </div>
           </div>
         ) : null}
       </motion.div>
 
       <motion.div
-        className="group absolute inset-y-0 z-30 -ml-2 flex w-4 cursor-col-resize items-center justify-center"
-        style={{ left: `${startPx}px`, touchAction: 'none' }}
+        className="group absolute inset-y-0 z-30 -ml-2.5 flex w-5 cursor-col-resize items-center justify-center"
+        style={{ left: `${startPx}px`, touchAction: 'pan-x' }}
         onPointerDown={(event) => {
           event.stopPropagation();
           onSelect(slice.start);
@@ -130,8 +131,8 @@ export default function TimelineSliceBlock({
       </motion.div>
 
       <motion.div
-        className="group absolute inset-y-0 z-30 -ml-2 flex w-4 cursor-col-resize items-center justify-center"
-        style={{ left: `${endPx}px`, touchAction: 'none' }}
+        className="group absolute inset-y-0 z-30 -ml-2.5 flex w-5 cursor-col-resize items-center justify-center"
+        style={{ left: `${endPx}px`, touchAction: 'pan-x' }}
         onPointerDown={(event) => {
           event.stopPropagation();
           onSelect(slice.end);

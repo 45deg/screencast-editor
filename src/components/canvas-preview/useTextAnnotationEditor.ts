@@ -3,6 +3,8 @@ import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPoi
 import type { AnnotationModel } from '../../types/editor';
 
 const DOUBLE_TAP_MS = 320;
+const LONG_PRESS_MS = 420;
+const LONG_PRESS_MOVE_THRESHOLD = 12;
 
 interface UseTextAnnotationEditorArgs {
   activeAnnotations: AnnotationModel[];
@@ -21,8 +23,18 @@ export function useTextAnnotationEditor({
 }: UseTextAnnotationEditorArgs) {
   const inlineEditorRef = useRef<HTMLTextAreaElement | null>(null);
   const lastTapRef = useRef<{ annotationId: string; timestamp: number } | null>(null);
+  const cancelTouchLongPressRef = useRef<(() => void) | null>(null);
   const [editingTextAnnotationId, setEditingTextAnnotationId] = useState<string | null>(null);
   const [editingTextValue, setEditingTextValue] = useState('');
+
+  const clearPendingTouchLongPress = useCallback(() => {
+    if (!cancelTouchLongPressRef.current) {
+      return;
+    }
+
+    cancelTouchLongPressRef.current();
+    cancelTouchLongPressRef.current = null;
+  }, []);
 
   useEffect(() => {
     if (!editingTextAnnotationId) {
@@ -58,6 +70,12 @@ export function useTextAnnotationEditor({
       };
     }
   }, [activeAnnotations, editingTextAnnotationId, isEditing]);
+
+  useEffect(() => {
+    return () => {
+      clearPendingTouchLongPress();
+    };
+  }, [clearPendingTouchLongPress]);
 
   const startInlineTextEdit = useCallback(
     (annotation: Extract<AnnotationModel, { kind: 'text' }>) => {
@@ -102,20 +120,72 @@ export function useTextAnnotationEditor({
           previousTap.annotationId === annotation.id &&
           now - previousTap.timestamp <= DOUBLE_TAP_MS
         ) {
+          clearPendingTouchLongPress();
           lastTapRef.current = null;
           startInlineTextEdit(annotation);
           return;
         }
 
+        clearPendingTouchLongPress();
+
         lastTapRef.current = {
           annotationId: annotation.id,
           timestamp: now,
         };
+
+        const pointerId = event.pointerId;
+        const startX = event.clientX;
+        const startY = event.clientY;
+        let timer: number | null = window.setTimeout(() => {
+          timer = null;
+          startInlineTextEdit(annotation);
+          cancelTouchLongPressRef.current = null;
+          window.removeEventListener('pointermove', handlePointerMove);
+          window.removeEventListener('pointerup', handlePointerEnd);
+          window.removeEventListener('pointercancel', handlePointerEnd);
+        }, LONG_PRESS_MS);
+
+        const cancelLongPress = () => {
+          if (timer !== null) {
+            window.clearTimeout(timer);
+            timer = null;
+          }
+
+          window.removeEventListener('pointermove', handlePointerMove);
+          window.removeEventListener('pointerup', handlePointerEnd);
+          window.removeEventListener('pointercancel', handlePointerEnd);
+        };
+
+        const handlePointerMove = (nativeEvent: PointerEvent) => {
+          if (nativeEvent.pointerId !== pointerId || timer === null) {
+            return;
+          }
+
+          const distance = Math.hypot(nativeEvent.clientX - startX, nativeEvent.clientY - startY);
+          if (distance > LONG_PRESS_MOVE_THRESHOLD) {
+            cancelLongPress();
+            cancelTouchLongPressRef.current = null;
+          }
+        };
+
+        const handlePointerEnd = (nativeEvent: PointerEvent) => {
+          if (nativeEvent.pointerId !== pointerId) {
+            return;
+          }
+
+          cancelLongPress();
+          cancelTouchLongPressRef.current = null;
+        };
+
+        window.addEventListener('pointermove', handlePointerMove, { passive: true });
+        window.addEventListener('pointerup', handlePointerEnd, { passive: true });
+        window.addEventListener('pointercancel', handlePointerEnd, { passive: true });
+        cancelTouchLongPressRef.current = cancelLongPress;
       }
 
       onSelectedAnnotationIdChange(annotation.id);
     },
-    [editingTextAnnotationId, onSelectedAnnotationIdChange, startInlineTextEdit],
+    [clearPendingTouchLongPress, editingTextAnnotationId, onSelectedAnnotationIdChange, startInlineTextEdit],
   );
 
   return {

@@ -24,7 +24,6 @@ import {
 } from '../../lib/annotationFonts';
 import type { AnnotationTextStyle, TextAnnotation } from '../../types/editor';
 import {
-  AnnotationToolbarDragHandle,
   AnnotationToolbarRoot,
   AnnotationToolbarSeparator,
   ToolbarTooltip,
@@ -32,7 +31,6 @@ import {
 
 interface TextStyleToolbarProps {
   selectedTextAnnotation: TextAnnotation | null;
-  dragHandleClassName?: string;
   outlinePreviewScaleY?: number;
   showLayerMoveControls?: boolean;
   canBringToFront?: boolean;
@@ -41,6 +39,18 @@ interface TextStyleToolbarProps {
   onBringToFront?: () => void;
   onSendToBack?: () => void;
   onDelete?: () => void;
+}
+
+interface NumberSliderPopoverFieldProps {
+  ariaLabel: string;
+  tooltipLabel?: string;
+  icon: ReactNode;
+  valueLabel: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  onChange: (value: number) => void;
 }
 
 interface ColorPopoverFieldProps {
@@ -140,6 +150,137 @@ function ColorPopoverField({
   );
 }
 
+function NumberSliderPopoverField({
+  ariaLabel,
+  tooltipLabel,
+  icon,
+  valueLabel,
+  value,
+  min,
+  max,
+  step = 1,
+  onChange,
+}: NumberSliderPopoverFieldProps) {
+  return (
+    <Popover.Root>
+      <ToolbarTooltip label={tooltipLabel ?? ariaLabel}>
+        <Popover.Trigger
+          type="button"
+          aria-label={ariaLabel}
+          className="inline-flex h-8 items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px] text-slate-200 transition hover:border-slate-500"
+        >
+          <span className="text-slate-400">{icon}</span>
+          <span className="font-mono text-white">{valueLabel}</span>
+        </Popover.Trigger>
+      </ToolbarTooltip>
+      <Popover.Portal>
+        <Popover.Positioner side="bottom" align="center" sideOffset={8} className="z-[120]">
+          <Popover.Popup className="z-[120] w-64 rounded-xl border border-slate-800 bg-slate-950/98 p-3 shadow-2xl backdrop-blur">
+            <div className="mb-2 text-[11px] font-medium text-slate-300">{ariaLabel}</div>
+            <div className="mb-2 flex items-center justify-between text-[11px] text-slate-300">
+              <span>{min}</span>
+              <span className="font-mono text-white">{valueLabel}</span>
+              <span>{max}</span>
+            </div>
+            <input
+              type="range"
+              min={min}
+              max={max}
+              step={step}
+              value={value}
+              onChange={(event) => {
+                const next = Number.parseFloat(event.target.value);
+                if (Number.isFinite(next)) {
+                  onChange(next);
+                }
+              }}
+              className="h-2 w-full accent-cyan-300"
+              aria-label={ariaLabel}
+            />
+          </Popover.Popup>
+        </Popover.Positioner>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
+function OutlinePopoverField({
+  widthLabel,
+  widthTooltipLabel,
+  colorLabel,
+  widthValue,
+  maxWidth,
+  colorValue,
+  onWidthChange,
+  onColorChange,
+}: {
+  widthLabel: string;
+  widthTooltipLabel?: string;
+  colorLabel: string;
+  widthValue: number;
+  maxWidth: number;
+  colorValue: string;
+  onWidthChange: (next: number) => void;
+  onColorChange: (next: string) => void;
+}) {
+  return (
+    <Popover.Root>
+      <ToolbarTooltip label={widthTooltipLabel ?? widthLabel}>
+        <Popover.Trigger
+          type="button"
+          aria-label={widthLabel}
+          className="inline-flex h-8 items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px] text-slate-200 transition hover:border-slate-500"
+        >
+          <TypeOutline size={12} className="text-slate-400" />
+          <span className="font-mono text-white">{widthValue}px</span>
+        </Popover.Trigger>
+      </ToolbarTooltip>
+      <Popover.Portal>
+        <Popover.Positioner side="bottom" align="center" sideOffset={8} className="z-[120]">
+          <Popover.Popup className="z-[120] w-72 rounded-xl border border-slate-800 bg-slate-950/98 p-3 shadow-2xl backdrop-blur">
+            <div className="mb-2 text-[11px] font-medium text-slate-300">{widthLabel}</div>
+            <div className="mb-2 flex items-center justify-between text-[11px] text-slate-300">
+              <span>0</span>
+              <span className="font-mono text-white">{widthValue}px</span>
+              <span>{maxWidth}</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={maxWidth}
+              step={1}
+              value={widthValue}
+              onChange={(event) => {
+                const next = Number.parseInt(event.target.value, 10);
+                if (Number.isFinite(next)) {
+                  onWidthChange(Math.max(0, Math.min(maxWidth, next)));
+                }
+              }}
+              className="h-2 w-full accent-cyan-300"
+              aria-label={widthLabel}
+            />
+
+            <div className="mt-3 border-t border-slate-800 pt-3">
+              <div className="mb-2 text-[11px] font-medium text-slate-300">{colorLabel}</div>
+              <HexAlphaColorPicker color={colorValue} onChange={onColorChange} />
+              <label className="mt-3 flex items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-[11px] text-slate-200">
+                <input
+                  type="text"
+                  value={colorValue}
+                  onChange={(event) => onColorChange(event.target.value)}
+                  spellCheck={false}
+                  className="w-24 border-0 bg-transparent font-mono uppercase text-white outline-none"
+                  aria-label={colorLabel}
+                />
+              </label>
+            </div>
+          </Popover.Popup>
+        </Popover.Positioner>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
 function FontFamilySelect({
   value,
   ariaLabel,
@@ -210,7 +351,6 @@ function FontFamilySelect({
 
 export default function TextStyleToolbar({
   selectedTextAnnotation,
-  dragHandleClassName,
   outlinePreviewScaleY = 1,
   showLayerMoveControls = false,
   canBringToFront = false,
@@ -232,8 +372,6 @@ export default function TextStyleToolbar({
 
   return (
     <AnnotationToolbarRoot ariaLabel={t('canvas.textToolbar')}>
-      <AnnotationToolbarDragHandle ariaLabel={t('canvas.moveToolbar')} className={dragHandleClassName} />
-
       <ToolbarTooltip label={t('canvas.boldTooltip')}>
         <Toolbar.Button
           aria-label={t('canvas.bold')}
@@ -262,26 +400,17 @@ export default function TextStyleToolbar({
         </Toolbar.Button>
       </ToolbarTooltip>
 
-      <ToolbarTooltip label={t('canvas.fontSizeTooltip')}>
-        <label className="inline-flex h-8 items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px] text-slate-200">
-          <Type size={12} className="text-slate-400" />
-          <input
-            type="number"
-            min={8}
-            max={180}
-            step={1}
-            value={style.fontSize}
-            onChange={(event) => {
-              const next = Number.parseInt(event.target.value, 10);
-              if (Number.isFinite(next)) {
-                onStyleChange({ fontSize: Math.max(8, Math.min(180, next)) });
-              }
-            }}
-            className="w-14 border-0 bg-transparent text-right text-[11px] text-white outline-none"
-            aria-label={t('canvas.fontSize')}
-          />
-        </label>
-      </ToolbarTooltip>
+      <NumberSliderPopoverField
+        ariaLabel={t('canvas.fontSize')}
+        tooltipLabel={t('canvas.fontSizeTooltip')}
+        icon={<Type size={12} />}
+        valueLabel={`${style.fontSize}px`}
+        value={style.fontSize}
+        min={8}
+        max={180}
+        step={1}
+        onChange={(next) => onStyleChange({ fontSize: Math.max(8, Math.min(180, Math.round(next))) })}
+      />
 
       <FontFamilySelect
         value={style.fontFamily}
@@ -317,36 +446,17 @@ export default function TextStyleToolbar({
         }
       />
 
-      <ToolbarTooltip label={t('canvas.outlineWidthTooltip')}>
-        <label className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px] text-slate-200">
-          <span className="font-mono text-[10px]">
-            <TypeOutline size={12} className="text-slate-400" />
-          </span>
-          <input
-            type="number"
-            min={0}
-            max={maxDisplayOutlineWidth}
-            step={1}
-            value={displayOutlineWidth}
-            onChange={(event) => {
-              const next = Number.parseInt(event.target.value, 10);
-              if (Number.isFinite(next)) {
-                const clamped = Math.max(0, Math.min(maxDisplayOutlineWidth, next));
-                onStyleChange({ outlineWidth: clamped / Math.max(0.0001, outlinePreviewScaleY) });
-              }
-            }}
-            className="w-10 border-0 bg-transparent text-right text-[11px] text-white outline-none"
-            aria-label={t('canvas.outlineWidth')}
-          />
-        </label>
-      </ToolbarTooltip>
-
-      <ColorPopoverField
-        ariaLabel={t('canvas.outlineColor')}
-        tooltipLabel={t('canvas.outlineColorTooltip')}
-        icon={<TypeOutline size={12} />}
-        value={style.outlineColor}
-        onChange={(value) => onStyleChange({ outlineColor: value })}
+      <OutlinePopoverField
+        widthLabel={t('canvas.outlineWidth')}
+        widthTooltipLabel={t('canvas.outlineWidthTooltip')}
+        colorLabel={t('canvas.outlineColor')}
+        widthValue={displayOutlineWidth}
+        maxWidth={maxDisplayOutlineWidth}
+        colorValue={style.outlineColor}
+        onWidthChange={(next) =>
+          onStyleChange({ outlineWidth: Math.max(0, next) / Math.max(0.0001, outlinePreviewScaleY) })
+        }
+        onColorChange={(value) => onStyleChange({ outlineColor: value })}
       />
 
       {showLayerMoveControls ? (

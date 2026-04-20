@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Rnd } from 'react-rnd';
 
 import ImageStyleToolbar from './annotation/ImageStyleToolbar';
 import CanvasPreviewHeader from './canvas-preview/CanvasPreviewHeader';
@@ -16,24 +15,59 @@ import type { LayerEdgeDirection } from '../lib/annotationTimeline';
 const TOOLBAR_MARGIN = 12;
 
 type ToolbarKind = 'image' | 'text';
+type ToolbarPlacement = 'top' | 'bottom';
 
-interface ToolbarPosition {
+interface Rect {
   x: number;
   y: number;
+  width: number;
+  height: number;
 }
 
-function snapToolbarPosition(
-  position: ToolbarPosition,
-  bounds: { width: number; height: number },
-  toolbarSize: { width: number; height: number },
-): ToolbarPosition {
-  const maxX = Math.max(0, bounds.width - toolbarSize.width - TOOLBAR_MARGIN);
-  const maxY = Math.max(0, bounds.height - toolbarSize.height - TOOLBAR_MARGIN);
+function hasRectIntersection(a: Rect, b: Rect): boolean {
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+}
 
-  return {
-    x: position.x <= maxX / 2 ? TOOLBAR_MARGIN : maxX,
-    y: position.y <= maxY / 2 ? TOOLBAR_MARGIN : maxY,
+function resolveToolbarPlacement(
+  viewportSize: { width: number; height: number },
+  toolbarSize: { width: number; height: number },
+  targetRect: Rect | null,
+): ToolbarPlacement {
+  if (!targetRect) {
+    return 'bottom';
+  }
+
+  const x = Math.max(TOOLBAR_MARGIN, viewportSize.width - toolbarSize.width - TOOLBAR_MARGIN);
+  const topRect: Rect = {
+    x,
+    y: TOOLBAR_MARGIN,
+    width: toolbarSize.width,
+    height: toolbarSize.height,
   };
+  const bottomRect: Rect = {
+    x,
+    y: Math.max(TOOLBAR_MARGIN, viewportSize.height - toolbarSize.height - TOOLBAR_MARGIN),
+    width: toolbarSize.width,
+    height: toolbarSize.height,
+  };
+
+  const topIntersects = hasRectIntersection(topRect, targetRect);
+  const bottomIntersects = hasRectIntersection(bottomRect, targetRect);
+
+  if (bottomIntersects && !topIntersects) {
+    return 'top';
+  }
+
+  if (topIntersects && !bottomIntersects) {
+    return 'bottom';
+  }
+
+  if (!topIntersects && !bottomIntersects) {
+    return 'bottom';
+  }
+
+  const targetCenterY = targetRect.y + targetRect.height / 2;
+  return targetCenterY >= viewportSize.height / 2 ? 'top' : 'bottom';
 }
 
 function formatCropRect(crop: CropRect | null) {
@@ -128,9 +162,9 @@ export default function CanvasPreview({
   const isEditing = editMode !== 'idle';
   const textToolbarRef = useRef<HTMLDivElement>(null);
   const imageToolbarRef = useRef<HTMLDivElement>(null);
-  const [toolbarPositions, setToolbarPositions] = useState<Record<ToolbarKind, ToolbarPosition | null>>({
-    text: null,
-    image: null,
+  const [toolbarPlacements, setToolbarPlacements] = useState<Record<ToolbarKind, ToolbarPlacement>>({
+    text: 'bottom',
+    image: 'bottom',
   });
 
   const { videoRef, viewportRef, viewport, frameSize, syncVideoTime, handleVideoLoadedMetadata } =
@@ -230,66 +264,38 @@ export default function CanvasPreview({
     onStartCrop();
   }, [onStartCrop, stopPlayback]);
 
-  const measureToolbarPosition = useCallback(
-    (toolbarElement: HTMLDivElement | null): ToolbarPosition | null => {
+  const resolveSelectedAnnotationRect = useCallback((): Rect | null => {
+    const viewportElement = viewportRef.current;
+    if (!viewportElement || !selectedAnnotationId) {
+      return null;
+    }
+
+    const targetElement = viewportElement.querySelector<HTMLElement>(
+      `[data-annotation-id="${selectedAnnotationId}"]`,
+    );
+    if (!targetElement) {
+      return null;
+    }
+
+    const viewportBounds = viewportElement.getBoundingClientRect();
+    const targetBounds = targetElement.getBoundingClientRect();
+    return {
+      x: targetBounds.left - viewportBounds.left,
+      y: targetBounds.top - viewportBounds.top,
+      width: targetBounds.width,
+      height: targetBounds.height,
+    };
+  }, [selectedAnnotationId, viewportRef]);
+
+  const computeToolbarPlacement = useCallback(
+    (kind: ToolbarKind): ToolbarPlacement | null => {
       const viewportElement = viewportRef.current;
+      const toolbarElement = kind === 'text' ? textToolbarRef.current : imageToolbarRef.current;
       if (!viewportElement || !toolbarElement) {
         return null;
       }
 
-      return {
-        x: Math.max(0, viewportElement.clientWidth - toolbarElement.offsetWidth - TOOLBAR_MARGIN),
-        y: Math.max(0, viewportElement.clientHeight - toolbarElement.offsetHeight - TOOLBAR_MARGIN),
-      };
-    },
-    [viewportRef],
-  );
-
-  const clampToolbarPosition = useCallback(
-    (position: ToolbarPosition, toolbarElement: HTMLDivElement | null): ToolbarPosition => {
-      const viewportElement = viewportRef.current;
-      if (!viewportElement || !toolbarElement) {
-        return position;
-      }
-
-      return {
-        x: Math.max(0, Math.min(position.x, viewportElement.clientWidth - toolbarElement.offsetWidth)),
-        y: Math.max(0, Math.min(position.y, viewportElement.clientHeight - toolbarElement.offsetHeight)),
-      };
-    },
-    [viewportRef],
-  );
-
-  const updateToolbarPosition = useCallback(
-    (kind: ToolbarKind, nextPosition: ToolbarPosition) => {
-      const toolbarElement = kind === 'text' ? textToolbarRef.current : imageToolbarRef.current;
-      const clamped = clampToolbarPosition(nextPosition, toolbarElement);
-      setToolbarPositions((current) => {
-        const previous = current[kind];
-        if (previous && previous.x === clamped.x && previous.y === clamped.y) {
-          return current;
-        }
-
-        return {
-          ...current,
-          [kind]: clamped,
-        };
-      });
-    },
-    [clampToolbarPosition],
-  );
-
-  const snapToolbarToCorner = useCallback(
-    (kind: ToolbarKind, nextPosition: ToolbarPosition) => {
-      const toolbarElement = kind === 'text' ? textToolbarRef.current : imageToolbarRef.current;
-      const viewportElement = viewportRef.current;
-      if (!toolbarElement || !viewportElement) {
-        updateToolbarPosition(kind, nextPosition);
-        return;
-      }
-
-      const snapped = snapToolbarPosition(
-        nextPosition,
+      return resolveToolbarPlacement(
         {
           width: viewportElement.clientWidth,
           height: viewportElement.clientHeight,
@@ -298,11 +304,10 @@ export default function CanvasPreview({
           width: toolbarElement.offsetWidth,
           height: toolbarElement.offsetHeight,
         },
+        resolveSelectedAnnotationRect(),
       );
-
-      updateToolbarPosition(kind, snapped);
     },
-    [updateToolbarPosition, viewportRef],
+    [resolveSelectedAnnotationRect, viewportRef],
   );
 
   const previewScale = Math.min(frameSize.width / Math.max(1, baseCrop.w), frameSize.height / Math.max(1, baseCrop.h));
@@ -312,51 +317,61 @@ export default function CanvasPreview({
   const overlayOffsetY = (frameSize.height - overlayHeight) / 2;
 
   useLayoutEffect(() => {
-    if (isEditing || !selectedTextAnnotation || toolbarPositions.text) {
+    if (isEditing) {
       return;
     }
 
-    const nextPosition = measureToolbarPosition(textToolbarRef.current);
-    if (nextPosition) {
-      setToolbarPositions((current) => ({ ...current, text: nextPosition }));
-    }
-  }, [isEditing, measureToolbarPosition, selectedTextAnnotation, toolbarPositions.text]);
-
-  useLayoutEffect(() => {
-    if (isEditing || selectedTextAnnotation || !selectedImageAnnotation || toolbarPositions.image) {
-      return;
-    }
-
-    const nextPosition = measureToolbarPosition(imageToolbarRef.current);
-    if (nextPosition) {
-      setToolbarPositions((current) => ({ ...current, image: nextPosition }));
-    }
-  }, [isEditing, measureToolbarPosition, selectedImageAnnotation, selectedTextAnnotation, toolbarPositions.image]);
-
-  useEffect(() => {
-    setToolbarPositions((current) => {
+    setToolbarPlacements((current) => {
       let changed = false;
       const next = { ...current };
 
-      ([
-        ['text', textToolbarRef.current],
-        ['image', imageToolbarRef.current],
-      ] as const).forEach(([kind, toolbarElement]) => {
-        const currentPosition = current[kind];
-        if (!currentPosition || !toolbarElement) {
-          return;
-        }
-
-        const clamped = clampToolbarPosition(currentPosition, toolbarElement);
-        if (clamped.x !== currentPosition.x || clamped.y !== currentPosition.y) {
-          next[kind] = clamped;
+      if (!selectedTextAnnotation && !selectedImageAnnotation) {
+        if (next.text !== 'bottom') {
+          next.text = 'bottom';
           changed = true;
         }
-      });
+        if (next.image !== 'bottom') {
+          next.image = 'bottom';
+          changed = true;
+        }
+      }
+
+      if (selectedTextAnnotation) {
+        const placement = computeToolbarPlacement('text');
+        if (placement && placement !== next.text) {
+          next.text = placement;
+          changed = true;
+        }
+      }
+
+      if (selectedImageAnnotation && !selectedTextAnnotation) {
+        const placement = computeToolbarPlacement('image');
+        if (placement && placement !== next.image) {
+          next.image = placement;
+          changed = true;
+        }
+      }
 
       return changed ? next : current;
     });
-  }, [clampToolbarPosition, frameSize.height, frameSize.width]);
+  }, [computeToolbarPlacement, frameSize.height, frameSize.width, isEditing, selectedImageAnnotation, selectedTextAnnotation]);
+
+  const getToolbarStyle = useCallback(
+    (kind: ToolbarKind) => {
+      if (toolbarPlacements[kind] === 'top') {
+        return {
+          right: TOOLBAR_MARGIN,
+          top: TOOLBAR_MARGIN,
+        };
+      }
+
+      return {
+        right: TOOLBAR_MARGIN,
+        bottom: TOOLBAR_MARGIN,
+      };
+    },
+    [toolbarPlacements],
+  );
 
   useEffect(() => {
     console.debug('[crop-debug] canvas frame metrics', {
@@ -476,31 +491,16 @@ export default function CanvasPreview({
           )}
 
           {!isEditing && selectedTextAnnotation ? (
-            <Rnd
-              bounds="parent"
-              enableResizing={false}
-              dragHandleClassName="annotation-toolbar__drag-handle"
-              position={toolbarPositions.text ?? { x: 0, y: 0 }}
-              size={{ width: 'auto', height: 'auto' }}
-              onDrag={(_, data) => {
-                updateToolbarPosition('text', { x: data.x, y: data.y });
-              }}
-              onDragStop={(_, data) => {
-                snapToolbarToCorner('text', { x: data.x, y: data.y });
-              }}
-              className="z-20"
-            >
+            <div className="absolute z-20" style={getToolbarStyle('text')}>
               <div
                 data-annotation-box="true"
                 ref={textToolbarRef}
                 className="pointer-events-auto max-w-[calc(100vw-2rem)]"
-                style={{ visibility: toolbarPositions.text ? 'visible' : 'hidden' }}
                 onPointerDown={(event) => {
                   event.stopPropagation();
                 }}
               >
                 <TextStyleToolbar
-                  dragHandleClassName="annotation-toolbar__drag-handle"
                   selectedTextAnnotation={selectedTextAnnotation}
                   outlinePreviewScaleY={outlinePreviewScaleY}
                   showLayerMoveControls={hasSelectedAnnotationLayerOverlap}
@@ -512,35 +512,20 @@ export default function CanvasPreview({
                   onDelete={onDeleteSelectedAnnotation}
                 />
               </div>
-            </Rnd>
+            </div>
           ) : null}
 
           {!isEditing && !selectedTextAnnotation && selectedImageAnnotation ? (
-            <Rnd
-              bounds="parent"
-              enableResizing={false}
-              dragHandleClassName="annotation-toolbar__drag-handle"
-              position={toolbarPositions.image ?? { x: 0, y: 0 }}
-              size={{ width: 'auto', height: 'auto' }}
-              onDrag={(_, data) => {
-                updateToolbarPosition('image', { x: data.x, y: data.y });
-              }}
-              onDragStop={(_, data) => {
-                snapToolbarToCorner('image', { x: data.x, y: data.y });
-              }}
-              className="z-20"
-            >
+            <div className="absolute z-20" style={getToolbarStyle('image')}>
               <div
                 data-annotation-box="true"
                 ref={imageToolbarRef}
                 className="pointer-events-auto max-w-[calc(100vw-2rem)]"
-                style={{ visibility: toolbarPositions.image ? 'visible' : 'hidden' }}
                 onPointerDown={(event) => {
                   event.stopPropagation();
                 }}
               >
                 <ImageStyleToolbar
-                  dragHandleClassName="annotation-toolbar__drag-handle"
                   selectedImageAnnotation={selectedImageAnnotation}
                   showLayerMoveControls={hasSelectedAnnotationLayerOverlap}
                   canBringToFront={canBringSelectedAnnotationToFront}
@@ -551,7 +536,7 @@ export default function CanvasPreview({
                   onDelete={onDeleteSelectedAnnotation}
                 />
               </div>
-            </Rnd>
+            </div>
           ) : null}
         </div>
       </div>

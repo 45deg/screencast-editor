@@ -117,7 +117,11 @@ export function useSliceEditorPointerHandlers({
   );
 
   const handleTimelinePan = useCallback(
-    (_event: Event, info: PanInfo) => {
+    (event: Event, info: PanInfo) => {
+      if (typeof PointerEvent !== 'undefined' && event instanceof PointerEvent && event.pointerType === 'touch') {
+        return;
+      }
+
       updateTimeFromClientX(info.point.x);
     },
     [updateTimeFromClientX],

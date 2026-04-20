@@ -1,6 +1,5 @@
 import { Tooltip } from '@base-ui/react/tooltip';
 import { Toolbar } from '@base-ui/react/toolbar';
-import { GripVertical } from 'lucide-react';
 import { type ReactElement, type ReactNode } from 'react';
 
 interface ToolbarTooltipProps {
@@ -11,11 +10,6 @@ interface ToolbarTooltipProps {
 interface AnnotationToolbarRootProps {
   ariaLabel: string;
   children: ReactNode;
-  className?: string;
-}
-
-interface AnnotationToolbarDragHandleProps {
-  ariaLabel: string;
   className?: string;
 }
 
@@ -45,20 +39,6 @@ export function AnnotationToolbarRoot({ ariaLabel, children, className }: Annota
     >
       {children}
     </Toolbar.Root>
-  );
-}
-
-export function AnnotationToolbarDragHandle({ ariaLabel, className }: AnnotationToolbarDragHandleProps) {
-  return (
-    <ToolbarTooltip label={ariaLabel}>
-      <div
-        className={`${className ?? ''} inline-flex h-8 w-5 cursor-move touch-none select-none items-center justify-center text-slate-400`}
-        aria-label={ariaLabel}
-        role="presentation"
-      >
-        <GripVertical size={14} />
-      </div>
-    </ToolbarTooltip>
   );
 }
 

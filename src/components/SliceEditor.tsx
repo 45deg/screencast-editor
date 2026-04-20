@@ -183,7 +183,7 @@ export default function SliceEditorTimeline({
 
   return (
     <section
-      className={`relative z-10 flex w-full shrink-0 select-none flex-col overflow-hidden rounded-lg border border-slate-800/70 bg-slate-950 shadow-xl ${fillHeight ? 'min-h-0 h-full' : 'h-[320px] sm:h-[360px]'} ${className ?? ''}`}
+      className={`relative z-10 flex w-full shrink-0 select-none flex-col overflow-hidden rounded-lg border border-slate-800/70 bg-slate-950 shadow-xl ${fillHeight ? 'min-h-0 h-full' : 'h-[260px] sm:h-[340px]'} ${className ?? ''}`}
     >
       <EditorToolbar
         undo={onUndo}
@@ -222,8 +222,8 @@ export default function SliceEditorTimeline({
           style={{
             width: `${Math.max(10, totalDuration) * pixelsPerSecond}px`,
             minWidth: '100%',
-            minHeight: '250px',
-            touchAction: 'pan-y',
+            minHeight: '200px',
+            touchAction: 'pan-x',
           }}
           onPointerDown={handleTimelinePointerDown}
           onPan={handleTimelinePan}

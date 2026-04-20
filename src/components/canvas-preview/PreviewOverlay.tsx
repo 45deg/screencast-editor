@@ -80,8 +80,10 @@ export default function PreviewOverlay({
     bottomLeft: true,
     bottomRight: true,
   } as const;
+  const imageHandleSize = Math.max(16, Math.min(30, Math.round(Math.min(overlayWidth, overlayHeight) * 0.045)));
+  const imageHandleOffset = Math.round(imageHandleSize / 2);
   const imageHandleClassName =
-    'absolute h-5 w-5 rounded-full border border-cyan-200 bg-slate-950 shadow-[0_0_0_1px_rgba(15,23,42,0.55)]';
+    'absolute rounded-full border border-cyan-200 bg-slate-950 shadow-[0_0_0_1px_rgba(15,23,42,0.55)]';
 
   useEffect(() => {
     if (!hasActiveVideoSlice) {
@@ -232,6 +234,7 @@ export default function PreviewOverlay({
               >
                 <button
                   data-annotation-box="true"
+                  data-annotation-id={annotation.id}
                   type="button"
                   onPointerDown={(event) => handleTextPointerDown(event, annotation)}
                   onDoubleClick={() => startInlineTextEdit(annotation)}
@@ -264,28 +267,52 @@ export default function PreviewOverlay({
                   <span
                     aria-hidden="true"
                     data-annotation-box="true"
-                    className={`${imageHandleClassName} -left-2.5 -top-2.5`}
+                    className={imageHandleClassName}
+                    style={{
+                      width: `${imageHandleSize}px`,
+                      height: `${imageHandleSize}px`,
+                      left: `${-imageHandleOffset}px`,
+                      top: `${-imageHandleOffset}px`,
+                    }}
                   />
                 ),
                 topRight: (
                   <span
                     aria-hidden="true"
                     data-annotation-box="true"
-                    className={`${imageHandleClassName} -right-2.5 -top-2.5`}
+                    className={imageHandleClassName}
+                    style={{
+                      width: `${imageHandleSize}px`,
+                      height: `${imageHandleSize}px`,
+                      right: `${-imageHandleOffset}px`,
+                      top: `${-imageHandleOffset}px`,
+                    }}
                   />
                 ),
                 bottomLeft: (
                   <span
                     aria-hidden="true"
                     data-annotation-box="true"
-                    className={`${imageHandleClassName} -bottom-2.5 -left-2.5`}
+                    className={imageHandleClassName}
+                    style={{
+                      width: `${imageHandleSize}px`,
+                      height: `${imageHandleSize}px`,
+                      left: `${-imageHandleOffset}px`,
+                      bottom: `${-imageHandleOffset}px`,
+                    }}
                   />
                 ),
                 bottomRight: (
                   <span
                     aria-hidden="true"
                     data-annotation-box="true"
-                    className={`${imageHandleClassName} -bottom-2.5 -right-2.5`}
+                    className={imageHandleClassName}
+                    style={{
+                      width: `${imageHandleSize}px`,
+                      height: `${imageHandleSize}px`,
+                      right: `${-imageHandleOffset}px`,
+                      bottom: `${-imageHandleOffset}px`,
+                    }}
                   />
                 ),
               }}
@@ -342,6 +369,7 @@ export default function PreviewOverlay({
             >
               <button
                 data-annotation-box="true"
+                data-annotation-id={annotation.id}
                 type="button"
                 onPointerDown={() => onSelectedAnnotationIdChange(annotation.id)}
                 className={`annotation-rnd__drag h-full w-full cursor-move select-none overflow-hidden rounded-md border bg-slate-950/20 transition ${

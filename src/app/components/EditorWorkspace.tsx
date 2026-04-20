@@ -147,7 +147,7 @@ export default function EditorWorkspace({
     <>
       <main className="fixed inset-x-0 bottom-0 top-16 z-10 overflow-hidden lg:right-[23rem]">
         <Group orientation="vertical" className="h-full min-h-0">
-          <Panel defaultSize="52%" minSize="12rem" className="min-h-0">
+          <Panel defaultSize="58%" minSize="10rem" className="min-h-0">
             <section className="relative h-full min-h-0 px-1 pt-1 lg:pr-1">
               <CanvasPreview
                 video={video}
@@ -194,7 +194,7 @@ export default function EditorWorkspace({
             <div className="absolute left-1/2 top-1/2 h-1.5 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full border border-slate-700 bg-slate-900 transition group-hover:border-cyan-400/60 group-hover:bg-slate-800" />
           </Separator>
 
-          <Panel defaultSize="48%" minSize="16rem" className="min-h-0">
+          <Panel defaultSize="42%" minSize="10rem" className="min-h-0">
             <div className="h-full min-h-0 px-0.5 pb-[calc(env(safe-area-inset-bottom)+2px)] pt-0 lg:pr-1">
               <SliceEditorTimeline
                 video={video}

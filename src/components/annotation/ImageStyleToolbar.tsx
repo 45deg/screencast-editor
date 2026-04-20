@@ -3,7 +3,6 @@ import { BringToFront, SendToBack, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import {
-  AnnotationToolbarDragHandle,
   AnnotationToolbarRoot,
   AnnotationToolbarSeparator,
   ToolbarTooltip,
@@ -12,7 +11,6 @@ import type { ImageAnnotation } from '../../types/editor';
 
 interface ImageStyleToolbarProps {
   selectedImageAnnotation: ImageAnnotation | null;
-  dragHandleClassName?: string;
   showLayerMoveControls: boolean;
   canBringToFront: boolean;
   canSendToBack: boolean;
@@ -24,7 +22,6 @@ interface ImageStyleToolbarProps {
 
 export default function ImageStyleToolbar({
   selectedImageAnnotation,
-  dragHandleClassName,
   showLayerMoveControls,
   canBringToFront,
   canSendToBack,
@@ -43,8 +40,6 @@ export default function ImageStyleToolbar({
 
   return (
     <AnnotationToolbarRoot ariaLabel={t('canvas.imageToolbar')}>
-      <AnnotationToolbarDragHandle ariaLabel={t('canvas.moveToolbar')} className={dragHandleClassName} />
-
       <label className="inline-flex h-8 items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px] text-slate-200">
         <span className="shrink-0 text-slate-400">{t('canvas.imageOpacity')}</span>
         <input
