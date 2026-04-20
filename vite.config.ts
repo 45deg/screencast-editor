@@ -6,6 +6,9 @@ import tailwindcss from '@tailwindcss/vite'
 // https://vite.dev/config/
 export default defineConfig({
   base: './',
+  build: {
+    outDir: 'screencast-editor',
+  },
   plugins: [
     react(),
     tailwindcss(),

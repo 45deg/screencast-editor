@@ -1,11 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const distRoot = path.resolve(process.cwd(), 'dist');
-const sanityEntry = path.join(distRoot, 'sanity-check.html');
+const outputRoot = path.resolve(process.cwd(), 'screencast-editor');
+const sanityEntry = path.join(outputRoot, 'sanity-check.html');
 
-if (!fs.existsSync(distRoot)) {
-  throw new Error(`Expected build output at ${distRoot}`);
+if (!fs.existsSync(outputRoot)) {
+  throw new Error(`Expected build output at ${outputRoot}`);
 }
 
 if (fs.existsSync(sanityEntry)) {
