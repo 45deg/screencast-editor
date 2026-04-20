@@ -1,6 +1,8 @@
 import { Button } from '@base-ui/react/button';
+import { Tooltip } from '@base-ui/react/tooltip';
 import { Toolbar } from '@base-ui/react/toolbar';
 import { Check, Crop, Pause, Play, RotateCcw, SkipBack, X } from 'lucide-react';
+import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatSeconds } from './math';
@@ -17,6 +19,27 @@ interface CanvasPreviewHeaderProps {
   onRestart: () => void;
   onTogglePlay: () => void;
   onStartCrop: () => void;
+}
+
+function ToolbarTooltip({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactElement;
+}) {
+  return (
+    <Tooltip.Root>
+      <Tooltip.Trigger render={children} />
+      <Tooltip.Portal>
+        <Tooltip.Positioner side="top" sideOffset={8} className="z-[130]">
+          <Tooltip.Popup className="max-w-[18rem] whitespace-pre-line rounded-md border border-slate-700 bg-slate-950/98 px-2.5 py-2 text-[11px] leading-relaxed text-slate-100 shadow-xl backdrop-blur">
+            {label}
+          </Tooltip.Popup>
+        </Tooltip.Positioner>
+      </Tooltip.Portal>
+    </Tooltip.Root>
+  );
 }
 
 export default function CanvasPreviewHeader({
@@ -100,14 +123,16 @@ export default function CanvasPreviewHeader({
               {formatSeconds(currentTime)} / {formatSeconds(totalDuration)}
             </div>
           </Toolbar.Root>
-          <Button
-            type="button"
-            onClick={onStartCrop}
-            className="inline-flex items-center gap-1 rounded-md border border-cyan-300/40 bg-cyan-400/10 px-2.5 py-1.5 text-xs font-medium text-cyan-100 transition hover:bg-cyan-400/20"
-          >
-            <Crop size={13} />
-            {t('sliceEditor.crop')}
-          </Button>
+          <ToolbarTooltip label={t('canvas.canvasCropTooltip')}>
+            <Button
+              type="button"
+              onClick={onStartCrop}
+              className="inline-flex items-center gap-1 rounded-md border border-cyan-300/40 bg-cyan-400/10 px-2.5 py-1.5 text-xs font-medium text-cyan-100 transition hover:bg-cyan-400/20"
+            >
+              <Crop size={13} />
+              {t('sliceEditor.crop')}
+            </Button>
+          </ToolbarTooltip>
         </div>
       ) : null}
     </div>

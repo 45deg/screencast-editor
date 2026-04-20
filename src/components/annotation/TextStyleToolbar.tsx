@@ -39,6 +39,7 @@ interface TextStyleToolbarProps {
 
 interface ColorPopoverFieldProps {
   ariaLabel: string;
+  tooltipLabel?: string;
   icon: ReactNode;
   value: string;
   onChange: (value: string) => void;
@@ -77,6 +78,7 @@ function hasTransparentAlpha(value: string): boolean {
 
 function ColorPopoverField({
   ariaLabel,
+  tooltipLabel,
   icon,
   value,
   onChange,
@@ -85,27 +87,28 @@ function ColorPopoverField({
 }: ColorPopoverFieldProps) {
   return (
     <Popover.Root>
-      <Popover.Trigger
-        type="button"
-        disabled={disabled}
-        aria-label={ariaLabel}
-        title={ariaLabel}
-        className="inline-flex h-8 items-center gap-2 rounded-md border border-slate-700 bg-slate-950 px-2 text-slate-200 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        <span className="text-slate-400">{icon}</span>
-        <span
-          aria-hidden="true"
-          className="h-4 w-4 rounded border border-white/20 shadow-inner"
-          style={{
-            backgroundColor: value,
-            backgroundImage: hasTransparentAlpha(value)
-              ? 'linear-gradient(45deg, rgba(148, 163, 184, 0.35) 25%, transparent 25%, transparent 75%, rgba(148, 163, 184, 0.35) 75%, rgba(148, 163, 184, 0.35)), linear-gradient(45deg, rgba(148, 163, 184, 0.35) 25%, transparent 25%, transparent 75%, rgba(148, 163, 184, 0.35) 75%, rgba(148, 163, 184, 0.35))'
-              : undefined,
-            backgroundPosition: hasTransparentAlpha(value) ? '0 0, 6px 6px' : undefined,
-            backgroundSize: hasTransparentAlpha(value) ? '12px 12px' : undefined,
-          }}
-        />
-      </Popover.Trigger>
+      <ToolbarTooltip label={tooltipLabel ?? ariaLabel}>
+        <Popover.Trigger
+          type="button"
+          disabled={disabled}
+          aria-label={ariaLabel}
+          className="inline-flex h-8 items-center gap-2 rounded-md border border-slate-700 bg-slate-950 px-2 text-slate-200 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <span className="text-slate-400">{icon}</span>
+          <span
+            aria-hidden="true"
+            className="h-4 w-4 rounded border border-white/20 shadow-inner"
+            style={{
+              backgroundColor: value,
+              backgroundImage: hasTransparentAlpha(value)
+                ? 'linear-gradient(45deg, rgba(148, 163, 184, 0.35) 25%, transparent 25%, transparent 75%, rgba(148, 163, 184, 0.35) 75%, rgba(148, 163, 184, 0.35)), linear-gradient(45deg, rgba(148, 163, 184, 0.35) 25%, transparent 25%, transparent 75%, rgba(148, 163, 184, 0.35) 75%, rgba(148, 163, 184, 0.35))'
+                : undefined,
+              backgroundPosition: hasTransparentAlpha(value) ? '0 0, 6px 6px' : undefined,
+              backgroundSize: hasTransparentAlpha(value) ? '12px 12px' : undefined,
+            }}
+          />
+        </Popover.Trigger>
+      </ToolbarTooltip>
       <Popover.Portal>
         <Popover.Positioner side="bottom" align="center" sideOffset={8} className="z-[120]">
           <Popover.Popup className="z-[120] rounded-xl border border-slate-800 bg-slate-950/98 p-3 shadow-2xl backdrop-blur">
@@ -170,18 +173,19 @@ function FontFamilySelect({
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
-      <Popover.Trigger
-        type="button"
-        aria-label={ariaLabel}
-        title={ariaLabel}
-        className="inline-flex h-8 min-w-[13rem] items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-2.5 text-[11px] text-slate-200 transition hover:border-slate-500"
-      >
-        <Type size={12} className="shrink-0 text-slate-400" />
-        <span className="min-w-0 flex-1 truncate text-left text-white" style={{ fontFamily: resolveAnnotationFontFamily(value) }}>
-          {currentLabel}
-        </span>
-        <ChevronDown size={12} className="shrink-0 text-slate-500" />
-      </Popover.Trigger>
+      <ToolbarTooltip label={ariaLabel}>
+        <Popover.Trigger
+          type="button"
+          aria-label={ariaLabel}
+          className="inline-flex h-8 min-w-[13rem] items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-2.5 text-[11px] text-slate-200 transition hover:border-slate-500"
+        >
+          <Type size={12} className="shrink-0 text-slate-400" />
+          <span className="min-w-0 flex-1 truncate text-left text-white" style={{ fontFamily: resolveAnnotationFontFamily(value) }}>
+            {currentLabel}
+          </span>
+          <ChevronDown size={12} className="shrink-0 text-slate-500" />
+        </Popover.Trigger>
+      </ToolbarTooltip>
       <Popover.Portal>
         <Popover.Positioner side="bottom" align="start" sideOffset={8} className="z-[120]">
           <Popover.Popup className="z-[120] w-[19rem] max-h-[18rem] overflow-auto rounded-xl border border-slate-800 bg-slate-950/98 p-1 shadow-2xl backdrop-blur">
@@ -245,48 +249,54 @@ export default function TextStyleToolbar({
       aria-label={t('canvas.textToolbar')}
       className="timeline-scrollbar inline-flex max-w-[min(92vw,820px)] flex-wrap items-center justify-end gap-1 rounded-lg border border-slate-700/90 bg-slate-950/95 p-1.5 shadow-xl backdrop-blur"
     >
-      <Toolbar.Button
-        aria-label={t('canvas.bold')}
-        onClick={() => onStyleChange({ bold: !style.bold })}
-        className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition ${
-          style.bold
-            ? 'border-cyan-300/70 bg-cyan-400/20 text-cyan-100'
-            : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500'
-        }`}
-      >
-        <Bold size={14} />
-      </Toolbar.Button>
+      <ToolbarTooltip label={t('canvas.boldTooltip')}>
+        <Toolbar.Button
+          aria-label={t('canvas.bold')}
+          onClick={() => onStyleChange({ bold: !style.bold })}
+          className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition ${
+            style.bold
+              ? 'border-cyan-300/70 bg-cyan-400/20 text-cyan-100'
+              : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500'
+          }`}
+        >
+          <Bold size={14} />
+        </Toolbar.Button>
+      </ToolbarTooltip>
 
-      <Toolbar.Button
-        aria-label={t('canvas.italic')}
-        onClick={() => onStyleChange({ italic: !style.italic })}
-        className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition ${
-          style.italic
-            ? 'border-cyan-300/70 bg-cyan-400/20 text-cyan-100'
-            : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500'
-        }`}
-      >
-        <Italic size={14} />
-      </Toolbar.Button>
+      <ToolbarTooltip label={t('canvas.italicTooltip')}>
+        <Toolbar.Button
+          aria-label={t('canvas.italic')}
+          onClick={() => onStyleChange({ italic: !style.italic })}
+          className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition ${
+            style.italic
+              ? 'border-cyan-300/70 bg-cyan-400/20 text-cyan-100'
+              : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-slate-500'
+          }`}
+        >
+          <Italic size={14} />
+        </Toolbar.Button>
+      </ToolbarTooltip>
 
-      <label className="inline-flex h-8 items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px] text-slate-200">
-        <Type size={12} className="text-slate-400" />
-        <input
-          type="number"
-          min={8}
-          max={180}
-          step={1}
-          value={style.fontSize}
-          onChange={(event) => {
-            const next = Number.parseInt(event.target.value, 10);
-            if (Number.isFinite(next)) {
-              onStyleChange({ fontSize: Math.max(8, Math.min(180, next)) });
-            }
-          }}
-          className="w-14 border-0 bg-transparent text-right text-[11px] text-white outline-none"
-          aria-label={t('canvas.fontSize')}
-        />
-      </label>
+      <ToolbarTooltip label={t('canvas.fontSizeTooltip')}>
+        <label className="inline-flex h-8 items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px] text-slate-200">
+          <Type size={12} className="text-slate-400" />
+          <input
+            type="number"
+            min={8}
+            max={180}
+            step={1}
+            value={style.fontSize}
+            onChange={(event) => {
+              const next = Number.parseInt(event.target.value, 10);
+              if (Number.isFinite(next)) {
+                onStyleChange({ fontSize: Math.max(8, Math.min(180, next)) });
+              }
+            }}
+            className="w-14 border-0 bg-transparent text-right text-[11px] text-white outline-none"
+            aria-label={t('canvas.fontSize')}
+          />
+        </label>
+      </ToolbarTooltip>
 
       <FontFamilySelect
         value={style.fontFamily}
@@ -296,6 +306,7 @@ export default function TextStyleToolbar({
 
       <ColorPopoverField
         ariaLabel={t('canvas.fontColor')}
+        tooltipLabel={t('canvas.fontColorTooltip')}
         icon={<PenLine size={12} />}
         value={style.textColor}
         onChange={(value) => onStyleChange({ textColor: value })}
@@ -303,45 +314,51 @@ export default function TextStyleToolbar({
 
       <ColorPopoverField
         ariaLabel={t('canvas.boxColor')}
+        tooltipLabel={t('canvas.boxColorTooltip')}
         icon={<PaintBucket size={12} />}
         value={style.boxColor}
         onChange={(value) => onStyleChange({ boxColor: value })}
         footer={
-          <Switch.Root
-            aria-label={t('canvas.toggleBox')}
-            checked={style.boxEnabled}
-            onCheckedChange={(checked) => onStyleChange({ boxEnabled: checked })}
-            className="inline-flex h-5 w-9 items-center rounded-full border border-slate-600 bg-slate-800 p-0.5 transition data-[checked]:border-emerald-400/60 data-[checked]:bg-emerald-500/30 data-[unchecked]:bg-slate-800"
-          >
-            <Switch.Thumb className="h-3.5 w-3.5 rounded-full bg-slate-200 shadow-sm transition data-[checked]:translate-x-4 data-[unchecked]:translate-x-0" />
-          </Switch.Root>
+          <ToolbarTooltip label={t('canvas.toggleBoxTooltip')}>
+            <Switch.Root
+              aria-label={t('canvas.toggleBox')}
+              checked={style.boxEnabled}
+              onCheckedChange={(checked) => onStyleChange({ boxEnabled: checked })}
+              className="inline-flex h-5 w-9 items-center rounded-full border border-slate-600 bg-slate-800 p-0.5 transition data-[checked]:border-emerald-400/60 data-[checked]:bg-emerald-500/30 data-[unchecked]:bg-slate-800"
+            >
+              <Switch.Thumb className="h-3.5 w-3.5 rounded-full bg-slate-200 shadow-sm transition data-[checked]:translate-x-4 data-[unchecked]:translate-x-0" />
+            </Switch.Root>
+          </ToolbarTooltip>
         }
       />
 
-      <label className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px] text-slate-200">
-        <span className="font-mono text-[10px]">
-          <TypeOutline size={12} className="text-slate-400" />
-        </span>
-        <input
-          type="number"
-          min={0}
-          max={maxDisplayOutlineWidth}
-          step={1}
-          value={displayOutlineWidth}
-          onChange={(event) => {
-            const next = Number.parseInt(event.target.value, 10);
-            if (Number.isFinite(next)) {
-              const clamped = Math.max(0, Math.min(maxDisplayOutlineWidth, next));
-              onStyleChange({ outlineWidth: clamped / Math.max(0.0001, outlinePreviewScaleY) });
-            }
-          }}
-          className="w-10 border-0 bg-transparent text-right text-[11px] text-white outline-none"
-          aria-label={t('canvas.outlineWidth')}
-        />
-      </label>
+      <ToolbarTooltip label={t('canvas.outlineWidthTooltip')}>
+        <label className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px] text-slate-200">
+          <span className="font-mono text-[10px]">
+            <TypeOutline size={12} className="text-slate-400" />
+          </span>
+          <input
+            type="number"
+            min={0}
+            max={maxDisplayOutlineWidth}
+            step={1}
+            value={displayOutlineWidth}
+            onChange={(event) => {
+              const next = Number.parseInt(event.target.value, 10);
+              if (Number.isFinite(next)) {
+                const clamped = Math.max(0, Math.min(maxDisplayOutlineWidth, next));
+                onStyleChange({ outlineWidth: clamped / Math.max(0.0001, outlinePreviewScaleY) });
+              }
+            }}
+            className="w-10 border-0 bg-transparent text-right text-[11px] text-white outline-none"
+            aria-label={t('canvas.outlineWidth')}
+          />
+        </label>
+      </ToolbarTooltip>
 
       <ColorPopoverField
         ariaLabel={t('canvas.outlineColor')}
+        tooltipLabel={t('canvas.outlineColorTooltip')}
         icon={<TypeOutline size={12} />}
         value={style.outlineColor}
         onChange={(value) => onStyleChange({ outlineColor: value })}
@@ -378,13 +395,15 @@ export default function TextStyleToolbar({
       {onDelete ? (
         <>
           <Toolbar.Separator className="mx-1 h-5 w-px bg-slate-800" />
-          <Toolbar.Button
-            aria-label={t('sliceEditor.deleteSelected')}
-            onClick={onDelete}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-rose-300/40 bg-rose-400/10 text-rose-100 transition hover:bg-rose-400/20"
-          >
-            <Trash2 size={14} />
-          </Toolbar.Button>
+          <ToolbarTooltip label={t('canvas.deleteTextLayerTooltip')}>
+            <Toolbar.Button
+              aria-label={t('sliceEditor.deleteSelected')}
+              onClick={onDelete}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-rose-300/40 bg-rose-400/10 text-rose-100 transition hover:bg-rose-400/20"
+            >
+              <Trash2 size={14} />
+            </Toolbar.Button>
+          </ToolbarTooltip>
         </>
       ) : null}
     </Toolbar.Root>

@@ -1,6 +1,7 @@
-import { useCallback, useRef, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useCallback, useRef, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactElement } from 'react';
 import { Popover } from '@base-ui/react/popover';
 import { Slider } from '@base-ui/react/slider';
+import { Tooltip } from '@base-ui/react/tooltip';
 import { Crop, Gauge, ImagePlus, PlusSquare, Redo2, Scissors, Trash2, Undo2, ZoomIn } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -26,6 +27,27 @@ interface EditorToolbarProps {
   zoomSlider: number;
   setZoomSlider: (val: number) => void;
   zoom: number;
+}
+
+function ToolbarTooltip({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactElement;
+}) {
+  return (
+    <Tooltip.Root>
+      <Tooltip.Trigger render={children} />
+      <Tooltip.Portal>
+        <Tooltip.Positioner side="top" sideOffset={8} className="z-[130]">
+          <Tooltip.Popup className="max-w-[18rem] whitespace-pre-line rounded-md border border-slate-700 bg-slate-950/98 px-2.5 py-2 text-[11px] leading-relaxed text-slate-100 shadow-xl backdrop-blur">
+            {label}
+          </Tooltip.Popup>
+        </Tooltip.Positioner>
+      </Tooltip.Portal>
+    </Tooltip.Root>
+  );
 }
 
 export default function EditorToolbar({
@@ -98,93 +120,102 @@ export default function EditorToolbar({
         className="timeline-scrollbar flex h-full min-w-max items-center gap-2 overflow-x-auto overflow-y-hidden sm:min-w-0"
       >
         <div className="flex min-w-max items-center gap-1.5 sm:gap-2">
-          <button
-            type="button"
-            onClick={undo}
-            disabled={!canUndo}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-800 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent"
-            aria-label={t('sliceEditor.undo')}
-            title={t('sliceEditor.undoWithShortcut')}
-          >
-            <Undo2 size={16} />
-          </button>
-          <button
-            type="button"
-            onClick={redo}
-            disabled={!canRedo}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-800 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent"
-            aria-label={t('sliceEditor.redo')}
-            title={t('sliceEditor.redoWithShortcut')}
-          >
-            <Redo2 size={16} />
-          </button>
+          <ToolbarTooltip label={t('sliceEditor.undoTooltip')}>
+            <button
+              type="button"
+              onClick={undo}
+              disabled={!canUndo}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-800 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent"
+              aria-label={t('sliceEditor.undo')}
+            >
+              <Undo2 size={16} />
+            </button>
+          </ToolbarTooltip>
+          <ToolbarTooltip label={t('sliceEditor.redoTooltip')}>
+            <button
+              type="button"
+              onClick={redo}
+              disabled={!canRedo}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-800 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent"
+              aria-label={t('sliceEditor.redo')}
+            >
+              <Redo2 size={16} />
+            </button>
+          </ToolbarTooltip>
 
           <div aria-hidden="true" className="mx-1 h-5 w-px bg-slate-700" />
 
-          <button
-            type="button"
-            onClick={onSceneCropToggle}
-            disabled={!canSceneCrop && !isSceneCropEditing}
-            className={`inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition sm:gap-1.5 sm:px-2.5 sm:text-xs ${
-              isSceneCropEditing
-                ? 'bg-cyan-400/20 text-cyan-50 ring-1 ring-cyan-300/40 hover:bg-cyan-400/25'
-                : 'text-amber-100 hover:bg-amber-400/15 hover:text-white'
-            } disabled:opacity-30`}
-            aria-label={isSceneCropEditing ? t('canvas.cancel') : t('sliceEditor.sceneCrop')}
-            aria-pressed={isSceneCropEditing}
-            title={isSceneCropEditing ? t('canvas.cancel') : t('sliceEditor.sceneCrop')}
-          >
-            <Crop size={15} />
-            <span className="hidden sm:inline">{t('sliceEditor.sceneCrop')}</span>
-          </button>
+          <ToolbarTooltip label={t('sliceEditor.cutTooltip')}>
+            <button
+              type="button"
+              onClick={onCut}
+              disabled={!canCut}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium text-cyan-200 transition hover:bg-cyan-500/15 hover:text-white disabled:opacity-30 sm:gap-1.5 sm:px-2.5 sm:text-xs"
+              aria-label={t('sliceEditor.cutAtPlayhead')}
+            >
+              <Scissors size={16} />
+              <span className="hidden sm:inline">{t('sliceEditor.cut')}</span>
+            </button>
+          </ToolbarTooltip>
 
-          <button
-            type="button"
-            onClick={onCut}
-            disabled={!canCut}
-            className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium text-cyan-200 transition hover:bg-cyan-500/15 hover:text-white disabled:opacity-30 sm:gap-1.5 sm:px-2.5 sm:text-xs"
-            aria-label={t('sliceEditor.cutAtPlayhead')}
-            title={t('sliceEditor.cutAtPlayhead')}
-          >
-            <Scissors size={16} />
-            <span className="hidden sm:inline">{t('sliceEditor.cut')}</span>
-          </button>
+          <ToolbarTooltip label={t('sliceEditor.deleteTooltip')}>
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={!canDelete}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium text-rose-300 transition hover:bg-rose-500/15 hover:text-rose-200 disabled:opacity-30 sm:gap-1.5 sm:px-2.5 sm:text-xs"
+              aria-label={t('sliceEditor.deleteSelection')}
+            >
+              <Trash2 size={16} />
+              <span className="hidden sm:inline">{t('sliceEditor.deleteSelection')}</span>
+            </button>
+          </ToolbarTooltip>
 
-          <button
-            type="button"
-            onClick={onDelete}
-            disabled={!canDelete}
-            className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium text-rose-300 transition hover:bg-rose-500/15 hover:text-rose-200 disabled:opacity-30 sm:gap-1.5 sm:px-2.5 sm:text-xs"
-            aria-label={t('sliceEditor.deleteSelection')}
-            title={t('sliceEditor.deleteWithShortcut')}
+          <ToolbarTooltip
+            label={t(isSceneCropEditing ? 'sliceEditor.sceneCropActiveTooltip' : 'sliceEditor.sceneCropTooltip')}
           >
-            <Trash2 size={16} />
-            <span className="hidden sm:inline">{t('sliceEditor.deleteSelection')}</span>
-          </button>
+            <button
+              type="button"
+              onClick={onSceneCropToggle}
+              disabled={!canSceneCrop && !isSceneCropEditing || !selectedSlice}
+              className={`inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition sm:gap-1.5 sm:px-2.5 sm:text-xs ${
+                isSceneCropEditing
+                  ? 'bg-cyan-400/20 text-cyan-50 ring-1 ring-cyan-300/40 hover:bg-cyan-400/25'
+                  : 'text-amber-100 hover:bg-amber-400/15 hover:text-white'
+              } disabled:opacity-30`}
+              aria-label={isSceneCropEditing ? t('canvas.cancel') : t('sliceEditor.sceneCrop')}
+              aria-pressed={isSceneCropEditing}
+            >
+              <Crop size={15} />
+              <span className="hidden sm:inline">{t('sliceEditor.sceneCrop')}</span>
+            </button>
+          </ToolbarTooltip>
 
           <div aria-hidden="true" className="mx-1 h-5 w-px bg-slate-700" />
 
-          <button
-            type="button"
-            onClick={onAddTextLayer}
-            className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium text-rose-100 transition hover:bg-rose-500/15 hover:text-white sm:gap-1.5 sm:px-2.5 sm:text-xs"
-            aria-label={t('sliceEditor.addTextLayer')}
-            title={t('sliceEditor.addTextLayer')}
-          >
-            <PlusSquare size={16} />
-            <span className="hidden sm:inline">{t('sliceEditor.addTextLayer')}</span>
-          </button>
+          <ToolbarTooltip label={t('sliceEditor.addTextLayerTooltip')}>
+            <button
+              type="button"
+              onClick={onAddTextLayer}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium text-rose-100 transition hover:bg-rose-500/15 hover:text-white sm:gap-1.5 sm:px-2.5 sm:text-xs"
+              aria-label={t('sliceEditor.addTextLayer')}
+            >
+              <PlusSquare size={16} />
+              <span className="hidden sm:inline">{t('sliceEditor.addTextLayer')}</span>
+            </button>
+          </ToolbarTooltip>
 
-          <button
-            type="button"
-            onClick={onAddImageLayer}
-            className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium text-amber-100 transition hover:bg-amber-500/15 hover:text-white sm:gap-1.5 sm:px-2.5 sm:text-xs"
-            aria-label={t('sliceEditor.addImageLayer')}
-            title={t('sliceEditor.addImageLayer')}
-          >
-            <ImagePlus size={16} />
-            <span className="hidden sm:inline">{t('sliceEditor.addImageLayer')}</span>
-          </button>
+          <ToolbarTooltip label={t('sliceEditor.addImageLayerTooltip')}>
+            <button
+              type="button"
+              onClick={onAddImageLayer}
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-medium text-amber-100 transition hover:bg-amber-500/15 hover:text-white sm:gap-1.5 sm:px-2.5 sm:text-xs"
+              aria-label={t('sliceEditor.addImageLayer')}
+            >
+              <ImagePlus size={16} />
+              <span className="hidden sm:inline">{t('sliceEditor.addImageLayer')}</span>
+            </button>
+          </ToolbarTooltip>
 
           <div aria-hidden="true" className="mx-1 h-5 w-px bg-slate-700" />
         </div>
@@ -250,10 +281,9 @@ export default function EditorToolbar({
                 <Slider.Track className="relative h-3 w-full rounded-full bg-slate-700">
                   <Slider.Indicator className="absolute h-full rounded-full bg-cyan-500" />
                 </Slider.Track>
-                <Slider.Thumb
-                  className="block h-3 w-3 rounded-full border border-cyan-100 bg-cyan-400 shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300"
-                  title={t('sliceEditor.timelineZoom', { zoom: zoom.toFixed(2) })}
-                />
+                <ToolbarTooltip label={t('sliceEditor.timelineZoomTooltip', { zoom: zoom.toFixed(2) })}>
+                  <Slider.Thumb className="block h-3 w-3 rounded-full border border-cyan-100 bg-cyan-400 shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300" />
+                </ToolbarTooltip>
               </Slider.Control>
             </Slider.Root>
           </div>

@@ -1,6 +1,20 @@
 import type { AnnotationModel, SliceModel } from '../../types/editor';
 
 export function updateSliceDuration(slices: SliceModel[], sliceId: string, duration: number): SliceModel[] {
+  const targetSlice = slices.find((slice) => slice.id === sliceId);
+  if (!targetSlice) {
+    return slices;
+  }
+
+  const nextSliceStart = slices
+    .filter((slice) => slice.id !== sliceId && slice.timelineStart >= targetSlice.timelineStart)
+    .reduce<number | null>(
+      (closest, slice) => (closest === null || slice.timelineStart < closest ? slice.timelineStart : closest),
+      null,
+    );
+  const maxDuration = nextSliceStart === null ? Number.POSITIVE_INFINITY : Math.max(0.0001, nextSliceStart - targetSlice.timelineStart);
+  const nextDuration = Math.min(duration, maxDuration);
+
   return slices.map((slice) => {
     if (slice.id !== sliceId) {
       return slice;
@@ -8,12 +22,30 @@ export function updateSliceDuration(slices: SliceModel[], sliceId: string, durat
 
     return {
       ...slice,
-      duration,
+      duration: nextDuration,
     };
   });
 }
 
 export function updateSliceStart(slices: SliceModel[], sliceId: string, timelineStart: number): SliceModel[] {
+  const targetSlice = slices.find((slice) => slice.id === sliceId);
+  if (!targetSlice) {
+    return slices;
+  }
+
+  const previousSliceEnd = slices
+    .filter((slice) => slice.id !== sliceId && slice.timelineStart + slice.duration <= targetSlice.timelineStart)
+    .reduce((latestEnd, slice) => Math.max(latestEnd, slice.timelineStart + slice.duration), 0);
+  const nextSliceStart = slices
+    .filter((slice) => slice.id !== sliceId && slice.timelineStart >= targetSlice.timelineStart)
+    .reduce<number | null>(
+      (closest, slice) => (closest === null || slice.timelineStart < closest ? slice.timelineStart : closest),
+      null,
+    );
+  const maxStart =
+    nextSliceStart === null ? Number.POSITIVE_INFINITY : Math.max(previousSliceEnd, nextSliceStart - targetSlice.duration);
+  const nextTimelineStart = Math.max(previousSliceEnd, Math.min(timelineStart, maxStart));
+
   return slices.map((slice) => {
     if (slice.id !== sliceId) {
       return slice;
@@ -21,7 +53,7 @@ export function updateSliceStart(slices: SliceModel[], sliceId: string, timeline
 
     return {
       ...slice,
-      timelineStart,
+      timelineStart: nextTimelineStart,
     };
   });
 }
