@@ -5,11 +5,7 @@ import {
   moveAnnotationLayer,
   resizeAnnotationDuration,
 } from '../../lib/annotationTimeline';
-import type {
-  AnnotationModel,
-  DerivedSlice,
-  SliceModel,
-} from '../../types/editor';
+import { compactSlices, type AnnotationModel, type DerivedSlice, type SliceModel } from '../../types/editor';
 import { updateAnnotationStart, updateSliceDuration, updateSliceStart } from './sliceMutations';
 
 const MIN_SLICE_DURATION = 0.5;
@@ -134,7 +130,7 @@ export function useSliceEditorMutationHandlers({
     }
 
     if (selectedSliceId) {
-      const nextSlices = slices.filter((slice) => slice.id !== selectedSliceId);
+      const nextSlices = compactSlices(slices.filter((slice) => slice.id !== selectedSliceId));
       onSlicesCommit(nextSlices, null);
     }
   }, [annotations, onAnnotationsCommit, onSlicesCommit, selectedAnnotationId, selectedSliceId, slices]);
@@ -175,6 +171,10 @@ export function useSliceEditorMutationHandlers({
     (sliceId: string, newDuration: number) => {
       const clamped = Math.max(MIN_SLICE_DURATION, newDuration);
       const updated = updateSliceDuration(slices, sliceId, clamped);
+      if (updated === slices) {
+        return;
+      }
+
       pendingSliceCommitRef.current = updated;
       onSlicesPreview(updated);
     },
@@ -188,6 +188,10 @@ export function useSliceEditorMutationHandlers({
   const handleMoveSlice = useCallback(
     (sliceId: string, nextStart: number) => {
       const updated = updateSliceStart(slices, sliceId, nextStart);
+      if (updated === slices) {
+        return;
+      }
+
       pendingSliceCommitRef.current = updated;
       onSlicesPreview(updated);
     },
@@ -201,6 +205,10 @@ export function useSliceEditorMutationHandlers({
   const handleMoveAnnotation = useCallback(
     (annotationId: string, nextStart: number) => {
       const updated = updateAnnotationStart(annotations, annotationId, nextStart);
+      if (updated === annotations) {
+        return;
+      }
+
       pendingAnnotationCommitRef.current = updated;
       onAnnotationsPreview(updated);
     },

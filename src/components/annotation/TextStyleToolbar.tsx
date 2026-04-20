@@ -6,6 +6,7 @@ import {
   Bold,
   BringToFront,
   ChevronDown,
+  GripVertical,
   Italic,
   PaintBucket,
   PenLine,
@@ -27,6 +28,7 @@ import type { AnnotationTextStyle, TextAnnotation } from '../../types/editor';
 
 interface TextStyleToolbarProps {
   selectedTextAnnotation: TextAnnotation | null;
+  dragHandleClassName?: string;
   outlinePreviewScaleY?: number;
   showLayerMoveControls?: boolean;
   canBringToFront?: boolean;
@@ -225,6 +227,7 @@ function FontFamilySelect({
 
 export default function TextStyleToolbar({
   selectedTextAnnotation,
+  dragHandleClassName,
   outlinePreviewScaleY = 1,
   showLayerMoveControls = false,
   canBringToFront = false,
@@ -249,6 +252,17 @@ export default function TextStyleToolbar({
       aria-label={t('canvas.textToolbar')}
       className="timeline-scrollbar inline-flex max-w-[min(92vw,820px)] flex-wrap items-center justify-end gap-1 rounded-lg border border-slate-700/90 bg-slate-950/95 p-1.5 shadow-xl backdrop-blur"
     >
+      <ToolbarTooltip label={t('canvas.moveToolbar')}>
+        <div
+          className={`${dragHandleClassName ?? ''} inline-flex h-8 w-8 cursor-move touch-none select-none items-center justify-center rounded-md border border-slate-700 bg-slate-900 text-slate-400 transition hover:border-slate-500 hover:text-slate-200`}
+          aria-label={t('canvas.moveToolbar')}
+          role="presentation"
+        >
+          <GripVertical size={14} />
+        </div>
+      </ToolbarTooltip>
+      <Toolbar.Separator className="mx-1 h-5 w-px bg-slate-800" />
+
       <ToolbarTooltip label={t('canvas.boldTooltip')}>
         <Toolbar.Button
           aria-label={t('canvas.bold')}

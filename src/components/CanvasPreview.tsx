@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Rnd } from 'react-rnd';
 
 import ImageStyleToolbar from './annotation/ImageStyleToolbar';
 import CanvasPreviewHeader from './canvas-preview/CanvasPreviewHeader';
@@ -11,6 +12,29 @@ import { useCanvasViewport } from './canvas-preview/useCanvasViewport';
 import { useTextAnnotationEditor } from './canvas-preview/useTextAnnotationEditor';
 import type { AnnotationModel, AnnotationTextStyle, CropRect, ImageAnnotation, TextAnnotation, VideoMeta } from '../types/editor';
 import type { LayerEdgeDirection } from '../lib/annotationTimeline';
+
+const TOOLBAR_MARGIN = 12;
+
+type ToolbarKind = 'image' | 'text';
+
+interface ToolbarPosition {
+  x: number;
+  y: number;
+}
+
+function snapToolbarPosition(
+  position: ToolbarPosition,
+  bounds: { width: number; height: number },
+  toolbarSize: { width: number; height: number },
+): ToolbarPosition {
+  const maxX = Math.max(0, bounds.width - toolbarSize.width - TOOLBAR_MARGIN);
+  const maxY = Math.max(0, bounds.height - toolbarSize.height - TOOLBAR_MARGIN);
+
+  return {
+    x: position.x <= maxX / 2 ? TOOLBAR_MARGIN : maxX,
+    y: position.y <= maxY / 2 ? TOOLBAR_MARGIN : maxY,
+  };
+}
 
 function formatCropRect(crop: CropRect | null) {
   if (!crop) {
@@ -102,6 +126,12 @@ export default function CanvasPreview({
   fillHeight = false,
 }: CanvasPreviewProps) {
   const isEditing = editMode !== 'idle';
+  const textToolbarRef = useRef<HTMLDivElement>(null);
+  const imageToolbarRef = useRef<HTMLDivElement>(null);
+  const [toolbarPositions, setToolbarPositions] = useState<Record<ToolbarKind, ToolbarPosition | null>>({
+    text: null,
+    image: null,
+  });
 
   const { videoRef, viewportRef, viewport, frameSize, syncVideoTime, handleVideoLoadedMetadata } =
     useCanvasViewport({
@@ -200,11 +230,133 @@ export default function CanvasPreview({
     onStartCrop();
   }, [onStartCrop, stopPlayback]);
 
+  const measureToolbarPosition = useCallback(
+    (toolbarElement: HTMLDivElement | null): ToolbarPosition | null => {
+      const viewportElement = viewportRef.current;
+      if (!viewportElement || !toolbarElement) {
+        return null;
+      }
+
+      return {
+        x: Math.max(0, viewportElement.clientWidth - toolbarElement.offsetWidth - TOOLBAR_MARGIN),
+        y: Math.max(0, viewportElement.clientHeight - toolbarElement.offsetHeight - TOOLBAR_MARGIN),
+      };
+    },
+    [viewportRef],
+  );
+
+  const clampToolbarPosition = useCallback(
+    (position: ToolbarPosition, toolbarElement: HTMLDivElement | null): ToolbarPosition => {
+      const viewportElement = viewportRef.current;
+      if (!viewportElement || !toolbarElement) {
+        return position;
+      }
+
+      return {
+        x: Math.max(0, Math.min(position.x, viewportElement.clientWidth - toolbarElement.offsetWidth)),
+        y: Math.max(0, Math.min(position.y, viewportElement.clientHeight - toolbarElement.offsetHeight)),
+      };
+    },
+    [viewportRef],
+  );
+
+  const updateToolbarPosition = useCallback(
+    (kind: ToolbarKind, nextPosition: ToolbarPosition) => {
+      const toolbarElement = kind === 'text' ? textToolbarRef.current : imageToolbarRef.current;
+      const clamped = clampToolbarPosition(nextPosition, toolbarElement);
+      setToolbarPositions((current) => {
+        const previous = current[kind];
+        if (previous && previous.x === clamped.x && previous.y === clamped.y) {
+          return current;
+        }
+
+        return {
+          ...current,
+          [kind]: clamped,
+        };
+      });
+    },
+    [clampToolbarPosition],
+  );
+
+  const snapToolbarToCorner = useCallback(
+    (kind: ToolbarKind, nextPosition: ToolbarPosition) => {
+      const toolbarElement = kind === 'text' ? textToolbarRef.current : imageToolbarRef.current;
+      const viewportElement = viewportRef.current;
+      if (!toolbarElement || !viewportElement) {
+        updateToolbarPosition(kind, nextPosition);
+        return;
+      }
+
+      const snapped = snapToolbarPosition(
+        nextPosition,
+        {
+          width: viewportElement.clientWidth,
+          height: viewportElement.clientHeight,
+        },
+        {
+          width: toolbarElement.offsetWidth,
+          height: toolbarElement.offsetHeight,
+        },
+      );
+
+      updateToolbarPosition(kind, snapped);
+    },
+    [updateToolbarPosition, viewportRef],
+  );
+
   const previewScale = Math.min(frameSize.width / Math.max(1, baseCrop.w), frameSize.height / Math.max(1, baseCrop.h));
   const overlayWidth = baseCrop.w * previewScale;
   const overlayHeight = baseCrop.h * previewScale;
   const overlayOffsetX = (frameSize.width - overlayWidth) / 2;
   const overlayOffsetY = (frameSize.height - overlayHeight) / 2;
+
+  useLayoutEffect(() => {
+    if (isEditing || !selectedTextAnnotation || toolbarPositions.text) {
+      return;
+    }
+
+    const nextPosition = measureToolbarPosition(textToolbarRef.current);
+    if (nextPosition) {
+      setToolbarPositions((current) => ({ ...current, text: nextPosition }));
+    }
+  }, [isEditing, measureToolbarPosition, selectedTextAnnotation, toolbarPositions.text]);
+
+  useLayoutEffect(() => {
+    if (isEditing || selectedTextAnnotation || !selectedImageAnnotation || toolbarPositions.image) {
+      return;
+    }
+
+    const nextPosition = measureToolbarPosition(imageToolbarRef.current);
+    if (nextPosition) {
+      setToolbarPositions((current) => ({ ...current, image: nextPosition }));
+    }
+  }, [isEditing, measureToolbarPosition, selectedImageAnnotation, selectedTextAnnotation, toolbarPositions.image]);
+
+  useEffect(() => {
+    setToolbarPositions((current) => {
+      let changed = false;
+      const next = { ...current };
+
+      ([
+        ['text', textToolbarRef.current],
+        ['image', imageToolbarRef.current],
+      ] as const).forEach(([kind, toolbarElement]) => {
+        const currentPosition = current[kind];
+        if (!currentPosition || !toolbarElement) {
+          return;
+        }
+
+        const clamped = clampToolbarPosition(currentPosition, toolbarElement);
+        if (clamped.x !== currentPosition.x || clamped.y !== currentPosition.y) {
+          next[kind] = clamped;
+          changed = true;
+        }
+      });
+
+      return changed ? next : current;
+    });
+  }, [clampToolbarPosition, frameSize.height, frameSize.width]);
 
   useEffect(() => {
     console.debug('[crop-debug] canvas frame metrics', {
@@ -324,15 +476,31 @@ export default function CanvasPreview({
           )}
 
           {!isEditing && selectedTextAnnotation ? (
-            <div className="pointer-events-none absolute bottom-3 right-3 z-20 flex max-w-[calc(100%-1.5rem)] justify-end">
+            <Rnd
+              bounds="parent"
+              enableResizing={false}
+              dragHandleClassName="annotation-toolbar__drag-handle"
+              position={toolbarPositions.text ?? { x: 0, y: 0 }}
+              size={{ width: 'auto', height: 'auto' }}
+              onDrag={(_, data) => {
+                updateToolbarPosition('text', { x: data.x, y: data.y });
+              }}
+              onDragStop={(_, data) => {
+                snapToolbarToCorner('text', { x: data.x, y: data.y });
+              }}
+              className="z-20"
+            >
               <div
                 data-annotation-box="true"
-                className="pointer-events-auto"
+                ref={textToolbarRef}
+                className="pointer-events-auto max-w-[calc(100vw-2rem)]"
+                style={{ visibility: toolbarPositions.text ? 'visible' : 'hidden' }}
                 onPointerDown={(event) => {
                   event.stopPropagation();
                 }}
               >
                 <TextStyleToolbar
+                  dragHandleClassName="annotation-toolbar__drag-handle"
                   selectedTextAnnotation={selectedTextAnnotation}
                   outlinePreviewScaleY={outlinePreviewScaleY}
                   showLayerMoveControls={hasSelectedAnnotationLayerOverlap}
@@ -344,19 +512,35 @@ export default function CanvasPreview({
                   onDelete={onDeleteSelectedAnnotation}
                 />
               </div>
-            </div>
+            </Rnd>
           ) : null}
 
           {!isEditing && !selectedTextAnnotation && selectedImageAnnotation ? (
-            <div className="pointer-events-none absolute bottom-3 right-3 z-20 flex max-w-[calc(100%-1.5rem)] justify-end">
+            <Rnd
+              bounds="parent"
+              enableResizing={false}
+              dragHandleClassName="annotation-toolbar__drag-handle"
+              position={toolbarPositions.image ?? { x: 0, y: 0 }}
+              size={{ width: 'auto', height: 'auto' }}
+              onDrag={(_, data) => {
+                updateToolbarPosition('image', { x: data.x, y: data.y });
+              }}
+              onDragStop={(_, data) => {
+                snapToolbarToCorner('image', { x: data.x, y: data.y });
+              }}
+              className="z-20"
+            >
               <div
                 data-annotation-box="true"
-                className="pointer-events-auto"
+                ref={imageToolbarRef}
+                className="pointer-events-auto max-w-[calc(100vw-2rem)]"
+                style={{ visibility: toolbarPositions.image ? 'visible' : 'hidden' }}
                 onPointerDown={(event) => {
                   event.stopPropagation();
                 }}
               >
                 <ImageStyleToolbar
+                  dragHandleClassName="annotation-toolbar__drag-handle"
                   selectedImageAnnotation={selectedImageAnnotation}
                   showLayerMoveControls={hasSelectedAnnotationLayerOverlap}
                   canBringToFront={canBringSelectedAnnotationToFront}
@@ -367,7 +551,7 @@ export default function CanvasPreview({
                   onDelete={onDeleteSelectedAnnotation}
                 />
               </div>
-            </div>
+            </Rnd>
           ) : null}
         </div>
       </div>

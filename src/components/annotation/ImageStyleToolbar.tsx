@@ -1,6 +1,6 @@
 import { Tooltip } from '@base-ui/react/tooltip';
 import { Toolbar } from '@base-ui/react/toolbar';
-import { BringToFront, SendToBack, Trash2 } from 'lucide-react';
+import { BringToFront, GripVertical, SendToBack, Trash2 } from 'lucide-react';
 import { type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -8,6 +8,7 @@ import type { ImageAnnotation } from '../../types/editor';
 
 interface ImageStyleToolbarProps {
   selectedImageAnnotation: ImageAnnotation | null;
+  dragHandleClassName?: string;
   showLayerMoveControls: boolean;
   canBringToFront: boolean;
   canSendToBack: boolean;
@@ -40,6 +41,7 @@ function ToolbarTooltip({
 
 export default function ImageStyleToolbar({
   selectedImageAnnotation,
+  dragHandleClassName,
   showLayerMoveControls,
   canBringToFront,
   canSendToBack,
@@ -61,6 +63,17 @@ export default function ImageStyleToolbar({
       aria-label={t('canvas.imageToolbar')}
       className="timeline-scrollbar inline-flex max-w-[min(92vw,820px)] flex-wrap items-center justify-end gap-1 rounded-lg border border-slate-700/90 bg-slate-950/95 p-1.5 shadow-xl backdrop-blur"
     >
+      <ToolbarTooltip label={t('canvas.moveToolbar')}>
+        <div
+          className={`${dragHandleClassName ?? ''} inline-flex h-8 w-8 cursor-move touch-none select-none items-center justify-center rounded-md border border-slate-700 bg-slate-900 text-slate-400 transition hover:border-slate-500 hover:text-slate-200`}
+          aria-label={t('canvas.moveToolbar')}
+          role="presentation"
+        >
+          <GripVertical size={14} />
+        </div>
+      </ToolbarTooltip>
+      <Toolbar.Separator className="mx-1 h-5 w-px bg-slate-800" />
+
       <label className="inline-flex h-8 items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-2 text-[11px] text-slate-200">
         <span className="shrink-0 text-slate-400">{t('canvas.imageOpacity')}</span>
         <input

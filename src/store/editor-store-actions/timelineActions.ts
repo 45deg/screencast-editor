@@ -1,5 +1,6 @@
 import {
   cloneAnnotations,
+  compactSlices,
   cloneCrop,
   cloneSlices,
   deriveSlices,
@@ -134,7 +135,7 @@ export function createTimelineActions(set: EditorStoreSet): TimelineActions {
           return state;
         }
 
-        const nextSlices = state.slices.filter((slice) => slice.id !== state.selectedSliceId);
+        const nextSlices = compactSlices(state.slices.filter((slice) => slice.id !== state.selectedSliceId));
         if (nextSlices.length === state.slices.length) {
           return state;
         }

@@ -164,6 +164,29 @@ export function cloneSlices(slices: SliceModel[]): SliceModel[] {
   }));
 }
 
+export function compactSlices(slices: SliceModel[]): SliceModel[] {
+  const sortedSlices = [...slices].sort((a, b) => a.timelineStart - b.timelineStart || a.id.localeCompare(b.id));
+  let nextTimelineStart = 0;
+  let changed = false;
+
+  const compacted = sortedSlices.map((slice) => {
+    const normalizedStart = Math.max(0, nextTimelineStart);
+    nextTimelineStart = normalizedStart + slice.duration;
+
+    if (slice.timelineStart === normalizedStart) {
+      return slice;
+    }
+
+    changed = true;
+    return {
+      ...slice,
+      timelineStart: normalizedStart,
+    };
+  });
+
+  return changed ? compacted : slices;
+}
+
 export function cloneAnnotationStyle(style: AnnotationTextStyle): AnnotationTextStyle {
   return {
     ...style,

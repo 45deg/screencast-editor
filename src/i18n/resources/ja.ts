@@ -151,6 +151,7 @@ export const jaTranslation = {
     resizeEast: '右辺をリサイズ',
     textToolbar: 'テキストレイヤーのスタイル設定',
     imageToolbar: '画像レイヤーのスタイル設定',
+    moveToolbar: 'ツールバーを移動',
     textContent: 'テキスト内容',
     textPlaceholder: '字幕テキストを入力',
     defaultText: '新しいテキスト',

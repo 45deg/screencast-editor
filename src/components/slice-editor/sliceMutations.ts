@@ -14,6 +14,9 @@ export function updateSliceDuration(slices: SliceModel[], sliceId: string, durat
     );
   const maxDuration = nextSliceStart === null ? Number.POSITIVE_INFINITY : Math.max(0.0001, nextSliceStart - targetSlice.timelineStart);
   const nextDuration = Math.min(duration, maxDuration);
+  if (nextDuration === targetSlice.duration) {
+    return slices;
+  }
 
   return slices.map((slice) => {
     if (slice.id !== sliceId) {
@@ -45,6 +48,9 @@ export function updateSliceStart(slices: SliceModel[], sliceId: string, timeline
   const maxStart =
     nextSliceStart === null ? Number.POSITIVE_INFINITY : Math.max(previousSliceEnd, nextSliceStart - targetSlice.duration);
   const nextTimelineStart = Math.max(previousSliceEnd, Math.min(timelineStart, maxStart));
+  if (nextTimelineStart === targetSlice.timelineStart) {
+    return slices;
+  }
 
   return slices.map((slice) => {
     if (slice.id !== sliceId) {
@@ -63,6 +69,11 @@ export function updateAnnotationStart(
   annotationId: string,
   start: number,
 ): AnnotationModel[] {
+  const targetAnnotation = annotations.find((annotation) => annotation.id === annotationId);
+  if (!targetAnnotation || targetAnnotation.start === start) {
+    return annotations;
+  }
+
   return annotations.map((annotation) => {
     if (annotation.id !== annotationId) {
       return annotation;

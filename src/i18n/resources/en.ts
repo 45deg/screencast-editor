@@ -151,6 +151,7 @@ export const enTranslation = {
     resizeEast: 'Resize east',
     textToolbar: 'Text layer styling toolbar',
     imageToolbar: 'Image layer styling toolbar',
+    moveToolbar: 'Move toolbar',
     textContent: 'Text content',
     textPlaceholder: 'Add caption text',
     defaultText: 'New text',
