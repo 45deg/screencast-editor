@@ -28,9 +28,9 @@ export default function ExportDetailsSection({
   );
   const mp4PresetOptions: Array<{ value: Mp4PresetKey; label: string }> = [
     { value: 'size', label: t('propertyPanel.fileSizeFocused') },
-    { value: 'balance', label: 'Balanced' },
+    { value: 'balance', label: t('propertyPanel.balance') },
     { value: 'high_quality', label: t('propertyPanel.qualityFocused') },
-    { value: 'manual', label: 'Manual' },
+    { value: 'manual', label: t('propertyPanel.manual') },
   ];
 
   return (

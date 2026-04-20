@@ -1,17 +1,20 @@
 import { Switch } from '@base-ui/react/switch';
 import { Popover } from '@base-ui/react/popover';
+import { Tooltip } from '@base-ui/react/tooltip';
 import { Toolbar } from '@base-ui/react/toolbar';
 import {
   Bold,
+  BringToFront,
   ChevronDown,
   Italic,
   PaintBucket,
   PenLine,
+  SendToBack,
   Trash2,
   Type,
   TypeOutline,
 } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { type ReactElement, type ReactNode, useState } from 'react';
 import { HexAlphaColorPicker } from 'react-colorful';
 import { useTranslation } from 'react-i18next';
 
@@ -25,7 +28,12 @@ import type { AnnotationTextStyle, TextAnnotation } from '../../types/editor';
 interface TextStyleToolbarProps {
   selectedTextAnnotation: TextAnnotation | null;
   outlinePreviewScaleY?: number;
+  showLayerMoveControls?: boolean;
+  canBringToFront?: boolean;
+  canSendToBack?: boolean;
   onStyleChange: (next: Partial<AnnotationTextStyle>) => void;
+  onBringToFront?: () => void;
+  onSendToBack?: () => void;
   onDelete?: () => void;
 }
 
@@ -123,6 +131,27 @@ function ColorPopoverField({
   );
 }
 
+function ToolbarTooltip({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactElement;
+}) {
+  return (
+    <Tooltip.Root>
+      <Tooltip.Trigger render={children} />
+      <Tooltip.Portal>
+        <Tooltip.Positioner side="top" sideOffset={8} className="z-[130]">
+          <Tooltip.Popup className="rounded-md border border-slate-700 bg-slate-950/98 px-2 py-1 text-[11px] text-slate-100 shadow-xl backdrop-blur">
+            {label}
+          </Tooltip.Popup>
+        </Tooltip.Positioner>
+      </Tooltip.Portal>
+    </Tooltip.Root>
+  );
+}
+
 function FontFamilySelect({
   value,
   ariaLabel,
@@ -193,7 +222,12 @@ function FontFamilySelect({
 export default function TextStyleToolbar({
   selectedTextAnnotation,
   outlinePreviewScaleY = 1,
+  showLayerMoveControls = false,
+  canBringToFront = false,
+  canSendToBack = false,
   onStyleChange,
+  onBringToFront,
+  onSendToBack,
   onDelete,
 }: TextStyleToolbarProps) {
   const { t } = useTranslation();
@@ -312,6 +346,34 @@ export default function TextStyleToolbar({
         value={style.outlineColor}
         onChange={(value) => onStyleChange({ outlineColor: value })}
       />
+
+      {showLayerMoveControls ? (
+        <>
+          <Toolbar.Separator className="mx-1 h-5 w-px bg-slate-800" />
+          {canBringToFront && onBringToFront ? (
+            <ToolbarTooltip label={t('canvas.bringToFront')}>
+              <Toolbar.Button
+                aria-label={t('canvas.bringToFront')}
+                onClick={() => onBringToFront()}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-700 bg-slate-900 text-slate-200 transition hover:border-slate-500"
+              >
+                <BringToFront size={13} />
+              </Toolbar.Button>
+            </ToolbarTooltip>
+          ) : null}
+          {canSendToBack && onSendToBack ? (
+            <ToolbarTooltip label={t('canvas.sendToBack')}>
+              <Toolbar.Button
+                aria-label={t('canvas.sendToBack')}
+                onClick={() => onSendToBack()}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-700 bg-slate-900 text-slate-200 transition hover:border-slate-500"
+              >
+                <SendToBack size={13} />
+              </Toolbar.Button>
+            </ToolbarTooltip>
+          ) : null}
+        </>
+      ) : null}
 
       {onDelete ? (
         <>

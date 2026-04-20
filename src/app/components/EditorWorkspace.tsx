@@ -12,6 +12,7 @@ import type {
   TextAnnotation,
   VideoMeta,
 } from '../../types/editor';
+import type { LayerEdgeDirection } from '../../lib/annotationTimeline';
 
 interface EditorWorkspaceProps {
   video: VideoMeta;
@@ -24,6 +25,7 @@ interface EditorWorkspaceProps {
   selectedSliceId: string | null;
   selectedAnnotationId: string | null;
   selectedTextAnnotation: TextAnnotation | null;
+  selectedImageAnnotation: Extract<AnnotationModel, { kind: 'image' }> | null;
   hasActiveVideoSlice: boolean;
   cropEditMode: 'idle' | 'crop' | 'scene';
   effectiveEditCrop: CropRect | null;
@@ -46,6 +48,11 @@ interface EditorWorkspaceProps {
   onAnnotationPositionCommit: () => void;
   onTextAnnotationChange: (annotationId: string, text: string) => void;
   onTextAnnotationStyleChange: (next: Partial<AnnotationTextStyle>) => void;
+  onSelectedImageOpacityChange: (opacity: number) => void;
+  hasSelectedAnnotationLayerOverlap: boolean;
+  canBringSelectedAnnotationToFront: boolean;
+  canSendSelectedAnnotationToBack: boolean;
+  onMoveSelectedAnnotationLayer: (direction: LayerEdgeDirection) => void;
   onDeleteSelectedAnnotation: () => void;
   slices: SliceModel[];
   annotations: AnnotationModel[];
@@ -86,6 +93,7 @@ export default function EditorWorkspace({
   selectedSliceId,
   selectedAnnotationId,
   selectedTextAnnotation,
+  selectedImageAnnotation,
   hasActiveVideoSlice,
   cropEditMode,
   effectiveEditCrop,
@@ -102,6 +110,11 @@ export default function EditorWorkspace({
   onAnnotationPositionCommit,
   onTextAnnotationChange,
   onTextAnnotationStyleChange,
+  onSelectedImageOpacityChange,
+  hasSelectedAnnotationLayerOverlap,
+  canBringSelectedAnnotationToFront,
+  canSendSelectedAnnotationToBack,
+  onMoveSelectedAnnotationLayer,
   onDeleteSelectedAnnotation,
   slices,
   annotations,
@@ -147,6 +160,7 @@ export default function EditorWorkspace({
                 activeAnnotations={activeAnnotations}
                 selectedAnnotationId={selectedAnnotationId}
                 selectedTextAnnotation={selectedTextAnnotation}
+                selectedImageAnnotation={selectedImageAnnotation}
                 hasActiveVideoSlice={hasActiveVideoSlice}
                 editMode={cropEditMode}
                 editCrop={effectiveEditCrop}
@@ -162,6 +176,11 @@ export default function EditorWorkspace({
                 onAnnotationPositionCommit={onAnnotationPositionCommit}
                 onTextAnnotationChange={onTextAnnotationChange}
                 onTextAnnotationStyleChange={onTextAnnotationStyleChange}
+                onSelectedImageOpacityChange={onSelectedImageOpacityChange}
+                hasSelectedAnnotationLayerOverlap={hasSelectedAnnotationLayerOverlap}
+                canBringSelectedAnnotationToFront={canBringSelectedAnnotationToFront}
+                canSendSelectedAnnotationToBack={canSendSelectedAnnotationToBack}
+                onMoveSelectedAnnotationLayer={onMoveSelectedAnnotationLayer}
                 onDeleteSelectedAnnotation={onDeleteSelectedAnnotation}
                 outputHeight={exportSettings.height}
                 className="h-full"

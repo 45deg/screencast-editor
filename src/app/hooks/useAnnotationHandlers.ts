@@ -1,6 +1,12 @@
 import { useCallback, useRef } from 'react';
 
 import { clampAnnotationPosition, clampImageAnnotationRect } from '../appUtils';
+import {
+  canMoveAnnotationLayerToEdge,
+  hasOverlappingAnnotationLayers,
+  moveAnnotationLayerToEdge,
+  type LayerEdgeDirection,
+} from '../../lib/annotationTimeline';
 import type { AnnotationModel, AnnotationTextStyle, CropRect, TextAnnotation } from '../../types/editor';
 
 interface UseAnnotationHandlersArgs {
@@ -25,6 +31,12 @@ export function useAnnotationHandlers({
   setSelectedAnnotationId,
 }: UseAnnotationHandlersArgs) {
   const pendingAnnotationPreviewRef = useRef<AnnotationModel[] | null>(null);
+  const hasSelectedAnnotationLayerOverlap =
+    selectedAnnotationId !== null && hasOverlappingAnnotationLayers(annotations, selectedAnnotationId);
+  const canBringSelectedAnnotationToFront =
+    selectedAnnotationId !== null && canMoveAnnotationLayerToEdge(annotations, selectedAnnotationId, 'front');
+  const canSendSelectedAnnotationToBack =
+    selectedAnnotationId !== null && canMoveAnnotationLayerToEdge(annotations, selectedAnnotationId, 'back');
 
   const resetPendingAnnotationPreview = useCallback(() => {
     pendingAnnotationPreviewRef.current = null;
@@ -164,7 +176,48 @@ export function useAnnotationHandlers({
     setSelectedAnnotationId(null);
   }, [annotations, replaceAnnotationsCommit, selectedAnnotationId, setSelectedAnnotationId]);
 
+  const handleSelectedImageOpacityChange = useCallback(
+    (opacity: number) => {
+      if (!selectedAnnotationId) {
+        return;
+      }
+
+      const nextAnnotations = annotations.map((annotation) => {
+        if (annotation.id !== selectedAnnotationId || annotation.kind !== 'image') {
+          return annotation;
+        }
+
+        return {
+          ...annotation,
+          opacity: Math.max(0, Math.min(1, opacity)),
+        };
+      });
+
+      replaceAnnotationsCommit(nextAnnotations, selectedAnnotationId);
+    },
+    [annotations, replaceAnnotationsCommit, selectedAnnotationId],
+  );
+
+  const handleMoveSelectedAnnotationLayer = useCallback(
+    (direction: LayerEdgeDirection) => {
+      if (!selectedAnnotationId) {
+        return;
+      }
+
+      const nextAnnotations = moveAnnotationLayerToEdge(annotations, selectedAnnotationId, direction);
+      if (nextAnnotations === annotations) {
+        return;
+      }
+
+      replaceAnnotationsCommit(nextAnnotations, selectedAnnotationId);
+    },
+    [annotations, replaceAnnotationsCommit, selectedAnnotationId],
+  );
+
   return {
+    hasSelectedAnnotationLayerOverlap,
+    canBringSelectedAnnotationToFront,
+    canSendSelectedAnnotationToBack,
     pendingAnnotationPreviewRef,
     resetPendingAnnotationPreview,
     handleSelectedAnnotationChange,
@@ -173,6 +226,8 @@ export function useAnnotationHandlers({
     handleAnnotationPositionCommit,
     handleTextAnnotationChange,
     handleTextAnnotationStyleChange,
+    handleSelectedImageOpacityChange,
+    handleMoveSelectedAnnotationLayer,
     handleDeleteSelectedAnnotation,
   };
 }

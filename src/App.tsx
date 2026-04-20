@@ -67,6 +67,7 @@ export default function App() {
     activeSceneCrop,
     activeAnnotations,
     selectedTextAnnotation,
+    selectedImageAnnotation,
     hasVideo,
     totalDuration,
     previewSourceTime,
@@ -93,6 +94,11 @@ export default function App() {
     handleAnnotationPositionCommit,
     handleTextAnnotationChange,
     handleTextAnnotationStyleChange,
+    handleSelectedImageOpacityChange,
+    hasSelectedAnnotationLayerOverlap,
+    canBringSelectedAnnotationToFront,
+    canSendSelectedAnnotationToBack,
+    handleMoveSelectedAnnotationLayer,
     handleDeleteSelectedAnnotation,
   } = useAnnotationHandlers({
     annotations,
@@ -237,6 +243,7 @@ export default function App() {
               selectedSliceId={selectedSliceId}
               selectedAnnotationId={selectedAnnotationId}
               selectedTextAnnotation={selectedTextAnnotation}
+              selectedImageAnnotation={selectedImageAnnotation}
               hasActiveVideoSlice={Boolean(previewSlice)}
               cropEditMode={cropEditMode}
               effectiveEditCrop={effectiveEditCrop}
@@ -253,6 +260,11 @@ export default function App() {
               onAnnotationPositionCommit={handleAnnotationPositionCommit}
               onTextAnnotationChange={handleTextAnnotationChange}
               onTextAnnotationStyleChange={handleTextAnnotationStyleChange}
+              onSelectedImageOpacityChange={handleSelectedImageOpacityChange}
+              hasSelectedAnnotationLayerOverlap={hasSelectedAnnotationLayerOverlap}
+              canBringSelectedAnnotationToFront={canBringSelectedAnnotationToFront}
+              canSendSelectedAnnotationToBack={canSendSelectedAnnotationToBack}
+              onMoveSelectedAnnotationLayer={handleMoveSelectedAnnotationLayer}
               onDeleteSelectedAnnotation={handleDeleteSelectedAnnotation}
               slices={slices}
               annotations={annotations}

@@ -1,6 +1,7 @@
 import type { AnnotationModel, DerivedAnnotation } from '../types/editor';
 
 export type LayerMoveDirection = 'up' | 'down';
+export type LayerEdgeDirection = 'front' | 'back';
 
 export interface UnifiedAnnotationPlacement<T extends DerivedAnnotation = DerivedAnnotation> {
   annotation: T;
@@ -45,31 +46,68 @@ function getOverlappingIndices(annotations: AnnotationModel[], annotationId: str
   return indices;
 }
 
+function getSelectedOverlapPosition(annotations: AnnotationModel[], annotationId: string) {
+  const selectedIndex = annotations.findIndex((annotation) => annotation.id === annotationId);
+  if (selectedIndex < 0) {
+    return null;
+  }
+
+  const overlapIndices = getOverlappingIndices(annotations, annotationId);
+  if (overlapIndices.length <= 1) {
+    return null;
+  }
+
+  const groupPosition = overlapIndices.indexOf(selectedIndex);
+  if (groupPosition < 0) {
+    return null;
+  }
+
+  return {
+    selectedIndex,
+    overlapIndices,
+    groupPosition,
+  };
+}
+
 export function canMoveAnnotationLayer(
   annotations: AnnotationModel[],
   annotationId: string,
   direction: LayerMoveDirection,
 ): boolean {
-  const selectedIndex = annotations.findIndex((annotation) => annotation.id === annotationId);
-  if (selectedIndex < 0) {
-    return false;
-  }
-
-  const overlapIndices = getOverlappingIndices(annotations, annotationId);
-  if (overlapIndices.length <= 1) {
-    return false;
-  }
-
-  const groupPosition = overlapIndices.indexOf(selectedIndex);
-  if (groupPosition < 0) {
+  const overlap = getSelectedOverlapPosition(annotations, annotationId);
+  if (!overlap) {
     return false;
   }
 
   if (direction === 'up') {
-    return groupPosition > 0;
+    return overlap.groupPosition > 0;
   }
 
-  return groupPosition < overlapIndices.length - 1;
+  return overlap.groupPosition < overlap.overlapIndices.length - 1;
+}
+
+export function canMoveAnnotationLayerToEdge(
+  annotations: AnnotationModel[],
+  annotationId: string,
+  direction: LayerEdgeDirection,
+): boolean {
+  const overlap = getSelectedOverlapPosition(annotations, annotationId);
+  if (!overlap) {
+    return false;
+  }
+
+  if (direction === 'front') {
+    return overlap.groupPosition < overlap.overlapIndices.length - 1;
+  }
+
+  return overlap.groupPosition > 0;
+}
+
+export function hasOverlappingAnnotationLayers(
+  annotations: AnnotationModel[],
+  annotationId: string,
+): boolean {
+  return getSelectedOverlapPosition(annotations, annotationId) !== null;
 }
 
 export function buildUnifiedAnnotationLayout<T extends DerivedAnnotation>(annotations: T[]): UnifiedAnnotationLayout<T> {
@@ -128,32 +166,47 @@ export function moveAnnotationLayer(
   annotationId: string,
   direction: LayerMoveDirection,
 ): AnnotationModel[] {
-  const selectedIndex = annotations.findIndex((annotation) => annotation.id === annotationId);
-  if (selectedIndex < 0) {
+  const overlap = getSelectedOverlapPosition(annotations, annotationId);
+  if (!overlap) {
     return annotations;
   }
 
-  const overlapIndices = getOverlappingIndices(annotations, annotationId);
-  if (overlapIndices.length <= 1) {
+  const targetGroupPosition = direction === 'up' ? overlap.groupPosition - 1 : overlap.groupPosition + 1;
+  if (targetGroupPosition < 0 || targetGroupPosition >= overlap.overlapIndices.length) {
     return annotations;
   }
 
-  const groupPosition = overlapIndices.indexOf(selectedIndex);
-  if (groupPosition < 0) {
-    return annotations;
-  }
-
-  const targetGroupPosition = direction === 'up' ? groupPosition - 1 : groupPosition + 1;
-  if (targetGroupPosition < 0 || targetGroupPosition >= overlapIndices.length) {
-    return annotations;
-  }
-
-  const targetIndex = overlapIndices[targetGroupPosition];
+  const targetIndex = overlap.overlapIndices[targetGroupPosition];
 
   const next = [...annotations];
-  const selected = next[selectedIndex];
-  next[selectedIndex] = next[targetIndex];
+  const selected = next[overlap.selectedIndex];
+  next[overlap.selectedIndex] = next[targetIndex];
   next[targetIndex] = selected;
+  return next;
+}
+
+export function moveAnnotationLayerToEdge(
+  annotations: AnnotationModel[],
+  annotationId: string,
+  direction: LayerEdgeDirection,
+): AnnotationModel[] {
+  const overlap = getSelectedOverlapPosition(annotations, annotationId);
+  if (!overlap) {
+    return annotations;
+  }
+
+  const targetIndex =
+    direction === 'front'
+      ? overlap.overlapIndices[overlap.overlapIndices.length - 1]
+      : overlap.overlapIndices[0];
+
+  if (targetIndex === overlap.selectedIndex) {
+    return annotations;
+  }
+
+  const next = [...annotations];
+  const [selected] = next.splice(overlap.selectedIndex, 1);
+  next.splice(targetIndex, 0, selected);
   return next;
 }
 

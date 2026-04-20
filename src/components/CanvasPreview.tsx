@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo } from 'react';
-import { Button } from '@base-ui/react/button';
-import { Trash2 } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
 
+import ImageStyleToolbar from './annotation/ImageStyleToolbar';
 import CanvasPreviewHeader from './canvas-preview/CanvasPreviewHeader';
 import CropEditOverlay from './canvas-preview/CropEditOverlay';
 import PreviewOverlay from './canvas-preview/PreviewOverlay';
@@ -11,7 +9,8 @@ import { clampRectToVideo, computeDisplayLayout } from './canvas-preview/math';
 import { useCanvasPlayback } from './canvas-preview/useCanvasPlayback';
 import { useCanvasViewport } from './canvas-preview/useCanvasViewport';
 import { useTextAnnotationEditor } from './canvas-preview/useTextAnnotationEditor';
-import type { AnnotationModel, AnnotationTextStyle, CropRect, TextAnnotation, VideoMeta } from '../types/editor';
+import type { AnnotationModel, AnnotationTextStyle, CropRect, ImageAnnotation, TextAnnotation, VideoMeta } from '../types/editor';
+import type { LayerEdgeDirection } from '../lib/annotationTimeline';
 
 function formatCropRect(crop: CropRect | null) {
   if (!crop) {
@@ -32,6 +31,7 @@ interface CanvasPreviewProps {
   activeAnnotations: AnnotationModel[];
   selectedAnnotationId: string | null;
   selectedTextAnnotation: TextAnnotation | null;
+  selectedImageAnnotation: ImageAnnotation | null;
   hasActiveVideoSlice: boolean;
   editMode: 'idle' | 'crop' | 'scene';
   editCrop: CropRect | null;
@@ -53,6 +53,11 @@ interface CanvasPreviewProps {
   onAnnotationPositionCommit: () => void;
   onTextAnnotationChange: (annotationId: string, text: string) => void;
   onTextAnnotationStyleChange: (next: Partial<AnnotationTextStyle>) => void;
+  onSelectedImageOpacityChange: (opacity: number) => void;
+  hasSelectedAnnotationLayerOverlap: boolean;
+  canBringSelectedAnnotationToFront: boolean;
+  canSendSelectedAnnotationToBack: boolean;
+  onMoveSelectedAnnotationLayer: (direction: LayerEdgeDirection) => void;
   onDeleteSelectedAnnotation: () => void;
   outputHeight: number;
   className?: string;
@@ -70,6 +75,7 @@ export default function CanvasPreview({
   activeAnnotations,
   selectedAnnotationId,
   selectedTextAnnotation,
+  selectedImageAnnotation,
   hasActiveVideoSlice,
   editMode,
   editCrop,
@@ -85,12 +91,16 @@ export default function CanvasPreview({
   onAnnotationPositionCommit,
   onTextAnnotationChange,
   onTextAnnotationStyleChange,
+  onSelectedImageOpacityChange,
+  hasSelectedAnnotationLayerOverlap,
+  canBringSelectedAnnotationToFront,
+  canSendSelectedAnnotationToBack,
+  onMoveSelectedAnnotationLayer,
   onDeleteSelectedAnnotation,
   outputHeight,
   className,
   fillHeight = false,
 }: CanvasPreviewProps) {
-  const { t } = useTranslation();
   const isEditing = editMode !== 'idle';
 
   const { videoRef, viewportRef, viewport, frameSize, syncVideoTime, handleVideoLoadedMetadata } =
@@ -104,10 +114,6 @@ export default function CanvasPreview({
   const displayLayout = useMemo(() => {
     return computeDisplayLayout(video, baseCrop, activeSceneCrop);
   }, [activeSceneCrop, baseCrop, video]);
-  const selectedImageAnnotation = useMemo(() => {
-    const selected = activeAnnotations.find((annotation) => annotation.id === selectedAnnotationId);
-    return selected?.kind === 'image' ? selected : null;
-  }, [activeAnnotations, selectedAnnotationId]);
   const outlinePreviewScaleY = useMemo(() => {
     return outputHeight / Math.max(1, baseCrop.h);
   }, [baseCrop.h, outputHeight]);
@@ -329,7 +335,12 @@ export default function CanvasPreview({
                 <TextStyleToolbar
                   selectedTextAnnotation={selectedTextAnnotation}
                   outlinePreviewScaleY={outlinePreviewScaleY}
+                  showLayerMoveControls={hasSelectedAnnotationLayerOverlap}
+                  canBringToFront={canBringSelectedAnnotationToFront}
+                  canSendToBack={canSendSelectedAnnotationToBack}
                   onStyleChange={onTextAnnotationStyleChange}
+                  onBringToFront={() => onMoveSelectedAnnotationLayer('front')}
+                  onSendToBack={() => onMoveSelectedAnnotationLayer('back')}
                   onDelete={onDeleteSelectedAnnotation}
                 />
               </div>
@@ -345,14 +356,16 @@ export default function CanvasPreview({
                   event.stopPropagation();
                 }}
               >
-                <Button
-                  type="button"
-                  aria-label={t('sliceEditor.deleteSelected')}
-                  onClick={onDeleteSelectedAnnotation}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-rose-300/40 bg-slate-950/95 text-rose-100 shadow-xl backdrop-blur transition hover:bg-rose-400/20"
-                >
-                  <Trash2 size={16} />
-                </Button>
+                <ImageStyleToolbar
+                  selectedImageAnnotation={selectedImageAnnotation}
+                  showLayerMoveControls={hasSelectedAnnotationLayerOverlap}
+                  canBringToFront={canBringSelectedAnnotationToFront}
+                  canSendToBack={canSendSelectedAnnotationToBack}
+                  onOpacityChange={onSelectedImageOpacityChange}
+                  onBringToFront={() => onMoveSelectedAnnotationLayer('front')}
+                  onSendToBack={() => onMoveSelectedAnnotationLayer('back')}
+                  onDelete={onDeleteSelectedAnnotation}
+                />
               </div>
             </div>
           ) : null}

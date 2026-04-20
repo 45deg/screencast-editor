@@ -9,6 +9,7 @@ import {
   type AnnotationModel,
   type CropRect,
   type ExportSettings,
+  type ImageAnnotation,
   type SliceModel,
   type TextAnnotation,
   type VideoMeta,
@@ -73,6 +74,15 @@ export function useAppDerivedState({
     return selected as TextAnnotation;
   }, [annotations, selectedAnnotationId]);
 
+  const selectedImageAnnotation = useMemo(() => {
+    const selected = activeAnnotations.find((annotation) => annotation.id === selectedAnnotationId);
+    if (!selected || selected.kind !== 'image') {
+      return null;
+    }
+
+    return selected as ImageAnnotation;
+  }, [activeAnnotations, selectedAnnotationId]);
+
   const hasVideo = Boolean(video && baseCrop);
   const totalDuration = useMemo(() => getTotalDuration(slices, annotations), [annotations, slices]);
   const previewSourceTime = useMemo(() => getSourceTimeAtTimelineTime(slices, currentTime), [currentTime, slices]);
@@ -100,6 +110,7 @@ export function useAppDerivedState({
     activeSceneCrop,
     activeAnnotations,
     selectedTextAnnotation,
+    selectedImageAnnotation,
     hasVideo,
     totalDuration,
     previewSourceTime,

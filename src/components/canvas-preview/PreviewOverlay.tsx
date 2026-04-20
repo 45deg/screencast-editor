@@ -81,7 +81,7 @@ export default function PreviewOverlay({
     bottomRight: true,
   } as const;
   const imageHandleClassName =
-    'absolute h-4 w-4 rounded-full border border-cyan-200 bg-slate-950 shadow-[0_0_0_1px_rgba(15,23,42,0.55)]';
+    'absolute h-5 w-5 rounded-full border border-cyan-200 bg-slate-950 shadow-[0_0_0_1px_rgba(15,23,42,0.55)]';
 
   useEffect(() => {
     if (!hasActiveVideoSlice) {
@@ -260,10 +260,34 @@ export default function PreviewOverlay({
               position={{ x: left, y: top }}
               size={{ width: Math.max(24, width), height: Math.max(24, height) }}
               resizeHandleComponent={{
-                topLeft: <span aria-hidden="true" className={`${imageHandleClassName} -left-2 -top-2`} />,
-                topRight: <span aria-hidden="true" className={`${imageHandleClassName} -right-2 -top-2`} />,
-                bottomLeft: <span aria-hidden="true" className={`${imageHandleClassName} -bottom-2 -left-2`} />,
-                bottomRight: <span aria-hidden="true" className={`${imageHandleClassName} -bottom-2 -right-2`} />,
+                topLeft: (
+                  <span
+                    aria-hidden="true"
+                    data-annotation-box="true"
+                    className={`${imageHandleClassName} -left-2.5 -top-2.5`}
+                  />
+                ),
+                topRight: (
+                  <span
+                    aria-hidden="true"
+                    data-annotation-box="true"
+                    className={`${imageHandleClassName} -right-2.5 -top-2.5`}
+                  />
+                ),
+                bottomLeft: (
+                  <span
+                    aria-hidden="true"
+                    data-annotation-box="true"
+                    className={`${imageHandleClassName} -bottom-2.5 -left-2.5`}
+                  />
+                ),
+                bottomRight: (
+                  <span
+                    aria-hidden="true"
+                    data-annotation-box="true"
+                    className={`${imageHandleClassName} -bottom-2.5 -right-2.5`}
+                  />
+                ),
               }}
               onDragStart={() => {
                 onSelectedAnnotationIdChange(annotation.id);
@@ -323,8 +347,19 @@ export default function PreviewOverlay({
                 className={`annotation-rnd__drag h-full w-full cursor-move select-none overflow-hidden rounded-md border bg-slate-950/20 transition ${
                   selected ? 'border-cyan-200' : 'border-slate-200/50'
                 }`}
+                style={{
+                  opacity: Math.max(0, Math.min(1, annotation.opacity ?? 1)),
+                }}
               >
-                <img src={annotation.imageUrl} alt="" className="h-full w-full object-contain" />
+                <img
+                  src={annotation.imageUrl}
+                  alt=""
+                  draggable={false}
+                  onDragStart={(event) => {
+                    event.preventDefault();
+                  }}
+                  className="pointer-events-none h-full w-full object-contain"
+                />
               </button>
             </Rnd>
           );

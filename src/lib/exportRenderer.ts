@@ -80,6 +80,8 @@ function drawImageOverlay(
   scaleX: number,
   scaleY: number,
 ) {
+  context.save();
+  context.globalAlpha = Math.max(0, Math.min(1, annotation.opacity ?? 1));
   context.drawImage(
     bitmap,
     annotation.x * scaleX,
@@ -87,6 +89,7 @@ function drawImageOverlay(
     Math.max(1, annotation.width * scaleX),
     Math.max(1, annotation.height * scaleY),
   );
+  context.restore();
 }
 
 export async function prepareAnnotationAssets(annotations: AnnotationModel[]): Promise<PreparedAnnotationAssets> {

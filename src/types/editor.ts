@@ -81,6 +81,7 @@ export interface ImageAnnotation extends AnnotationBase {
   naturalHeight: number;
   width: number;
   height: number;
+  opacity: number;
 }
 
 export type AnnotationModel = TextAnnotation | ImageAnnotation;
@@ -190,6 +191,7 @@ export function cloneAnnotation(annotation: AnnotationModel): AnnotationModel {
     naturalHeight: Math.max(1, Math.round(annotation.naturalHeight ?? annotation.height)),
     width: Math.max(1, annotation.width),
     height: Math.max(1, annotation.height),
+    opacity: Math.max(0, Math.min(1, annotation.opacity ?? 1)),
   };
 }
 

@@ -147,6 +147,7 @@ export function useMediaImportHandlers({
           height,
           file,
           imageUrl,
+          opacity: 1,
         };
 
         const nextAnnotations = [...annotations, nextAnnotation];
