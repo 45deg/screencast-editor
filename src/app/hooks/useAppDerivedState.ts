@@ -1,6 +1,12 @@
 import { useMemo } from 'react';
 
-import { clampCropToVideo, formatDurationLabel, formatFileSize, getDefaultCrop } from '../appUtils';
+import {
+  clampCropToVideo,
+  formatDurationLabel,
+  formatFileSize,
+  getDefaultCrop,
+  getDefaultSceneCrop,
+} from '../appUtils';
 import {
   findVideoSourceById,
   findSliceAtTimelineTime,
@@ -45,6 +51,19 @@ export function useAppDerivedState({
     return getActiveVideoSourceAtTimelineTime(sources, slices, currentTime);
   }, [currentTime, previewSlice, slices, sources]);
   const primaryVideo = sources[0] ?? null;
+  const referenceBaseCrop = useMemo(() => {
+    if (!primaryVideo) {
+      return null;
+    }
+
+    const crop = globalCrop ? clampCropToVideo(globalCrop, primaryVideo) : getDefaultCrop(primaryVideo.width, primaryVideo.height);
+    return {
+      x: 0,
+      y: 0,
+      w: crop.w,
+      h: crop.h,
+    };
+  }, [globalCrop, primaryVideo]);
 
   const fullCrop = useMemo(() => {
     if (!video) {
@@ -55,20 +74,18 @@ export function useAppDerivedState({
   }, [video]);
 
   const baseCrop = useMemo(() => {
-    if (!video || !fullCrop) {
-      return null;
-    }
-
-    return globalCrop ?? fullCrop;
-  }, [fullCrop, globalCrop, video]);
+    return referenceBaseCrop;
+  }, [referenceBaseCrop]);
 
   const activeSceneCrop = useMemo(() => {
-    if (!previewSlice?.crop || !video) {
+    if (!video || !baseCrop) {
       return null;
     }
 
-    return clampCropToVideo(previewSlice.crop, video);
-  }, [previewSlice, video]);
+    const referenceAspectRatio = baseCrop.w / Math.max(1, baseCrop.h);
+    const preferredCrop = previewSlice?.crop ?? (video.id === primaryVideo?.id ? globalCrop : null);
+    return getDefaultSceneCrop(video, referenceAspectRatio, preferredCrop ?? null);
+  }, [baseCrop, globalCrop, previewSlice, primaryVideo, video]);
 
   const activeAnnotations = useMemo(
     () => getActiveAnnotationsAtTimelineTime(annotations, currentTime),
@@ -93,7 +110,7 @@ export function useAppDerivedState({
     return selected as ImageAnnotation;
   }, [activeAnnotations, selectedAnnotationId]);
 
-  const hasVideo = Boolean(primaryVideo && baseCrop);
+  const hasVideo = Boolean(primaryVideo && referenceBaseCrop);
   const totalDuration = useMemo(() => getTotalDuration(slices, annotations), [annotations, slices]);
   const previewSourceTime = useMemo(() => getSourceTimeAtTimelineTime(slices, currentTime), [currentTime, slices]);
   const videoInfoItems = useMemo(() => {

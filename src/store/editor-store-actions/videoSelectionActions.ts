@@ -1,5 +1,6 @@
 import { getTotalDuration, type SliceModel } from '../../types/editor';
 import { nanoid } from 'nanoid';
+import { getDefaultSceneCrop, normalizeCropForStorage } from '../../app/appUtils';
 import {
   DEFAULT_EXPORT_SETTINGS,
   normalizeSelectedAnnotationId,
@@ -50,6 +51,11 @@ export function createVideoSelectionActions(
     addVideoSource: (video) => {
       set((state) => {
         const timelineStart = getTotalDuration(state.slices, state.annotations);
+        const referenceSource = state.sources[0] ?? video;
+        const referenceCrop = state.globalCrop;
+        const referenceAspectRatio = referenceCrop
+          ? referenceCrop.w / Math.max(1, referenceCrop.h)
+          : referenceSource.width / Math.max(1, referenceSource.height);
         const nextSlice: SliceModel = {
           id: nanoid(),
           sourceId: video.id,
@@ -57,7 +63,10 @@ export function createVideoSelectionActions(
           sourceStart: 0,
           sourceEnd: video.duration,
           duration: video.duration,
-          crop: null,
+          crop: normalizeCropForStorage(
+            getDefaultSceneCrop(video, referenceAspectRatio),
+            video,
+          ),
         };
 
         return {

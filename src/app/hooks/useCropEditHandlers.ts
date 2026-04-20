@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { clampCropToVideo, findSliceIdAtTimelineTime, normalizeCropForStorage } from '../appUtils';
+import {
+  clampCropToVideo,
+  findSliceIdAtTimelineTime,
+  getDefaultSceneCrop,
+  normalizeCropForStorage,
+} from '../appUtils';
 import type { CropRect, SliceModel, VideoMeta } from '../../types/editor';
 
 function formatCropRect(crop: CropRect | null) {
@@ -91,7 +96,12 @@ export function useCropEditHandlers({
     setSelectedSliceId(targetSliceId);
     setCropEditMode('scene');
     setSceneCropTargetSliceId(targetSliceId);
-    setCropEditDraft(targetSlice.crop ? clampCropToVideo(targetSlice.crop, video) : baseCrop);
+    const referenceAspectRatio = baseCrop.w / Math.max(1, baseCrop.h);
+    setCropEditDraft(
+      targetSlice.crop
+        ? clampCropToVideo(targetSlice.crop, video)
+        : getDefaultSceneCrop(video, referenceAspectRatio),
+    );
   }, [baseCrop, currentTime, selectedSliceId, setSelectedAnnotationId, setSelectedSliceId, slices, video]);
 
   const handleEditCropPreview = useCallback(

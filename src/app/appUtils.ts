@@ -52,6 +52,53 @@ export function clampCropToVideo(crop: CropRect, video: VideoMeta): CropRect {
   };
 }
 
+export function createAspectMatchedCrop(
+  width: number,
+  height: number,
+  targetAspectRatio: number,
+): CropRect {
+  const safeWidth = Math.max(1, Math.round(width));
+  const safeHeight = Math.max(1, Math.round(height));
+  const safeAspectRatio = Number.isFinite(targetAspectRatio) && targetAspectRatio > 0
+    ? targetAspectRatio
+    : safeWidth / Math.max(1, safeHeight);
+  const sourceAspectRatio = safeWidth / Math.max(1, safeHeight);
+
+  if (Math.abs(sourceAspectRatio - safeAspectRatio) < 0.0001) {
+    return { x: 0, y: 0, w: safeWidth, h: safeHeight };
+  }
+
+  if (sourceAspectRatio > safeAspectRatio) {
+    const cropWidth = Math.max(1, Math.min(safeWidth, Math.round(safeHeight * safeAspectRatio)));
+    return {
+      x: Math.round((safeWidth - cropWidth) / 2),
+      y: 0,
+      w: cropWidth,
+      h: safeHeight,
+    };
+  }
+
+  const cropHeight = Math.max(1, Math.min(safeHeight, Math.round(safeWidth / safeAspectRatio)));
+  return {
+    x: 0,
+    y: Math.round((safeHeight - cropHeight) / 2),
+    w: safeWidth,
+    h: cropHeight,
+  };
+}
+
+export function getDefaultSceneCrop(
+  video: VideoMeta,
+  targetAspectRatio: number,
+  preferredCrop: CropRect | null = null,
+): CropRect {
+  if (preferredCrop) {
+    return clampCropToVideo(preferredCrop, video);
+  }
+
+  return clampCropToVideo(createAspectMatchedCrop(video.width, video.height, targetAspectRatio), video);
+}
+
 export function normalizeCropForStorage(crop: CropRect, video: VideoMeta): CropRect | null {
   const safe = clampCropToVideo(crop, video);
 

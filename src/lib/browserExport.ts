@@ -1,10 +1,10 @@
 import { WebDemuxer } from 'web-demuxer';
 
 import type { AnnotationModel, CropRect, ExportSettings, SliceModel, VideoMeta } from '../types/editor';
+import { clampCropToVideo, getDefaultCrop, getDefaultSceneCrop } from '../app/appUtils';
 import { prepareAnnotationAssets, releaseAnnotationAssets, renderFrameToCanvas } from './exportRenderer';
 import {
   clampCrop,
-  getBaseCrop,
   getConfiguredBitrate,
   getOutputFrameDurationUs,
   getSortedSlices,
@@ -269,6 +269,16 @@ export async function exportVideoToMp4({
     if (!primarySource) {
       throw new Error('There is nothing to export.');
     }
+    const resolvedReferenceCrop = globalCrop
+      ? clampCropToVideo(globalCrop, primarySource)
+      : getDefaultCrop(primarySource.width, primarySource.height);
+    const virtualBaseCrop: CropRect = {
+      x: 0,
+      y: 0,
+      w: resolvedReferenceCrop.w,
+      h: resolvedReferenceCrop.h,
+    };
+    const referenceAspectRatio = virtualBaseCrop.w / Math.max(1, virtualBaseCrop.h);
 
     await getDecoderConfigForSource(primarySource);
     onProgress?.(28);
@@ -377,9 +387,8 @@ export async function exportVideoToMp4({
     };
 
     const emitGapFrames = async (endSec: number) => {
-      const primaryBaseCrop = getBaseCrop(primarySource, globalCrop);
       while (nextOutputFrameIndex / fps < endSec - 1e-9) {
-        await emitFrame(null, primaryBaseCrop, primaryBaseCrop, nextOutputFrameIndex / fps);
+        await emitFrame(null, virtualBaseCrop, virtualBaseCrop, nextOutputFrameIndex / fps);
       }
     };
 
@@ -482,8 +491,8 @@ export async function exportVideoToMp4({
         throw new Error(`Missing source for slice ${slice.id}.`);
       }
 
-      const baseCrop = getBaseCrop(source, globalCrop);
-      const sceneCrop = clampCrop(slice.crop ?? baseCrop, source);
+      const preferredCrop = slice.crop ?? (source.id === primarySource.id ? resolvedReferenceCrop : null);
+      const sceneCrop = clampCrop(getDefaultSceneCrop(source, referenceAspectRatio, preferredCrop), source);
       const targets: FrameTarget[] = [];
       let tempFrameIndex = nextOutputFrameIndex;
       while (tempFrameIndex / fps < slice.end - 1e-9) {
@@ -498,7 +507,7 @@ export async function exportVideoToMp4({
         tempFrameIndex += 1;
       }
 
-      await encodeSliceTargets(source, slice, baseCrop, sceneCrop, targets);
+      await encodeSliceTargets(source, slice, virtualBaseCrop, sceneCrop, targets);
       cursor = slice.end;
     }
 

@@ -1,5 +1,6 @@
 import type { CropRect } from '../types/editor';
 import { i18n } from '../i18n';
+import { createAspectMatchedCrop } from '../app/appUtils';
 
 export interface VideoThumbnailOptions {
   videoUrl: string;
@@ -56,8 +57,21 @@ function drawFrameWithCrop(
     h: sourceHeight,
   };
 
-  const safeBase = baseCrop ? clampCropToFrame(baseCrop, sourceWidth, sourceHeight) : fullCrop;
-  const safeScene = sceneCrop ? clampCropToFrame(sceneCrop, sourceWidth, sourceHeight) : safeBase;
+  const safeBase: CropRect = baseCrop
+    ? {
+        x: 0,
+        y: 0,
+        w: Math.max(1, Math.round(baseCrop.w)),
+        h: Math.max(1, Math.round(baseCrop.h)),
+      }
+    : fullCrop;
+  const safeScene = sceneCrop
+    ? clampCropToFrame(sceneCrop, sourceWidth, sourceHeight)
+    : clampCropToFrame(
+        createAspectMatchedCrop(sourceWidth, sourceHeight, safeBase.w / Math.max(1, safeBase.h)),
+        sourceWidth,
+        sourceHeight,
+      );
 
   const stageCanvas = document.createElement('canvas');
   stageCanvas.width = safeBase.w;

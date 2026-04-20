@@ -59,8 +59,13 @@ export function createCropVideoStyle(video: VideoMeta, crop: CropRect): CSSPrope
 }
 
 export function computeDisplayLayout(video: VideoMeta, baseCrop: CropRect, sceneCrop: CropRect | null): DisplayLayout {
-  const safeBase = clampRectToVideo(baseCrop, video);
-  const safeScene = sceneCrop ? clampRectToVideo(sceneCrop, video) : safeBase;
+  const safeBase: CropRect = {
+    x: 0,
+    y: 0,
+    w: Math.max(1, Math.round(baseCrop.w)),
+    h: Math.max(1, Math.round(baseCrop.h)),
+  };
+  const safeScene = sceneCrop ? clampRectToVideo(sceneCrop, video) : clampRectToVideo(safeBase, video);
 
   if (safeScene.w === safeBase.w && safeScene.h === safeBase.h) {
     return {

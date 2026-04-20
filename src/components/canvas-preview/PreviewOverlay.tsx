@@ -80,10 +80,22 @@ export default function PreviewOverlay({
     bottomLeft: true,
     bottomRight: true,
   } as const;
-  const imageHandleSize = Math.max(16, Math.min(30, Math.round(Math.min(overlayWidth, overlayHeight) * 0.045)));
+  const imageHandleSize = 30 // Math.max(16, Math.min(30, Math.round(Math.min(overlayWidth, overlayHeight) * 0.045)));
   const imageHandleOffset = Math.round(imageHandleSize / 2);
-  const imageHandleClassName =
-    'absolute rounded-full border border-cyan-200 bg-slate-950 shadow-[0_0_0_1px_rgba(15,23,42,0.55)]';
+  const imageHandleClassName = 'absolute rounded-full border border-4 border-cyan-200 bg-slate-950';
+  const videoContentStyle = displayLayout.padBox
+    ? {
+        left: `${displayLayout.padBox.left}%`,
+        top: `${displayLayout.padBox.top}%`,
+        width: `${displayLayout.padBox.width}%`,
+        height: `${displayLayout.padBox.height}%`,
+      }
+    : {
+        left: '0px',
+        top: '0px',
+        width: `${overlayWidth}px`,
+        height: `${overlayHeight}px`,
+      };
 
   useEffect(() => {
     if (!hasActiveVideoSlice) {
@@ -106,36 +118,16 @@ export default function PreviewOverlay({
       <div className="absolute inset-0 bg-black" />
 
       {hasActiveVideoSlice ? (
-        displayLayout.padBox ? (
-          <div
-            className="absolute overflow-hidden"
-            style={{
-              left: `${displayLayout.padBox.left}%`,
-              top: `${displayLayout.padBox.top}%`,
-              width: `${displayLayout.padBox.width}%`,
-              height: `${displayLayout.padBox.height}%`,
-            }}
-          >
-            <video
-              ref={videoRef}
-              src={video.objectUrl}
-              muted
-              controls={false}
-              preload="auto"
-              className="absolute"
-              style={videoStyle}
-            />
-          </div>
-        ) : (
-          <div
-            className="absolute overflow-hidden"
-            style={{
-              left: `${overlayOffsetX}px`,
-              top: `${overlayOffsetY}px`,
-              width: `${overlayWidth}px`,
-              height: `${overlayHeight}px`,
-            }}
-          >
+        <div
+          className="absolute overflow-hidden"
+          style={{
+            left: `${overlayOffsetX}px`,
+            top: `${overlayOffsetY}px`,
+            width: `${overlayWidth}px`,
+            height: `${overlayHeight}px`,
+          }}
+        >
+          <div className="absolute overflow-hidden" style={videoContentStyle}>
             <video
               ref={videoRef}
               src={video.objectUrl}
@@ -147,7 +139,7 @@ export default function PreviewOverlay({
               style={videoStyle}
             />
           </div>
-        )
+        </div>
       ) : null}
 
       <div

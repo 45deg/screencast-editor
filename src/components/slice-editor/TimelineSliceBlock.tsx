@@ -84,11 +84,11 @@ export default function TimelineSliceBlock({
       >
         {isVisible ? (
           <div
-            className="pointer-events-none absolute inset-y-0 flex w-max -translate-x-1/2 items-center gap-2 px-1.5 py-1.5 sm:flex-col sm:items-center sm:gap-1 sm:py-2"
+            className="pointer-events-none absolute inset-y-0 flex w-max -translate-x-1/2 items-center gap-2 px-1.5 py-1.5"
             style={{ left: `${labelOffset}px` }}
           >
             <div
-              className="w-14 shrink-0 overflow-hidden rounded-md border border-slate-700 bg-slate-950/85 shadow-lg sm:w-[118px]"
+              className="w-14 shrink-0 overflow-hidden rounded-md border border-slate-700 bg-slate-950/85 shadow-lg md:w-16"
               style={{ aspectRatio: `${outputAspectRatio} / 1` }}
             >
               {thumbnailUrl ? (
@@ -97,14 +97,14 @@ export default function TimelineSliceBlock({
                 <div className="h-full w-full animate-pulse bg-slate-800/70" />
               )}
             </div>
-            <div className="min-w-0 sm:text-center">
-              <div className="flex items-center gap-1 text-[11px] font-bold tracking-wide text-white drop-shadow sm:justify-center sm:text-sm sm:tracking-wider">
-                {slice.crop ? <Crop size={12} className="shrink-0 text-amber-200 sm:h-[13px] sm:w-[13px]" /> : null}
+            <div className="min-w-0">
+              <div className="flex items-center gap-1 text-[11px] font-bold tracking-wide text-white drop-shadow md:text-xs">
+                {slice.crop ? <Crop size={12} className="shrink-0 text-amber-200" /> : null}
                 <span className="truncate">{t('sliceEditor.sceneNumber', { index: index + 1 })}</span>
               </div>
-              <div className="font-mono text-[9px] leading-tight text-cyan-100 drop-shadow sm:text-[10px]">
+              <div className="font-mono text-[9px] leading-tight text-cyan-100 drop-shadow md:text-[10px]">
                 <span className="text-white">{slice.duration.toFixed(1)}s</span>
-                <span className="ml-1 text-amber-200 sm:ml-0 sm:block">x{slice.speed.toFixed(2)}</span>
+                <span className="ml-1 text-amber-200">x{slice.speed.toFixed(2)}</span>
               </div>
             </div>
           </div>
