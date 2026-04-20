@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Dela+Gothic+One&family=Google+Sans+Flex:wght@100..900&family=Inter:wght@400;500;600;700&family=Kaisei+Opti:wght@400;500;700&family=Montserrat:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&family=Oswald:wght@400;500;600;700&family=Roboto:wght@400;500;700&family=Roboto+Flex:wght@100..1000&family=Yusei+Magic&family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Dela+Gothic+One&family=Geologica:wght@100..900&family=Google+Sans+Flex:wght@100..900&family=Inter:wght@400;500;600;700&family=Kaisei+Opti:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&family=Oswald:wght@400;500;600;700&family=Roboto:wght@400;500;700&family=Roboto+Flex:wght@100..1000&family=Yusei+Magic&family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap");
 @import "tailwindcss";
 
 :root {
@@ -33,5 +33,5 @@ h3,
 h4,
 h5,
 h6 {
-	font-family: "Montserrat", "Noto Sans JP", sans-serif;
+	font-family: "Geologica", "Noto Sans JP", sans-serif;
 }

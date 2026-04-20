@@ -35,7 +35,7 @@ export const enTranslation = {
     emptyCapture: 'No video was captured.',
   },
   landing: {
-    title: 'Screencast Editor',
+    title: 'ScreenCast Editor',
     description:
       'A screencast editor that lets you import video, record your screen, make quick edits, and export right in the browser.',
     privacyTitle: 'Processed locally only',

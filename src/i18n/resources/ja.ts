@@ -35,7 +35,7 @@ export const jaTranslation = {
     emptyCapture: '録画された動画がありませんでした。',
   },
   landing: {
-    title: 'Screencast Editor',
+    title: 'ScreenCast Editor',
     description:
       'ブラウザ上で動画の読み込み、画面録画、簡単な編集、書き出しまでをまとめて行えるスクリーンキャスト編集ツールです。',
     privacyTitle: 'ローカル処理のみ',

@@ -3,6 +3,7 @@ import { Popover } from '@base-ui/react/popover';
 import { ChevronLeft, CircleHelp, Download } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import githubLogo from '../../assets/GitHub_Invertocat_White.svg';
 import type { VideoMeta } from '../../types/editor';
 
 interface AppHeaderProps {
@@ -47,6 +48,16 @@ export default function AppHeader({
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-2">
+          <a
+            href="https://github.com/45deg/screencast-editor"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-800/85 bg-slate-950/78 text-slate-300 shadow-lg backdrop-blur transition hover:border-cyan-400/60 hover:bg-slate-900 hover:text-cyan-100"
+            aria-label="GitHub repository"
+            title="GitHub repository"
+          >
+            <img src={githubLogo} alt="" className="h-5 w-5" />
+          </a>
           {hasVideo && video ? (
             <Popover.Root>
               <Popover.Trigger
