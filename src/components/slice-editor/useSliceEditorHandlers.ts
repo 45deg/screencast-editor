@@ -60,6 +60,7 @@ export function useSliceEditorHandlers({
     slices,
     slicesWithPos,
     annotations,
+    pixelsPerSecond,
     currentTime,
     selectedSliceId,
     selectedAnnotationId,

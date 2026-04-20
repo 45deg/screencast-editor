@@ -141,10 +141,14 @@ export default function SliceEditorTimeline({
     handleSpeedValueCommit,
     handleResizeSlice,
     handleResizeSliceEnd,
+    handleResizeSliceStart,
+    handleResizeSliceStartEnd,
     handleMoveSlice,
     handleMoveSliceEnd,
     handleMoveAnnotation,
     handleMoveAnnotationEnd,
+    handleResizeAnnotationStart,
+    handleResizeAnnotationStartEnd,
     handleResizeAnnotation,
     handleResizeAnnotationEnd,
     handleMoveAnnotationLayer,
@@ -233,16 +237,21 @@ export default function SliceEditorTimeline({
             selectedAnnotationId={selectedAnnotationId}
             setSelectedSliceId={onSelectedSliceIdChange}
             setSelectedAnnotationId={onSelectedAnnotationIdChange}
+            onCurrentTimeChange={onCurrentTimeChange}
             pixelsPerSecond={pixelsPerSecond}
             scrollInfo={scrollInfo}
             thumbnailUrls={thumbnailUrls}
             outputAspectRatio={safeOutputAspectRatio}
+            onResizeSliceStart={handleResizeSliceStart}
+            onResizeSliceStartEnd={handleResizeSliceStartEnd}
             onResizeSlice={handleResizeSlice}
             onResizeSliceEnd={handleResizeSliceEnd}
             onMoveSlice={handleMoveSlice}
             onMoveSliceEnd={handleMoveSliceEnd}
             onMoveAnnotation={handleMoveAnnotation}
             onMoveAnnotationEnd={handleMoveAnnotationEnd}
+            onResizeAnnotationStart={handleResizeAnnotationStart}
+            onResizeAnnotationStartEnd={handleResizeAnnotationStartEnd}
             onResizeAnnotation={handleResizeAnnotation}
             onResizeAnnotationEnd={handleResizeAnnotationEnd}
             onMoveAnnotationLayer={handleMoveAnnotationLayer}

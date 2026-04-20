@@ -25,6 +25,8 @@ interface AnnotationLayerBlockProps {
   onSelect: () => void;
   onMove: (nextStart: number) => void;
   onMoveEnd: () => void;
+  onResizeStart: (nextStart: number) => void;
+  onResizeStartEnd: () => void;
   onResize: (nextDuration: number) => void;
   onResizeEnd: () => void;
   onLayerMove: (direction: LayerMoveDirection) => void;
@@ -46,6 +48,8 @@ export default function AnnotationLayerBlock({
   onSelect,
   onMove,
   onMoveEnd,
+  onResizeStart,
+  onResizeStartEnd,
   onResize,
   onResizeEnd,
   onLayerMove,
@@ -53,6 +57,7 @@ export default function AnnotationLayerBlock({
   onDragEnd,
 }: AnnotationLayerBlockProps) {
   const initialStartRef = useRef(annotation.start);
+  const initialResizeStartRef = useRef(annotation.start);
   const initialDurationRef = useRef(annotation.duration);
   const isDragging = draggingAnnotationId === annotation.id;
   const isDragLocked = draggingAnnotationId !== null && !isDragging;
@@ -63,8 +68,8 @@ export default function AnnotationLayerBlock({
     ? 'border-rose-300/60 bg-rose-700/85 text-rose-50 hover:bg-rose-600/90'
     : 'border-amber-300/60 bg-amber-600/85 text-amber-50 hover:bg-amber-500/90';
   const selectedColorClass = isText
-    ? 'border-rose-200 bg-rose-500/95 text-white'
-    : 'border-amber-200 bg-amber-400/95 text-slate-950';
+    ? 'border-[3px] border-rose-200 bg-rose-500/88 text-white'
+    : 'border-[3px] border-amber-200 bg-amber-400/88 text-slate-950';
 
   return (
     <div
@@ -80,12 +85,12 @@ export default function AnnotationLayerBlock({
     >
       <motion.button
         type="button"
-        className={`absolute inset-y-0 left-0 w-full rounded border px-2 pr-4 text-left text-xs transition ${
+        data-timeline-annotation-block="true"
+        className={`absolute inset-y-0 left-0 w-full border px-2 pr-4 text-left text-xs transition ${
           selected ? selectedColorClass : baseColorClass
         }`}
         style={{ touchAction: 'none' }}
         onPointerDown={(event) => {
-          event.stopPropagation();
           if (event.currentTarget.setPointerCapture) {
             event.currentTarget.setPointerCapture(event.pointerId);
           }
@@ -105,11 +110,40 @@ export default function AnnotationLayerBlock({
         }}
         title={getAnnotationLabel(annotation)}
       >
+        {selected ? (
+          <>
+            <span className="pointer-events-none absolute -left-[3px] -top-[3px] h-3 w-3 border-l-[3px] border-t-[3px] border-inherit" />
+            <span className="pointer-events-none absolute -right-[3px] -top-[3px] h-3 w-3 border-r-[3px] border-t-[3px] border-inherit" />
+            <span className="pointer-events-none absolute -bottom-[3px] -left-[3px] h-3 w-3 border-b-[3px] border-l-[3px] border-inherit" />
+            <span className="pointer-events-none absolute -bottom-[3px] -right-[3px] h-3 w-3 border-b-[3px] border-r-[3px] border-inherit" />
+          </>
+        ) : null}
         <span className="inline-flex max-w-full items-center gap-1 truncate font-semibold tracking-wide select-none">
           {isText ? <Type size={12} className="shrink-0" /> : <ImageIcon size={12} className="shrink-0" />}
           <span className="truncate">{getAnnotationLabel(annotation)}</span>
         </span>
       </motion.button>
+
+      <motion.div
+        className="group absolute inset-y-0 left-0 z-30 flex w-3 cursor-col-resize items-center justify-center"
+        style={{ touchAction: 'none' }}
+        onPointerDown={(event) => {
+          event.stopPropagation();
+          onSelect();
+        }}
+        onPanStart={() => {
+          initialResizeStartRef.current = annotation.start;
+          onDragStart();
+        }}
+        onPan={(_event: Event, info: PanInfo) => {
+          const deltaSeconds = info.offset.x / pixelsPerSecond;
+          onResizeStart(Math.max(0, initialResizeStartRef.current + deltaSeconds));
+        }}
+        onPanEnd={() => {
+          onResizeStartEnd();
+          onDragEnd();
+        }}
+      />
 
       <motion.div
         className="group absolute inset-y-0 right-0 z-30 flex w-3 cursor-col-resize items-center justify-center"
@@ -130,9 +164,7 @@ export default function AnnotationLayerBlock({
           onResizeEnd();
           onDragEnd();
         }}
-      >
-        <div className="h-full w-1 bg-black/30 transition-colors group-hover:bg-cyan-200/90" />
-      </motion.div>
+      />
 
       {selected ? (
         <div className="absolute -right-8 top-1/2 z-40 flex -translate-y-1/2 flex-col gap-1">

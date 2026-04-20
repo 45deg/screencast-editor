@@ -76,6 +76,22 @@ export function useSliceEditorPointerHandlers({
 
       const target = event.target as Element;
       const nextTime = updateTimeFromClientX(event.clientX);
+      const clickedSliceBlock = target.closest('[data-timeline-slice-block="true"]');
+      const clickedAnnotationBlock = target.closest('[data-timeline-annotation-block="true"]');
+
+      if (clickedAnnotationBlock) {
+        const hitAnnotation = getAnnotationIdAtTime(nextTime);
+        onSelectedSliceIdChange(null);
+        onSelectedAnnotationIdChange(hitAnnotation);
+        return;
+      }
+
+      if (clickedSliceBlock) {
+        const hitSlice = getSliceIdAtTime(nextTime);
+        onSelectedAnnotationIdChange(null);
+        onSelectedSliceIdChange(hitSlice);
+        return;
+      }
 
       if (event.target === event.currentTarget || target.id === 'ruler') {
         const hitAnnotation = getAnnotationIdAtTime(nextTime);

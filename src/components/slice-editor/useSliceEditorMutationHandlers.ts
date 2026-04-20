@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import {
-  canMoveAnnotationLayer,
-  moveAnnotationLayer,
-  resizeAnnotationDuration,
-} from '../../lib/annotationTimeline';
+import { canMoveAnnotationLayer, moveAnnotationLayer } from '../../lib/annotationTimeline';
 import { compactSlices, type AnnotationModel, type DerivedSlice, type SliceModel } from '../../types/editor';
-import { updateAnnotationStart, updateSliceDuration, updateSliceStart } from './sliceMutations';
+import {
+  updateAnnotationDurationWithSnap,
+  updateAnnotationLeftEdgeWithSnap,
+  updateAnnotationStartWithSnap,
+  updateSliceLeftEdge,
+  updateSliceDuration,
+  updateSliceStart,
+} from './sliceMutations';
 
 const MIN_SLICE_DURATION = 0.5;
 
@@ -14,6 +17,7 @@ interface UseSliceEditorMutationHandlersArgs {
   slices: SliceModel[];
   slicesWithPos: DerivedSlice[];
   annotations: AnnotationModel[];
+  pixelsPerSecond: number;
   currentTime: number;
   selectedSliceId: string | null;
   selectedAnnotationId: string | null;
@@ -30,6 +34,7 @@ export function useSliceEditorMutationHandlers({
   slices,
   slicesWithPos,
   annotations,
+  pixelsPerSecond,
   currentTime,
   selectedSliceId,
   selectedAnnotationId,
@@ -44,6 +49,15 @@ export function useSliceEditorMutationHandlers({
   const pendingSliceCommitRef = useRef<SliceModel[] | null>(null);
   const pendingAnnotationCommitRef = useRef<AnnotationModel[] | null>(null);
   const [draggingAnnotationId, setDraggingAnnotationId] = useState<string | null>(null);
+  const getAnnotationSnapPoints = useCallback(
+    (annotationId: string) => [
+      ...slicesWithPos.flatMap((slice) => [slice.start, slice.end]),
+      ...annotations
+        .filter((annotation) => annotation.id !== annotationId)
+        .flatMap((annotation) => [annotation.start, annotation.start + annotation.duration]),
+    ],
+    [annotations, slicesWithPos],
+  );
 
   const selectedAnnotationIndex = annotations.findIndex((annotation) => annotation.id === selectedAnnotationId);
   const canMoveAnnotationUp =
@@ -185,6 +199,23 @@ export function useSliceEditorMutationHandlers({
     commitPendingSlices();
   }, [commitPendingSlices]);
 
+  const handleResizeSliceStart = useCallback(
+    (sliceId: string, nextStart: number) => {
+      const updated = updateSliceLeftEdge(slices, sliceId, nextStart);
+      if (updated === slices) {
+        return;
+      }
+
+      pendingSliceCommitRef.current = updated;
+      onSlicesPreview(updated);
+    },
+    [onSlicesPreview, slices],
+  );
+
+  const handleResizeSliceStartEnd = useCallback(() => {
+    commitPendingSlices();
+  }, [commitPendingSlices]);
+
   const handleMoveSlice = useCallback(
     (sliceId: string, nextStart: number) => {
       const updated = updateSliceStart(slices, sliceId, nextStart);
@@ -204,7 +235,14 @@ export function useSliceEditorMutationHandlers({
 
   const handleMoveAnnotation = useCallback(
     (annotationId: string, nextStart: number) => {
-      const updated = updateAnnotationStart(annotations, annotationId, nextStart);
+      const snapPoints = getAnnotationSnapPoints(annotationId);
+      const updated = updateAnnotationStartWithSnap(
+        annotations,
+        annotationId,
+        nextStart,
+        snapPoints,
+        pixelsPerSecond,
+      );
       if (updated === annotations) {
         return;
       }
@@ -212,7 +250,7 @@ export function useSliceEditorMutationHandlers({
       pendingAnnotationCommitRef.current = updated;
       onAnnotationsPreview(updated);
     },
-    [annotations, onAnnotationsPreview],
+    [annotations, getAnnotationSnapPoints, onAnnotationsPreview, pixelsPerSecond],
   );
 
   const handleMoveAnnotationEnd = useCallback(() => {
@@ -221,14 +259,41 @@ export function useSliceEditorMutationHandlers({
 
   const handleResizeAnnotation = useCallback(
     (annotationId: string, nextDuration: number) => {
-      const updated = resizeAnnotationDuration(annotations, annotationId, nextDuration);
+      const snapPoints = getAnnotationSnapPoints(annotationId);
+      const updated = updateAnnotationDurationWithSnap(
+        annotations,
+        annotationId,
+        nextDuration,
+        snapPoints,
+        pixelsPerSecond,
+      );
       pendingAnnotationCommitRef.current = updated;
       onAnnotationsPreview(updated);
     },
-    [annotations, onAnnotationsPreview],
+    [annotations, getAnnotationSnapPoints, onAnnotationsPreview, pixelsPerSecond],
   );
 
   const handleResizeAnnotationEnd = useCallback(() => {
+    commitPendingAnnotations();
+  }, [commitPendingAnnotations]);
+
+  const handleResizeAnnotationStart = useCallback(
+    (annotationId: string, nextStart: number) => {
+      const snapPoints = getAnnotationSnapPoints(annotationId);
+      const updated = updateAnnotationLeftEdgeWithSnap(
+        annotations,
+        annotationId,
+        nextStart,
+        snapPoints,
+        pixelsPerSecond,
+      );
+      pendingAnnotationCommitRef.current = updated;
+      onAnnotationsPreview(updated);
+    },
+    [annotations, getAnnotationSnapPoints, onAnnotationsPreview, pixelsPerSecond],
+  );
+
+  const handleResizeAnnotationStartEnd = useCallback(() => {
     commitPendingAnnotations();
   }, [commitPendingAnnotations]);
 
@@ -292,12 +357,16 @@ export function useSliceEditorMutationHandlers({
     handleSpeedValueCommit,
     handleResizeSlice,
     handleResizeSliceEnd,
+    handleResizeSliceStart,
+    handleResizeSliceStartEnd,
     handleMoveSlice,
     handleMoveSliceEnd,
     handleMoveAnnotation,
     handleMoveAnnotationEnd,
     handleResizeAnnotation,
     handleResizeAnnotationEnd,
+    handleResizeAnnotationStart,
+    handleResizeAnnotationStartEnd,
     handleMoveAnnotationLayer,
     handleAnnotationDragStart,
     handleAnnotationDragEnd,

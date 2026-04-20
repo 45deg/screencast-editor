@@ -22,16 +22,21 @@ interface TimelineTracksProps {
   selectedAnnotationId: string | null;
   setSelectedSliceId: (id: string | null) => void;
   setSelectedAnnotationId: (id: string | null) => void;
+  onCurrentTimeChange: (time: number) => void;
   pixelsPerSecond: number;
   scrollInfo: TimelineScrollInfo;
   thumbnailUrls: Record<string, string>;
   outputAspectRatio: number;
+  onResizeSliceStart: (sliceId: string, nextStart: number) => void;
+  onResizeSliceStartEnd: () => void;
   onResizeSlice: (sliceId: string, newDuration: number) => void;
   onResizeSliceEnd: () => void;
   onMoveSlice: (sliceId: string, nextStart: number) => void;
   onMoveSliceEnd: () => void;
   onMoveAnnotation: (annotationId: string, nextStart: number) => void;
   onMoveAnnotationEnd: () => void;
+  onResizeAnnotationStart: (annotationId: string, nextStart: number) => void;
+  onResizeAnnotationStartEnd: () => void;
   onResizeAnnotation: (annotationId: string, nextDuration: number) => void;
   onResizeAnnotationEnd: () => void;
   onMoveAnnotationLayer: (annotationId: string, direction: LayerMoveDirection) => void;
@@ -49,16 +54,21 @@ export default function TimelineTracks({
   selectedAnnotationId,
   setSelectedSliceId,
   setSelectedAnnotationId,
+  onCurrentTimeChange,
   pixelsPerSecond,
   scrollInfo,
   thumbnailUrls,
   outputAspectRatio,
+  onResizeSliceStart,
+  onResizeSliceStartEnd,
   onResizeSlice,
   onResizeSliceEnd,
   onMoveSlice,
   onMoveSliceEnd,
   onMoveAnnotation,
   onMoveAnnotationEnd,
+  onResizeAnnotationStart,
+  onResizeAnnotationStartEnd,
   onResizeAnnotation,
   onResizeAnnotationEnd,
   onMoveAnnotationLayer,
@@ -105,12 +115,15 @@ export default function TimelineTracks({
             scrollInfo={scrollInfo}
             thumbnailUrl={thumbnailUrls[slice.id]}
             outputAspectRatio={safeOutputAspectRatio}
-            onSelect={() => {
+            onSelect={(time) => {
+              onCurrentTimeChange(time);
               setSelectedAnnotationId(null);
               setSelectedSliceId(slice.id);
             }}
             onMoveSlice={onMoveSlice}
             onMoveSliceEnd={onMoveSliceEnd}
+            onResizeSliceStart={onResizeSliceStart}
+            onResizeSliceStartEnd={onResizeSliceStartEnd}
             onResizeSlice={onResizeSlice}
             onResizeSliceEnd={onResizeSliceEnd}
           />
@@ -143,6 +156,8 @@ export default function TimelineTracks({
             }}
             onMove={(nextStart) => onMoveAnnotation(annotation.id, nextStart)}
             onMoveEnd={onMoveAnnotationEnd}
+            onResizeStart={(nextStart) => onResizeAnnotationStart(annotation.id, nextStart)}
+            onResizeStartEnd={onResizeAnnotationStartEnd}
             onResize={(nextDuration) => onResizeAnnotation(annotation.id, nextDuration)}
             onResizeEnd={onResizeAnnotationEnd}
             onLayerMove={(direction) => onMoveAnnotationLayer(annotation.id, direction)}

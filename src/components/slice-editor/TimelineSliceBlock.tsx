@@ -13,9 +13,11 @@ interface TimelineSliceBlockProps {
   scrollInfo: TimelineScrollInfo;
   thumbnailUrl: string | undefined;
   outputAspectRatio: number;
-  onSelect: () => void;
+  onSelect: (time: number) => void;
   onMoveSlice: (sliceId: string, nextStart: number) => void;
   onMoveSliceEnd: () => void;
+  onResizeSliceStart: (sliceId: string, nextStart: number) => void;
+  onResizeSliceStartEnd: () => void;
   onResizeSlice: (sliceId: string, nextDuration: number) => void;
   onResizeSliceEnd: () => void;
 }
@@ -31,12 +33,15 @@ export default function TimelineSliceBlock({
   onSelect,
   onMoveSlice,
   onMoveSliceEnd,
+  onResizeSliceStart,
+  onResizeSliceStartEnd,
   onResizeSlice,
   onResizeSliceEnd,
 }: TimelineSliceBlockProps) {
   const { t } = useTranslation();
   const initialDurationRef = useRef<number>(0);
   const initialStartRef = useRef<number>(0);
+  const initialLeftResizeStartRef = useRef<number>(0);
   const startPx = slice.start * pixelsPerSecond;
   const endPx = slice.end * pixelsPerSecond;
 
@@ -51,6 +56,7 @@ export default function TimelineSliceBlock({
       <motion.div
         role="button"
         tabIndex={0}
+        data-timeline-slice-block="true"
         className={`absolute inset-y-0 cursor-grab overflow-hidden transition-colors active:cursor-grabbing ${
           isSelected
             ? 'z-20 border-[3px] border-amber-300 bg-cyan-600'
@@ -61,14 +67,10 @@ export default function TimelineSliceBlock({
           width: `${slice.duration * pixelsPerSecond}px`,
           touchAction: 'none',
         }}
-        onPointerDown={(event) => {
-          event.stopPropagation();
-          onSelect();
-        }}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
-            onSelect();
+            onSelect(slice.start);
           }
         }}
         onPanStart={() => {
@@ -110,10 +112,29 @@ export default function TimelineSliceBlock({
 
       <motion.div
         className="group absolute inset-y-0 z-30 -ml-2 flex w-4 cursor-col-resize items-center justify-center"
+        style={{ left: `${startPx}px`, touchAction: 'none' }}
+        onPointerDown={(event) => {
+          event.stopPropagation();
+          onSelect(slice.start);
+        }}
+        onPanStart={() => {
+          initialLeftResizeStartRef.current = slice.start;
+        }}
+        onPan={(_event: Event, info: PanInfo) => {
+          const deltaSeconds = info.offset.x / pixelsPerSecond;
+          onResizeSliceStart(slice.id, initialLeftResizeStartRef.current + deltaSeconds);
+        }}
+        onPanEnd={onResizeSliceStartEnd}
+      >
+        <div className="h-full w-1.5 bg-black/10 transition-colors group-hover:bg-amber-300/80" />
+      </motion.div>
+
+      <motion.div
+        className="group absolute inset-y-0 z-30 -ml-2 flex w-4 cursor-col-resize items-center justify-center"
         style={{ left: `${endPx}px`, touchAction: 'none' }}
         onPointerDown={(event) => {
           event.stopPropagation();
-          onSelect();
+          onSelect(slice.end);
         }}
         onPanStart={() => {
           initialDurationRef.current = slice.duration;
