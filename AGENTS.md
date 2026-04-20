@@ -39,8 +39,8 @@ Use it to avoid unnecessary file exploration and to identify the target scope as
   - src/components/canvas-preview/math.ts
   - src/components/canvas-preview/annotationMath.ts
   - src/components/canvas-preview/*
-- Change annotation text editing UI:
-  - src/components/annotation/TextStyleToolbar.tsx
+- Change annotation editing UI:
+  - src/components/annotation/*
 - Change the overall timeline editor:
   - src/components/SliceEditor.tsx
   - src/components/slice-editor/EditorToolbar.tsx
@@ -107,7 +107,7 @@ Use it to avoid unnecessary file exploration and to identify the target scope as
 - src/components/canvas-preview/*:
   - Split preview rendering helpers, overlays, viewport logic, crop dragging, playback syncing, and annotation transform handlers.
 - src/components/annotation/*:
-  - Annotation-specific editing controls such as text style tools.
+  - Annotation-specific editing controls such as text and image style tools.
 - src/components/SliceEditor.tsx:
   - The container for the timeline editing screen.
 - src/components/slice-editor/*:
