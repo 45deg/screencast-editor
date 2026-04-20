@@ -89,7 +89,7 @@ export default function AnnotationLayerBlock({
         className={`absolute inset-y-0 left-0 w-full border px-2 pr-4 text-left text-xs transition ${
           selected ? selectedColorClass : baseColorClass
         }`}
-        style={{ touchAction: 'pan-x' }}
+        style={{ touchAction: 'none' }}
         onPointerDown={(event) => {
           if (event.currentTarget.setPointerCapture) {
             event.currentTarget.setPointerCapture(event.pointerId);
@@ -126,7 +126,7 @@ export default function AnnotationLayerBlock({
 
       <motion.div
         className="group absolute inset-y-0 left-0 z-30 flex w-4 cursor-col-resize items-center justify-center"
-        style={{ touchAction: 'pan-x' }}
+        style={{ touchAction: 'none' }}
         onPointerDown={(event) => {
           event.stopPropagation();
           onSelect();
@@ -147,7 +147,7 @@ export default function AnnotationLayerBlock({
 
       <motion.div
         className="group absolute inset-y-0 right-0 z-30 flex w-4 cursor-col-resize items-center justify-center"
-        style={{ touchAction: 'pan-x' }}
+        style={{ touchAction: 'none' }}
         onPointerDown={(event) => {
           event.stopPropagation();
           onSelect();

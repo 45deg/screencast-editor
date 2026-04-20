@@ -7,6 +7,7 @@ import {
   type SliceModel,
   getTotalDuration,
 } from '../../types/editor';
+import { nanoid } from 'nanoid';
 import {
   MIN_SLICE_DURATION,
   normalizeSelectedAnnotationId,
@@ -100,7 +101,7 @@ export function createTimelineActions(set: EditorStoreSet): TimelineActions {
         const splitSource = target.sourceStart + target.sourceDuration * ratio;
 
         const leftSlice: SliceModel = {
-          id: crypto.randomUUID(),
+          id: nanoid(),
           timelineStart: target.start,
           sourceStart: target.sourceStart,
           sourceEnd: splitSource,
@@ -108,7 +109,7 @@ export function createTimelineActions(set: EditorStoreSet): TimelineActions {
           crop: cloneCrop(target.crop),
         };
         const rightSlice: SliceModel = {
-          id: crypto.randomUUID(),
+          id: nanoid(),
           timelineStart: state.currentTime,
           sourceStart: splitSource,
           sourceEnd: target.sourceEnd,

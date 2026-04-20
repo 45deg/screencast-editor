@@ -1,4 +1,5 @@
 import { getTotalDuration, type SliceModel } from '../../types/editor';
+import { nanoid } from 'nanoid';
 import { DEFAULT_EXPORT_SETTINGS, normalizeSelectedAnnotationId, normalizeSelectedSliceId } from '../editorStoreHelpers';
 import type { EditorStoreGet, EditorStoreSet, VideoSelectionActions } from './types';
 
@@ -12,7 +13,7 @@ export function createVideoSelectionActions(
       const initialHeight = Math.max(1, Math.round(video.height));
 
       const initialSlice: SliceModel = {
-        id: crypto.randomUUID(),
+        id: nanoid(),
         timelineStart: 0,
         sourceStart: 0,
         sourceEnd: video.duration,

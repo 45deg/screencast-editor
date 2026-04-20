@@ -65,7 +65,7 @@ export default function TimelineSliceBlock({
         style={{
           left: `${startPx}px`,
           width: `${slice.duration * pixelsPerSecond}px`,
-          touchAction: 'pan-x',
+          touchAction: 'none',
         }}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {
@@ -113,7 +113,7 @@ export default function TimelineSliceBlock({
 
       <motion.div
         className="group absolute inset-y-0 z-30 -ml-2.5 flex w-5 cursor-col-resize items-center justify-center"
-        style={{ left: `${startPx}px`, touchAction: 'pan-x' }}
+        style={{ left: `${startPx}px`, touchAction: 'none' }}
         onPointerDown={(event) => {
           event.stopPropagation();
           onSelect(slice.start);
@@ -132,7 +132,7 @@ export default function TimelineSliceBlock({
 
       <motion.div
         className="group absolute inset-y-0 z-30 -ml-2.5 flex w-5 cursor-col-resize items-center justify-center"
-        style={{ left: `${endPx}px`, touchAction: 'pan-x' }}
+        style={{ left: `${endPx}px`, touchAction: 'none' }}
         onPointerDown={(event) => {
           event.stopPropagation();
           onSelect(slice.end);

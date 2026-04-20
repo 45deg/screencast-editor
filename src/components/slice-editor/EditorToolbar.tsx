@@ -118,6 +118,7 @@ export default function EditorToolbar({
       <div
         aria-label={t('sliceEditor.editorControls')}
         className="timeline-scrollbar flex h-full min-w-max items-center gap-2 overflow-x-auto overflow-y-hidden sm:min-w-0"
+        style={{ touchAction: 'pan-x', WebkitOverflowScrolling: 'touch' }}
       >
         <div className="flex min-w-max items-center gap-1.5 sm:gap-2">
           <ToolbarTooltip label={t('sliceEditor.undoTooltip')}>

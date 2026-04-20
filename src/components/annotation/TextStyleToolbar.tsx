@@ -303,7 +303,7 @@ function FontFamilySelect({
         <Popover.Trigger
           type="button"
           aria-label={ariaLabel}
-          className="inline-flex h-8 min-w-[13rem] items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-2.5 text-[11px] text-slate-200 transition hover:border-slate-500"
+          className="inline-flex h-8 min-w-[9.75rem] max-w-[12.5rem] items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-2.5 text-[11px] text-slate-200 transition hover:border-slate-500 sm:min-w-[11rem] sm:max-w-[13.5rem]"
         >
           <Type size={12} className="shrink-0 text-slate-400" />
           <span className="min-w-0 flex-1 truncate text-left text-white" style={{ fontFamily: resolveAnnotationFontFamily(value) }}>
@@ -314,7 +314,7 @@ function FontFamilySelect({
       </ToolbarTooltip>
       <Popover.Portal>
         <Popover.Positioner side="bottom" align="start" sideOffset={8} className="z-[120]">
-          <Popover.Popup className="z-[120] w-[19rem] max-h-[18rem] overflow-auto rounded-xl border border-slate-800 bg-slate-950/98 p-1 shadow-2xl backdrop-blur">
+          <Popover.Popup className="z-[120] w-[15.75rem] max-h-[18rem] overflow-auto rounded-xl border border-slate-800 bg-slate-950/98 p-1 shadow-2xl backdrop-blur sm:w-[17rem]">
             {Object.entries(groupedOptions).map(([group, options]) => (
               <div key={group} className="py-1">
                 <div className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-500">

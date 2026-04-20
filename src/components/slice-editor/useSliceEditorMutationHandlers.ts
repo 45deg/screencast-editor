@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { nanoid } from 'nanoid';
 
 import { canMoveAnnotationLayer, moveAnnotationLayer } from '../../lib/annotationTimeline';
 import { compactSlices, type AnnotationModel, type DerivedSlice, type SliceModel } from '../../types/editor';
@@ -114,7 +115,7 @@ export function useSliceEditorMutationHandlers({
     const splitSource = target.sourceStart + target.sourceDuration * ratio;
 
     const leftSlice: SliceModel = {
-      id: crypto.randomUUID(),
+      id: nanoid(),
       timelineStart: target.start,
       sourceStart: target.sourceStart,
       sourceEnd: splitSource,
@@ -122,7 +123,7 @@ export function useSliceEditorMutationHandlers({
       crop: target.crop ? { ...target.crop } : null,
     };
     const rightSlice: SliceModel = {
-      id: crypto.randomUUID(),
+      id: nanoid(),
       timelineStart: currentTime,
       sourceStart: splitSource,
       sourceEnd: target.sourceEnd,

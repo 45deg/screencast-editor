@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { nanoid } from 'nanoid';
 
 import { readImageMetaFromObjectUrl } from '../../lib/image';
 import { readVideoMetadata, revokeVideoObjectUrl } from '../../lib/video';
@@ -99,7 +100,7 @@ export function useMediaImportHandlers({
       Math.round(initialText.length * responsiveFontSize * 0.56 + 16),
     );
     const estimatedTextHeight = Math.max(40, Math.round(responsiveFontSize * 1.5 + 8));
-    const annotationId = crypto.randomUUID();
+    const annotationId = nanoid();
     const nextAnnotation: AnnotationModel = {
       id: annotationId,
       kind: 'text',
@@ -143,7 +144,7 @@ export function useMediaImportHandlers({
         const scale = Math.min(1, maxWidth / Math.max(1, meta.width));
         const width = Math.max(24, Math.round(meta.width * scale));
         const height = Math.max(24, Math.round(meta.height * scale));
-        const annotationId = crypto.randomUUID();
+        const annotationId = nanoid();
 
         const nextAnnotation: AnnotationModel = {
           id: annotationId,
