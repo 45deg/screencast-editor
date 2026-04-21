@@ -19,7 +19,7 @@ const MobileSettingsDrawer = lazy(() => import('./app/components/MobileSettingsD
 
 function EditorWorkspaceFallback() {
   return (
-    <main className="fixed inset-x-0 bottom-0 top-16 z-10 overflow-hidden lg:right-[23rem]">
+    <main className="fixed inset-x-0 bottom-0 top-16 z-10 overflow-hidden">
       <div className="flex h-full min-h-0 items-center justify-center rounded-none border border-slate-800/70 bg-slate-950/50 px-4 text-sm text-slate-300">
         Loading editor workspace...
       </div>
@@ -236,6 +236,7 @@ export default function App() {
         {hasVideo && video && baseCrop ? (
           <Suspense fallback={<EditorWorkspaceFallback />}>
             <EditorWorkspace
+              isDesktopViewport={isDesktopViewport}
               video={video}
               sources={sources}
               baseCrop={baseCrop}

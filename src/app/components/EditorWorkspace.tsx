@@ -15,6 +15,7 @@ import type {
 import type { LayerEdgeDirection } from '../../lib/annotationTimeline';
 
 interface EditorWorkspaceProps {
+  isDesktopViewport: boolean;
   video: VideoMeta;
   sources: VideoMeta[];
   baseCrop: CropRect;
@@ -85,6 +86,7 @@ interface EditorWorkspaceProps {
 }
 
 export default function EditorWorkspace({
+  isDesktopViewport,
   video,
   sources,
   baseCrop,
@@ -147,112 +149,136 @@ export default function EditorWorkspace({
   onExport,
   onCancelExport,
 }: EditorWorkspaceProps) {
-  return (
-    <>
-      <main className="fixed inset-x-0 bottom-0 top-16 z-10 overflow-hidden lg:right-[23rem]">
-        <Group orientation="vertical" className="h-full min-h-0">
-          <Panel defaultSize="58%" minSize="10rem" className="min-h-0">
-            <section className="relative h-full min-h-0 px-1 pt-1 lg:pr-1">
-              <CanvasPreview
-                video={video}
-                fileName={video.file.name}
-                currentTime={currentTime}
-                sourceTime={previewSourceTime}
-                totalDuration={totalDuration}
-                baseCrop={baseCrop}
-                activeSceneCrop={activeSceneCrop}
-                activeAnnotations={activeAnnotations}
-                selectedAnnotationId={selectedAnnotationId}
-                selectedTextAnnotation={selectedTextAnnotation}
-                selectedImageAnnotation={selectedImageAnnotation}
-                hasActiveVideoSlice={hasActiveVideoSlice}
-                editMode={cropEditMode}
-                editCrop={effectiveEditCrop}
-                onStartCrop={onStartCropEdit}
-                onEditCropPreview={onEditCropPreview}
-                onConfirmEdit={onConfirmCropEdit}
-                onCancelEdit={onCancelCropEdit}
-                onResetEdit={onResetCropEdit}
-                onCurrentTimeChange={onCurrentTimeChange}
-                onSelectedAnnotationIdChange={onSelectedAnnotationIdChange}
-                onAnnotationPositionPreview={onAnnotationPositionPreview}
-                onAnnotationImageResizePreview={onAnnotationImageResizePreview}
-                onAnnotationPositionCommit={onAnnotationPositionCommit}
-                onTextAnnotationChange={onTextAnnotationChange}
-                onTextAnnotationStyleChange={onTextAnnotationStyleChange}
-                onSelectedImageOpacityChange={onSelectedImageOpacityChange}
-                hasSelectedAnnotationLayerOverlap={hasSelectedAnnotationLayerOverlap}
-                canBringSelectedAnnotationToFront={canBringSelectedAnnotationToFront}
-                canSendSelectedAnnotationToBack={canSendSelectedAnnotationToBack}
-                onMoveSelectedAnnotationLayer={onMoveSelectedAnnotationLayer}
-                onDeleteSelectedAnnotation={onDeleteSelectedAnnotation}
-                outputHeight={exportSettings.height}
-                className="h-full"
-                fillHeight
-              />
-            </section>
-          </Panel>
-
-          <Separator className="group relative mx-1 my-0.5 h-4 shrink-0 lg:mr-1">
-            <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-slate-800/90 transition group-hover:bg-cyan-400/60" />
-            <div className="absolute left-1/2 top-1/2 h-1.5 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full border border-slate-700 bg-slate-900 transition group-hover:border-cyan-400/60 group-hover:bg-slate-800" />
-          </Separator>
-
-          <Panel defaultSize="42%" minSize="10rem" className="min-h-0">
-            <div className="h-full min-h-0 px-0.5 pb-[calc(env(safe-area-inset-bottom)+2px)] pt-0 lg:pr-1">
-              <SliceEditorTimeline
-                sources={sources}
-                slices={slices}
-                annotations={annotations}
-                currentTime={currentTime}
-                selectedSliceId={selectedSliceId}
-                selectedAnnotationId={selectedAnnotationId}
-                canStartSceneCrop={slices.length > 0}
-                isSceneCropEditing={isSceneCropEditing}
-                canUndo={canUndo}
-                canRedo={canRedo}
-                onCurrentTimeChange={onCurrentTimeChange}
-                onSelectedSliceIdChange={onSelectedSliceIdChange}
-                onSelectedAnnotationIdChange={onSelectedAnnotationIdChange}
-                onSceneCropToggle={onSceneCropToggle}
-                onSlicesPreview={onSlicesPreview}
-                onSlicesCommit={onSlicesCommit}
-                onAnnotationsPreview={onAnnotationsPreview}
-                onAnnotationsCommit={onAnnotationsCommit}
-                onCreateTextAnnotation={onCreateTextAnnotation}
-                onCreateImageAnnotation={onCreateImageAnnotation}
-                onCreateVideoSource={onCreateVideoSource}
-                baseCrop={baseCrop}
-                outputAspectRatio={outputAspectRatio}
-                onUndo={onUndo}
-                onRedo={onRedo}
-                className="h-full"
-                fillHeight
-              />
-            </div>
-          </Panel>
-        </Group>
-      </main>
-
-      <aside className="fixed bottom-0 right-0 top-16 z-20 hidden overflow-hidden border-l border-slate-800/80 bg-slate-950/30 backdrop-blur lg:block lg:w-[23rem]">
-        <div className="h-full overflow-y-auto px-2 py-1">
-          <PropertyPanel
+  const editorContent = (
+    <Group orientation="vertical" className="h-full min-h-0">
+      <Panel defaultSize="58%" minSize="10rem" className="min-h-0">
+        <section className="relative h-full min-h-0 px-1 pt-1 lg:pr-1">
+          <CanvasPreview
+            video={video}
+            fileName={video.file.name}
+            currentTime={currentTime}
+            sourceTime={previewSourceTime}
+            totalDuration={totalDuration}
             baseCrop={baseCrop}
-            exportSettings={exportSettings}
-            exportRuntimeStatus={exportRuntimeStatus}
-            exportRuntimeError={exportRuntimeError}
-            isExporting={isExporting}
-            isCancelling={isCancelling}
-            exportProgress={exportProgress}
-            exportProgressLabel={exportProgressLabel}
-            exportError={exportError}
-            onChangeExportSettings={onChangeExportSettings}
-            onExport={onExport}
-            onCancelExport={onCancelExport}
-            className="min-h-full border-none bg-transparent p-0 shadow-none rounded-none lg:w-full"
+            activeSceneCrop={activeSceneCrop}
+            activeAnnotations={activeAnnotations}
+            selectedAnnotationId={selectedAnnotationId}
+            selectedTextAnnotation={selectedTextAnnotation}
+            selectedImageAnnotation={selectedImageAnnotation}
+            hasActiveVideoSlice={hasActiveVideoSlice}
+            editMode={cropEditMode}
+            editCrop={effectiveEditCrop}
+            onStartCrop={onStartCropEdit}
+            onEditCropPreview={onEditCropPreview}
+            onConfirmEdit={onConfirmCropEdit}
+            onCancelEdit={onCancelCropEdit}
+            onResetEdit={onResetCropEdit}
+            onCurrentTimeChange={onCurrentTimeChange}
+            onSelectedAnnotationIdChange={onSelectedAnnotationIdChange}
+            onAnnotationPositionPreview={onAnnotationPositionPreview}
+            onAnnotationImageResizePreview={onAnnotationImageResizePreview}
+            onAnnotationPositionCommit={onAnnotationPositionCommit}
+            onTextAnnotationChange={onTextAnnotationChange}
+            onTextAnnotationStyleChange={onTextAnnotationStyleChange}
+            onSelectedImageOpacityChange={onSelectedImageOpacityChange}
+            hasSelectedAnnotationLayerOverlap={hasSelectedAnnotationLayerOverlap}
+            canBringSelectedAnnotationToFront={canBringSelectedAnnotationToFront}
+            canSendSelectedAnnotationToBack={canSendSelectedAnnotationToBack}
+            onMoveSelectedAnnotationLayer={onMoveSelectedAnnotationLayer}
+            onDeleteSelectedAnnotation={onDeleteSelectedAnnotation}
+            outputHeight={exportSettings.height}
+            className="h-full"
+            fillHeight
+          />
+        </section>
+      </Panel>
+
+      <Separator className="group relative mx-1 my-0.5 h-4 shrink-0 lg:mr-1">
+        <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-slate-800/90 transition group-hover:bg-cyan-400/60" />
+        <div className="absolute left-1/2 top-1/2 h-1.5 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full border border-slate-700 bg-slate-900 transition group-hover:border-cyan-400/60 group-hover:bg-slate-800" />
+      </Separator>
+
+      <Panel defaultSize="42%" minSize="10rem" className="min-h-0">
+        <div className="h-full min-h-0 px-0.5 pb-[calc(env(safe-area-inset-bottom)+2px)] pt-0 lg:pr-1">
+          <SliceEditorTimeline
+            sources={sources}
+            slices={slices}
+            annotations={annotations}
+            currentTime={currentTime}
+            selectedSliceId={selectedSliceId}
+            selectedAnnotationId={selectedAnnotationId}
+            canStartSceneCrop={slices.length > 0}
+            isSceneCropEditing={isSceneCropEditing}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            onCurrentTimeChange={onCurrentTimeChange}
+            onSelectedSliceIdChange={onSelectedSliceIdChange}
+            onSelectedAnnotationIdChange={onSelectedAnnotationIdChange}
+            onSceneCropToggle={onSceneCropToggle}
+            onSlicesPreview={onSlicesPreview}
+            onSlicesCommit={onSlicesCommit}
+            onAnnotationsPreview={onAnnotationsPreview}
+            onAnnotationsCommit={onAnnotationsCommit}
+            onCreateTextAnnotation={onCreateTextAnnotation}
+            onCreateImageAnnotation={onCreateImageAnnotation}
+            onCreateVideoSource={onCreateVideoSource}
+            baseCrop={baseCrop}
+            outputAspectRatio={outputAspectRatio}
+            onUndo={onUndo}
+            onRedo={onRedo}
+            className="h-full"
+            fillHeight
           />
         </div>
-      </aside>
+      </Panel>
+    </Group>
+  );
+
+  return (
+    <>
+      <main className="fixed inset-x-0 bottom-0 top-16 z-10 overflow-hidden">
+        {isDesktopViewport ? (
+          <Group orientation="horizontal" className="h-full min-h-0">
+            <Panel defaultSize="75%" minSize="40%" className="min-h-0">
+              {editorContent}
+            </Panel>
+
+            <Separator
+              className="group relative z-20 hidden w-2 cursor-col-resize items-stretch justify-center lg:flex"
+              aria-label="Resize sidebar"
+            >
+              <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-slate-800/90 transition group-hover:bg-cyan-400/60" />
+              <div className="z-10 my-auto h-14 w-1.5 rounded-full border border-slate-700 bg-slate-900 shadow-sm transition group-hover:border-cyan-400/60 group-hover:bg-slate-800" />
+            </Separator>
+
+            <Panel defaultSize="25%" minSize="18rem" maxSize="40%" className="hidden min-h-0 lg:block">
+              <aside className="h-full overflow-hidden border-l border-slate-800/80 bg-slate-950/30 backdrop-blur">
+                <div className="h-full overflow-y-auto px-2 py-1">
+                  <PropertyPanel
+                    baseCrop={baseCrop}
+                    exportSettings={exportSettings}
+                    exportRuntimeStatus={exportRuntimeStatus}
+                    exportRuntimeError={exportRuntimeError}
+                    isExporting={isExporting}
+                    isCancelling={isCancelling}
+                    exportProgress={exportProgress}
+                    exportProgressLabel={exportProgressLabel}
+                    exportError={exportError}
+                    onChangeExportSettings={onChangeExportSettings}
+                    onExport={onExport}
+                    onCancelExport={onCancelExport}
+                    className="min-h-full rounded-none border-none bg-transparent p-0 shadow-none w-full"
+                  />
+                </div>
+              </aside>
+            </Panel>
+          </Group>
+        ) : (
+          <div className="h-full min-h-0">
+            {editorContent}
+          </div>
+        )}
+      </main>
     </>
   );
 }

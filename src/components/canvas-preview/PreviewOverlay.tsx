@@ -80,9 +80,9 @@ export default function PreviewOverlay({
     bottomLeft: true,
     bottomRight: true,
   } as const;
-  const imageHandleSize = 30 // Math.max(16, Math.min(30, Math.round(Math.min(overlayWidth, overlayHeight) * 0.045)));
-  const imageHandleOffset = Math.round(imageHandleSize / 2);
-  const imageHandleClassName = 'absolute rounded-full border border-4 border-cyan-200 bg-slate-950';
+  const imageHandleSize = 24;
+  const imageHandleClassName = 'absolute rounded-full border border-[3px] border-cyan-200 bg-slate-950 shadow-sm';
+  const inversePreviewScale = 1 / Math.max(0.0001, previewScale);
   const videoContentStyle = displayLayout.padBox
     ? {
         left: `${displayLayout.padBox.left}%`,
@@ -230,7 +230,7 @@ export default function PreviewOverlay({
                   type="button"
                   onPointerDown={(event) => handleTextPointerDown(event, annotation)}
                   onDoubleClick={() => startInlineTextEdit(annotation)}
-                  className={`annotation-rnd__drag block cursor-move select-none text-left transition ${
+                  className={`annotation-rnd__drag block cursor-grab select-none text-left transition active:cursor-grabbing ${
                     selected ? 'ring-2 ring-cyan-300/80 ring-offset-2 ring-offset-black' : ''
                   }`}
                   style={toTextStyle(annotation.style, 1)}
@@ -263,8 +263,10 @@ export default function PreviewOverlay({
                     style={{
                       width: `${imageHandleSize}px`,
                       height: `${imageHandleSize}px`,
-                      left: `${-imageHandleOffset}px`,
-                      top: `${-imageHandleOffset}px`,
+                      left: 0,
+                      top: 0,
+                      transform: `scale(${inversePreviewScale})`,
+                      transformOrigin: 'top left',
                     }}
                   />
                 ),
@@ -276,8 +278,10 @@ export default function PreviewOverlay({
                     style={{
                       width: `${imageHandleSize}px`,
                       height: `${imageHandleSize}px`,
-                      right: `${-imageHandleOffset}px`,
-                      top: `${-imageHandleOffset}px`,
+                      right: 0,
+                      top: 0,
+                      transform: `scale(${inversePreviewScale})`,
+                      transformOrigin: 'top right',
                     }}
                   />
                 ),
@@ -289,8 +293,10 @@ export default function PreviewOverlay({
                     style={{
                       width: `${imageHandleSize}px`,
                       height: `${imageHandleSize}px`,
-                      left: `${-imageHandleOffset}px`,
-                      bottom: `${-imageHandleOffset}px`,
+                      left: 0,
+                      bottom: 0,
+                      transform: `scale(${inversePreviewScale})`,
+                      transformOrigin: 'bottom left',
                     }}
                   />
                 ),
@@ -302,8 +308,10 @@ export default function PreviewOverlay({
                     style={{
                       width: `${imageHandleSize}px`,
                       height: `${imageHandleSize}px`,
-                      right: `${-imageHandleOffset}px`,
-                      bottom: `${-imageHandleOffset}px`,
+                      right: 0,
+                      bottom: 0,
+                      transform: `scale(${inversePreviewScale})`,
+                      transformOrigin: 'bottom right',
                     }}
                   />
                 ),
@@ -358,13 +366,13 @@ export default function PreviewOverlay({
                 );
                 onAnnotationPositionCommit();
               }}
-            >
+              >
               <button
                 data-annotation-box="true"
                 data-annotation-id={annotation.id}
                 type="button"
                 onPointerDown={() => onSelectedAnnotationIdChange(annotation.id)}
-                className={`annotation-rnd__drag h-full w-full cursor-move select-none overflow-hidden rounded-md border bg-slate-950/20 transition ${
+                className={`annotation-rnd__drag h-full w-full cursor-grab select-none overflow-hidden border bg-slate-950/20 transition active:cursor-grabbing ${
                   selected ? 'border-cyan-200' : 'border-slate-200/50'
                 }`}
                 style={{

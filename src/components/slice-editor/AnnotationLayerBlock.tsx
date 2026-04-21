@@ -86,7 +86,7 @@ export default function AnnotationLayerBlock({
       <motion.button
         type="button"
         data-timeline-annotation-block="true"
-        className={`absolute inset-y-0 left-0 w-full border px-2 pr-4 text-left text-xs transition ${
+        className={`absolute inset-y-0 left-0 w-full cursor-grab border px-2 pr-4 text-left text-xs transition active:cursor-grabbing ${
           selected ? selectedColorClass : baseColorClass
         }`}
         style={{ touchAction: 'none' }}

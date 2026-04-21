@@ -40,7 +40,7 @@ export default function PropertyPanel({
 
   return (
     <aside
-      className={`w-full rounded-xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-xl lg:w-[360px] ${className ?? ''}`}
+      className={`w-full rounded-xl border border-slate-800/80 bg-slate-950/70 p-4 shadow-xl ${className ?? ''}`}
     >
       <h2 className="sr-only">{t('propertyPanel.title')}</h2>
 
