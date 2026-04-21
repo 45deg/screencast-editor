@@ -28,5 +28,7 @@ certs
 public/web-demuxer-mini.wasm
 public/web-demuxer.wasm
 
+test-results/
+
 .agents
 skills-lock.json
