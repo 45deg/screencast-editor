@@ -5,14 +5,10 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "postinstall": "node scripts/sync-web-demuxer-wasm.mjs",
     "dev": "vite",
-    "predev": "node scripts/sync-web-demuxer-wasm.mjs",
     "build": "tsc -b && vite build",
-    "prebuild": "node scripts/sync-web-demuxer-wasm.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
-    "sync:web-demuxer-wasm": "node scripts/sync-web-demuxer-wasm.mjs",
     "test": "vitest run",
     "test:e2e": "pnpm build && node tests/assert-no-sanity-check-in-dist.mjs && playwright test"
   },
@@ -23,6 +19,7 @@
     "framer-motion": "^12.38.0",
     "i18next": "^26.0.5",
     "lucide-react": "^1.8.0",
+    "mediabunny": "^1.42.0",
     "mp4box": "^2.3.0",
     "nanoid": "^5.1.9",
     "react": "^19.2.4",
@@ -33,7 +30,6 @@
     "react-rnd": "^10.5.3",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.2",
-    "web-demuxer": "^4.0.0",
     "zustand": "^5.0.12"
   },
   "devDependencies": {

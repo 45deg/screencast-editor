@@ -19,3 +19,9 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+Third-party components used by this project may be distributed under their own
+licenses. In particular, this project depends on `mediabunny`, which is
+licensed under the Mozilla Public License 2.0 (MPL-2.0). See
+[THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)
+for the third-party attribution notice.

@@ -46,29 +46,29 @@ test.describe('export sanity page', () => {
     await expect(page.getByTestId('export-result')).toContainText('Exported MP4');
   });
 
-  test('destroys the demuxer after repeated export attempts including cancellation', async ({ page }) => {
+  test('destroys the input after repeated export attempts including cancellation', async ({ page }) => {
     await loadFixture(page);
 
-    await page.getByTestId('demuxer-delay-ms').fill('1200');
+    await page.getByTestId('input-delay-ms').fill('1200');
     await page.getByTestId('start-export').click();
     await expect(page.getByTestId('runtime-status')).toHaveText('loading');
     await page.getByTestId('cancel-export').click();
 
     await expect
       .poll(async () => ({
-        created: Number(await page.getByTestId('demuxer-created-count').textContent()),
-        destroyed: Number(await page.getByTestId('demuxer-destroyed-count').textContent()),
+        created: Number(await page.getByTestId('input-created-count').textContent()),
+        destroyed: Number(await page.getByTestId('input-destroyed-count').textContent()),
       }))
       .toEqual({ created: 1, destroyed: 1 });
 
-    await page.getByTestId('demuxer-delay-ms').fill('0');
+    await page.getByTestId('input-delay-ms').fill('0');
     await page.getByTestId('start-export').click();
     await expect(page.getByTestId('export-result')).toContainText('Exported MP4');
 
     await expect
       .poll(async () => ({
-        created: Number(await page.getByTestId('demuxer-created-count').textContent()),
-        destroyed: Number(await page.getByTestId('demuxer-destroyed-count').textContent()),
+        created: Number(await page.getByTestId('input-created-count').textContent()),
+        destroyed: Number(await page.getByTestId('input-destroyed-count').textContent()),
       }))
       .toEqual({ created: 2, destroyed: 2 });
   });

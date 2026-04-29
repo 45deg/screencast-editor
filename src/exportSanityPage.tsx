@@ -72,9 +72,9 @@ export default function ExportSanityPage() {
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const [resultText, setResultText] = useState<string>('No export yet.');
   const [runtimeDelayMs, setRuntimeDelayMs] = useState(0);
-  const [demuxerDelayMs, setDemuxerDelayMs] = useState(0);
-  const [demuxerCreatedCount, setDemuxerCreatedCount] = useState(0);
-  const [demuxerDestroyedCount, setDemuxerDestroyedCount] = useState(0);
+  const [inputDelayMs, setInputDelayMs] = useState(0);
+  const [inputCreatedCount, setInputCreatedCount] = useState(0);
+  const [inputDestroyedCount, setInputDestroyedCount] = useState(0);
   const lastBlobSizeRef = useRef<number | null>(null);
 
   const slices = useMemo(() => createSlices(video), [video]);
@@ -119,9 +119,9 @@ export default function ExportSanityPage() {
 
       const diagnostics: BrowserExportDiagnostics = {
         beforeRuntimeReady: async (signal) => delayStage(runtimeDelayMs, signal),
-        beforeDemuxerLoad: async (signal) => delayStage(demuxerDelayMs, signal),
-        onDemuxerCreated: () => setDemuxerCreatedCount((count) => count + 1),
-        onDemuxerDestroyed: () => setDemuxerDestroyedCount((count) => count + 1),
+        beforeInputLoad: async (signal) => delayStage(inputDelayMs, signal),
+        onInputCreated: () => setInputCreatedCount((count) => count + 1),
+        onInputDestroyed: () => setInputDestroyedCount((count) => count + 1),
       };
 
       const blob = await exportVideoToMp4({
@@ -132,7 +132,7 @@ export default function ExportSanityPage() {
       lastBlobSizeRef.current = blob.size;
       return blob;
     },
-    [delayStage, demuxerDelayMs, runtimeDelayMs],
+    [delayStage, inputDelayMs, runtimeDelayMs],
   );
 
   const {
@@ -242,15 +242,15 @@ export default function ExportSanityPage() {
             </label>
 
             <label className="space-y-2 text-sm text-slate-200">
-              <span>Demuxer delay (ms)</span>
+              <span>Input delay (ms)</span>
               <input
-                data-testid="demuxer-delay-ms"
+                data-testid="input-delay-ms"
                 type="number"
                 min={0}
                 step={50}
-                value={demuxerDelayMs}
+                value={inputDelayMs}
                 className="block w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2"
-                onChange={(event) => setDemuxerDelayMs(Math.max(0, Number.parseInt(event.target.value, 10) || 0))}
+                onChange={(event) => setInputDelayMs(Math.max(0, Number.parseInt(event.target.value, 10) || 0))}
               />
             </label>
           </div>
@@ -295,15 +295,15 @@ export default function ExportSanityPage() {
               </dd>
             </div>
             <div>
-              <dt className="text-slate-500">Demuxer created</dt>
-              <dd data-testid="demuxer-created-count" className="font-mono text-slate-100">
-                {demuxerCreatedCount}
+              <dt className="text-slate-500">Input created</dt>
+              <dd data-testid="input-created-count" className="font-mono text-slate-100">
+                {inputCreatedCount}
               </dd>
             </div>
             <div>
-              <dt className="text-slate-500">Demuxer destroyed</dt>
-              <dd data-testid="demuxer-destroyed-count" className="font-mono text-slate-100">
-                {demuxerDestroyedCount}
+              <dt className="text-slate-500">Input destroyed</dt>
+              <dd data-testid="input-destroyed-count" className="font-mono text-slate-100">
+                {inputDestroyedCount}
               </dd>
             </div>
             <div className="sm:col-span-2">

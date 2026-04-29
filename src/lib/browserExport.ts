@@ -1,4 +1,4 @@
-import { WebDemuxer } from 'web-demuxer';
+import { ALL_FORMATS, BlobSource, EncodedPacketSink, Input } from 'mediabunny';
 
 import type { AnnotationModel, CropRect, ExportSettings, SliceModel, VideoMeta } from '../types/editor';
 import { clampCropToVideo, getDefaultCrop, getDefaultSceneCrop } from '../app/appUtils';
@@ -14,9 +14,9 @@ import { loadMp4BoxModule } from './mp4boxClient';
 
 export interface BrowserExportDiagnostics {
   beforeRuntimeReady?: (signal?: AbortSignal) => Promise<void> | void;
-  beforeDemuxerLoad?: (signal?: AbortSignal) => Promise<void> | void;
-  onDemuxerCreated?: () => void;
-  onDemuxerDestroyed?: () => void;
+  beforeInputLoad?: (signal?: AbortSignal) => Promise<void> | void;
+  onInputCreated?: () => void;
+  onInputDestroyed?: () => void;
 }
 
 interface ExportVideoToMp4Input {
@@ -37,18 +37,6 @@ interface FrameTarget {
 }
 
 type ExportCanvas = HTMLCanvasElement | OffscreenCanvas;
-
-function getWebDemuxerWasmUrl(): string {
-  const baseUrl = import.meta.env.BASE_URL || './';
-  const runtimeBase =
-    typeof document !== 'undefined'
-      ? document.baseURI
-      : typeof location !== 'undefined'
-        ? location.href
-        : 'http://localhost/';
-
-  return new URL(`${baseUrl}web-demuxer.wasm`, runtimeBase).toString();
-}
 
 function throwIfAborted(signal?: AbortSignal) {
   if (signal?.aborted) {
@@ -74,36 +62,6 @@ function getCanvasContext(canvas: ExportCanvas) {
   }
 
   return context;
-}
-
-function toEncodedVideoChunk(sample: EncodedVideoChunk | Record<string, unknown>): EncodedVideoChunk {
-  if (sample instanceof EncodedVideoChunk) {
-    return sample;
-  }
-
-  const dataSource = sample.data;
-  const data =
-    dataSource instanceof Uint8Array
-      ? dataSource
-      : dataSource instanceof ArrayBuffer
-        ? new Uint8Array(dataSource)
-        : new Uint8Array(dataSource as ArrayBufferLike);
-  const timestamp =
-    typeof sample.timestamp === 'number'
-      ? sample.timestamp
-      : Math.round((Number(sample.timestampNs) || 0) / 1000);
-  const duration =
-    typeof sample.duration === 'number'
-      ? sample.duration
-      : Math.max(1, Math.round((Number(sample.durationNs) || 33_333_000) / 1000));
-  const type = sample.type === 'key' || sample.type === 'delta' ? sample.type : sample.is_sync ? 'key' : 'delta';
-
-  return new EncodedVideoChunk({
-    type,
-    timestamp,
-    duration,
-    data,
-  });
 }
 
 function toEvenDimension(value: number): number {
@@ -228,25 +186,54 @@ export async function exportVideoToMp4({
 
   const mp4box = await loadMp4BoxModule(signal);
   const sourcesById = new Map(sources.map((source) => [source.id, source]));
-  const demuxers = new Map<string, WebDemuxer>();
-  const decoderConfigs = new Map<string, Awaited<ReturnType<WebDemuxer['getDecoderConfig']>>>();
+  const loadedInputs = new Map<
+    string,
+    {
+      input: Input;
+      packetSink: EncodedPacketSink;
+      decoderConfig: VideoDecoderConfig;
+    }
+  >();
+  const decoderConfigs = new Map<string, VideoDecoderConfig>();
 
   let annotationAssets: Awaited<ReturnType<typeof prepareAnnotationAssets>> | null = null;
   let encoder: VideoEncoder | null = null;
   try {
-    const getLoadedDemuxer = async (source: VideoMeta) => {
-      const existing = demuxers.get(source.id);
+    const getLoadedInput = async (source: VideoMeta) => {
+      const existing = loadedInputs.get(source.id);
       if (existing) {
         return existing;
       }
 
-      const demuxer = new WebDemuxer({ wasmFilePath: getWebDemuxerWasmUrl() });
-      diagnostics?.onDemuxerCreated?.();
-      await diagnostics?.beforeDemuxerLoad?.(signal);
-      await demuxer.load(source.file);
-      throwIfAborted(signal);
-      demuxers.set(source.id, demuxer);
-      return demuxer;
+      const input = new Input({
+        source: new BlobSource(source.file),
+        formats: ALL_FORMATS,
+      });
+      diagnostics?.onInputCreated?.();
+
+      try {
+        await diagnostics?.beforeInputLoad?.(signal);
+        throwIfAborted(signal);
+
+        const track = await input.getPrimaryVideoTrack();
+        if (!track) {
+          throw new Error(`The imported file "${source.file.name}" does not contain a supported video track.`);
+        }
+
+        const decoderConfig = await track.getDecoderConfig();
+        if (!decoderConfig) {
+          throw new Error(`The imported file "${source.file.name}" does not contain a supported video track.`);
+        }
+
+        const packetSink = new EncodedPacketSink(track);
+        const loadedInput = { input, packetSink, decoderConfig };
+        loadedInputs.set(source.id, loadedInput);
+        return loadedInput;
+      } catch (error) {
+        input.dispose();
+        diagnostics?.onInputDestroyed?.();
+        throw error;
+      }
     };
 
     const getDecoderConfigForSource = async (source: VideoMeta) => {
@@ -255,14 +242,9 @@ export async function exportVideoToMp4({
         return cached;
       }
 
-      const demuxer = await getLoadedDemuxer(source);
-      const decoderConfig = await demuxer.getDecoderConfig('video');
-      if (!decoderConfig) {
-        throw new Error(`The imported file "${source.file.name}" does not contain a supported video track.`);
-      }
-
-      decoderConfigs.set(source.id, decoderConfig);
-      return decoderConfig;
+      const loadedInput = await getLoadedInput(source);
+      decoderConfigs.set(source.id, loadedInput.decoderConfig);
+      return loadedInput.decoderConfig;
     };
 
     const primarySource = sources[0];
@@ -438,25 +420,30 @@ export async function exportVideoToMp4({
         },
       });
 
-      const demuxer = await getLoadedDemuxer(source);
+      const loadedInput = await getLoadedInput(source);
       const decoderConfig = await getDecoderConfigForSource(source);
-      const reader = demuxer.read('video', slice.sourceStart, slice.sourceEnd).getReader();
+      const startPacket =
+        (await loadedInput.packetSink.getKeyPacket(slice.sourceStart, { verifyKeyPackets: true })) ??
+        (await loadedInput.packetSink.getFirstPacket({ verifyKeyPackets: true }));
+      if (!startPacket) {
+        throw new Error('Failed to decode frames for one of the timeline slices.');
+      }
+      const endPacket = await loadedInput.packetSink.getPacket(slice.sourceEnd, { verifyKeyPackets: true });
+      const endPacketExclusive = endPacket
+        ? ((await loadedInput.packetSink.getNextPacket(endPacket, { verifyKeyPackets: true })) ?? undefined)
+        : undefined;
 
       try {
         decoder.configure(decoderConfig);
 
-        while (true) {
+        for await (const packet of loadedInput.packetSink.packets(startPacket, endPacketExclusive, {
+          verifyKeyPackets: true,
+        })) {
           throwIfAborted(signal);
-          const { done, value } = await reader.read();
-          if (done) {
-            break;
-          }
           if (deferredError) {
             throw deferredError;
           }
-          if (value) {
-            decoder.decode(toEncodedVideoChunk(value as EncodedVideoChunk | Record<string, unknown>));
-          }
+          decoder.decode(packet.toEncodedVideoChunk());
         }
 
         await decoder.flush();
@@ -474,7 +461,6 @@ export async function exportVideoToMp4({
           targetIndex += 1;
         }
       } finally {
-        reader.releaseLock();
         (heldFrame as VideoFrame | null)?.close();
         decoder.close();
       }
@@ -545,9 +531,9 @@ export async function exportVideoToMp4({
     if (annotationAssets) {
       releaseAnnotationAssets(annotationAssets);
     }
-    for (const demuxer of demuxers.values()) {
-      demuxer.destroy();
-      diagnostics?.onDemuxerDestroyed?.();
+    for (const loadedInput of loadedInputs.values()) {
+      loadedInput.input.dispose();
+      diagnostics?.onInputDestroyed?.();
     }
   }
 }

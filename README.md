@@ -2,7 +2,7 @@
 
 Screencast Editor is a browser-based video editor for short screen recordings and product walkthroughs. It focuses on a small set of editing operations that are common in screencast workflows: cutting a recording into scenes, adjusting timing, applying crop regions, placing text or image overlays, and exporting the result as `MP4`.
 
-The application runs entirely in the browser. Source media is imported locally, previewed in the UI, and exported with `web-demuxer`, `WebCodecs`, and `MP4Box`.
+The application runs entirely in the browser. Source media is imported locally, previewed in the UI, and exported with `mediabunny`, `WebCodecs`, and `MP4Box`.
 
 ## Features
 
@@ -27,7 +27,7 @@ The application runs entirely in the browser. Source media is imported locally, 
 - Zustand for editor state management
 - Tailwind CSS 4 for styling
 - Framer Motion for timeline and UI motion
-- `web-demuxer`, `WebCodecs`, and `MP4Box` for in-browser export
+- `mediabunny`, `WebCodecs`, and `MP4Box` for in-browser export
 - `i18next` and `react-i18next` for localization
 - Vitest for unit and integration tests
 
