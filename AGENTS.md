@@ -76,7 +76,6 @@ Use it to avoid unnecessary file exploration and to identify the target scope as
   - src/lib/video.ts
   - src/lib/videoThumbnail.ts
   - src/lib/image.ts
-  - src/lib/mp4boxClient.ts
 - Change annotation timeline helpers or rectangle math:
   - src/lib/annotationTimeline.ts
   - src/lib/containRect.ts

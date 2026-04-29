@@ -1,6 +1,6 @@
 import { Drawer } from '@base-ui/react/drawer';
 import { Popover } from '@base-ui/react/popover';
-import { ChevronLeft, CircleHelp, Download } from 'lucide-react';
+import { ChevronLeft, CircleHelp, Download, Home } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import githubLogo from '../../assets/GitHub_Invertocat_White.svg';
@@ -58,6 +58,17 @@ export default function AppHeader({
           >
             <img src={githubLogo} alt="" className="h-5 w-5" />
           </a>
+          <a
+            href="https://45deg.github.io/"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-800/85 bg-slate-950/78 text-slate-300 shadow-lg backdrop-blur transition hover:border-cyan-400/60 hover:bg-slate-900 hover:text-cyan-100"
+            aria-label="Author's homepage"
+            title="Author's homepage"
+          >
+            <Home size={18} />
+          </a>
+
           {hasVideo && video ? (
             <Popover.Root>
               <Popover.Trigger

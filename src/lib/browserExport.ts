@@ -1,4 +1,14 @@
-import { ALL_FORMATS, BlobSource, EncodedPacketSink, Input } from 'mediabunny';
+import {
+  ALL_FORMATS,
+  BlobSource,
+  BufferTarget,
+  EncodedPacket,
+  EncodedPacketSink,
+  EncodedVideoPacketSource,
+  Input,
+  Mp4OutputFormat,
+  Output,
+} from 'mediabunny';
 
 import type { AnnotationModel, CropRect, ExportSettings, SliceModel, VideoMeta } from '../types/editor';
 import { clampCropToVideo, getDefaultCrop, getDefaultSceneCrop } from '../app/appUtils';
@@ -10,7 +20,6 @@ import {
   getSortedSlices,
   getTotalFrameCount,
 } from './exportVideoUtils';
-import { loadMp4BoxModule } from './mp4boxClient';
 
 export interface BrowserExportDiagnostics {
   beforeRuntimeReady?: (signal?: AbortSignal) => Promise<void> | void;
@@ -67,41 +76,6 @@ function getCanvasContext(canvas: ExportCanvas) {
 function toEvenDimension(value: number): number {
   const rounded = Math.max(16, Math.round(value));
   return rounded % 2 === 0 ? rounded : rounded - 1;
-}
-
-function toBufferSource(data: AllowSharedBufferSource): BufferSource {
-  if (data instanceof SharedArrayBuffer) {
-    return Uint8Array.from(new Uint8Array(data));
-  }
-
-  if (ArrayBuffer.isView(data) && data.buffer instanceof SharedArrayBuffer) {
-    return Uint8Array.from(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
-  }
-
-  return data as BufferSource;
-}
-
-function toArrayBuffer(
-  buffer: ArrayBuffer | Uint8Array | { buffer: ArrayBufferLike; byteOffset?: number; byteLength?: number },
-): ArrayBuffer {
-  if (buffer instanceof ArrayBuffer) {
-    return buffer;
-  }
-
-  if (buffer instanceof Uint8Array) {
-    return Uint8Array.from(buffer).buffer;
-  }
-
-  const source = buffer.buffer;
-  const byteOffset = buffer.byteOffset ?? 0;
-  const availableLength = source.byteLength - byteOffset;
-  const byteLength = buffer.byteLength ?? availableLength;
-
-  if (source instanceof SharedArrayBuffer) {
-    return Uint8Array.from(new Uint8Array(source, byteOffset, byteLength)).buffer;
-  }
-
-  return source.slice(byteOffset, byteOffset + byteLength);
 }
 
 async function getSupportedAvcEncoderConfig(
@@ -164,8 +138,6 @@ export async function ensureBrowserExportRuntimeReady(signal?: AbortSignal): Pro
   ) {
     throw new Error('This browser does not support the WebCodecs APIs required for export.');
   }
-
-  await loadMp4BoxModule(signal);
 }
 
 export async function exportVideoToMp4({
@@ -184,7 +156,6 @@ export async function exportVideoToMp4({
   throwIfAborted(signal);
   onProgress?.(14);
 
-  const mp4box = await loadMp4BoxModule(signal);
   const sourcesById = new Map(sources.map((source) => [source.id, source]));
   const loadedInputs = new Map<
     string,
@@ -198,6 +169,7 @@ export async function exportVideoToMp4({
 
   let annotationAssets: Awaited<ReturnType<typeof prepareAnnotationAssets>> | null = null;
   let encoder: VideoEncoder | null = null;
+  let mp4Output: Output<Mp4OutputFormat, BufferTarget> | null = null;
   try {
     const getLoadedInput = async (source: VideoMeta) => {
       const existing = loadedInputs.get(source.id);
@@ -288,10 +260,20 @@ export async function exportVideoToMp4({
       );
     }
 
-    const outputSamples: Array<{ bytes: Uint8Array; timestamp: number; key: boolean }> = [];
-    const mp4 = mp4box.createFile();
-    let trackId: number | null = null;
     let deferredError: Error | null = null;
+    let muxQueue = Promise.resolve();
+    let encodedPacketCount = 0;
+    const outputTarget = new BufferTarget();
+    mp4Output = new Output({
+      format: new Mp4OutputFormat({ fastStart: 'in-memory' }),
+      target: outputTarget,
+    });
+    const encodedVideoSource = new EncodedVideoPacketSource('avc');
+    mp4Output.addVideoTrack(encodedVideoSource, {
+      frameRate: fps,
+      name: 'screencast-editor',
+    });
+    await mp4Output.start();
 
     encoder = new VideoEncoder({
       output: (chunk, metadata) => {
@@ -299,32 +281,16 @@ export async function exportVideoToMp4({
           return;
         }
 
-        const bytes = new Uint8Array(chunk.byteLength);
-        chunk.copyTo(bytes);
-
-        if (!trackId) {
-          const description = metadata?.decoderConfig?.description;
-          if (!description) {
-            deferredError = new Error('Failed to build the MP4 output. The browser encoder did not provide MP4 initialization data.');
-            return;
-          }
-
-          trackId = mp4.addTrack({
-            timescale: 1_000_000,
-            width: outputWidth,
-            height: outputHeight,
-            hdlr: 'vide',
-            type: 'avc1',
-            name: 'screencast-editor',
-            avcDecoderConfigRecord: toBufferSource(description),
+        const packet = EncodedPacket.fromEncodedChunk(chunk);
+        encodedPacketCount += 1;
+        muxQueue = muxQueue
+          .then(async () => {
+            throwIfAborted(signal);
+            await encodedVideoSource.add(packet, metadata);
+          })
+          .catch((error) => {
+            deferredError = error instanceof Error ? error : new Error(String(error));
           });
-        }
-
-        outputSamples.push({
-          bytes,
-          timestamp: chunk.timestamp,
-          key: chunk.type === 'key',
-        });
       },
       error: (error) => {
         deferredError = error instanceof Error ? error : new Error(String(error));
@@ -500,34 +466,29 @@ export async function exportVideoToMp4({
     await emitGapFrames(Math.max(cursor, totalDuration));
     throwIfAborted(signal);
     await encoder.flush();
+    await muxQueue;
 
     if (deferredError) {
       throw deferredError;
     }
-    if (!trackId || outputSamples.length === 0) {
+    if (encodedPacketCount === 0) {
       throw new Error('Failed to build the MP4 output. The browser encoder did not provide MP4 initialization data.');
     }
 
-    const finalTrackId = trackId;
     onProgress?.(94);
-    outputSamples.forEach((sample, index) => {
-      const nextSample = outputSamples[index + 1];
-      const duration = nextSample ? Math.max(1, nextSample.timestamp - sample.timestamp) : frameDurationUs;
-      mp4.addSample(finalTrackId, Uint8Array.from(sample.bytes), {
-        duration,
-        dts: sample.timestamp,
-        cts: sample.timestamp,
-        is_sync: sample.key,
-      });
-    });
-
-    mp4.flush?.();
-    const arrayBuffer = toArrayBuffer(mp4.getBuffer());
+    await mp4Output.finalize();
+    const arrayBuffer = outputTarget.buffer;
+    if (!arrayBuffer) {
+      throw new Error('Failed to build the MP4 output. The muxer did not provide output data.');
+    }
     onProgress?.(100);
 
     return new Blob([arrayBuffer], { type: 'video/mp4' });
   } finally {
     encoder?.close();
+    if (mp4Output && mp4Output.state !== 'finalized' && mp4Output.state !== 'canceled') {
+      await mp4Output.cancel();
+    }
     if (annotationAssets) {
       releaseAnnotationAssets(annotationAssets);
     }
