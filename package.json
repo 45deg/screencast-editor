@@ -15,7 +15,6 @@
   "dependencies": {
     "@base-ui/react": "^1.4.0",
     "@tailwindcss/vite": "^4.2.2",
-    "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
     "i18next": "^26.0.5",
     "lucide-react": "^1.8.0",
@@ -27,7 +26,6 @@
     "react-i18next": "^17.0.4",
     "react-resizable-panels": "^4.10.0",
     "react-rnd": "^10.5.3",
-    "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.2",
     "zustand": "^5.0.12"
   },

@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 
-import { exportVideoToMp4, ensureBrowserExportRuntimeReady } from '../../lib/browserExport';
+import type { ExportVideoToMp4Input } from '../../lib/browserExport';
 import type {
   AnnotationModel,
   CropRect,
@@ -10,6 +10,8 @@ import type {
 } from '../../types/editor';
 import type { ExportRuntimeStatus } from '../../store/editorStore';
 import { getSafeDownloadName, toErrorMessage } from '../appUtils';
+
+type ExportVideoToMp4 = (input: ExportVideoToMp4Input) => Promise<Blob>;
 
 interface UseExportHandlerArgs {
   sources: VideoMeta[];
@@ -21,7 +23,7 @@ interface UseExportHandlerArgs {
   totalDuration: number;
   t: (key: string, options?: Record<string, unknown>) => string;
   setExportRuntimeStatus: (status: ExportRuntimeStatus, error?: string | null) => void;
-  exportVideo?: typeof exportVideoToMp4;
+  exportVideo?: ExportVideoToMp4;
 }
 
 export function useExportHandler({
@@ -34,7 +36,7 @@ export function useExportHandler({
   totalDuration,
   t,
   setExportRuntimeStatus,
-  exportVideo = exportVideoToMp4,
+  exportVideo,
 }: UseExportHandlerArgs) {
   const runtimeStatusRef = useRef<ExportRuntimeStatus>('idle');
   const exportAbortControllerRef = useRef<AbortController | null>(null);
@@ -84,6 +86,7 @@ export function useExportHandler({
     }
 
     try {
+      const { ensureBrowserExportRuntimeReady } = await import('../../lib/browserExport');
       await ensureBrowserExportRuntimeReady();
       setExportRuntimeStatus('ready', null);
       runtimeStatusRef.current = 'ready';
@@ -132,7 +135,8 @@ export function useExportHandler({
       runtimeStatusRef.current = 'loading';
       updateExportProgress(12, t('app.exportStageLoadingRuntime'));
 
-      const blob = await exportVideo({
+      const resolvedExportVideo = exportVideo ?? (await import('../../lib/browserExport')).exportVideoToMp4;
+      const blob = await resolvedExportVideo({
         sources,
         slices,
         annotations,

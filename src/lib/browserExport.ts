@@ -28,7 +28,7 @@ export interface BrowserExportDiagnostics {
   onInputDestroyed?: () => void;
 }
 
-interface ExportVideoToMp4Input {
+export interface ExportVideoToMp4Input {
   sources: VideoMeta[];
   slices: SliceModel[];
   annotations: AnnotationModel[];
