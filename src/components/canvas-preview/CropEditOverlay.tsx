@@ -112,6 +112,33 @@ export default function CropEditOverlay({
             type="button"
             className="crop-rnd__drag absolute inset-0 cursor-move"
             aria-label={t('canvas.moveCrop')}
+            aria-description={t('canvas.cropKeyboardHint')}
+            onKeyDown={(event) => {
+              if (!event.key.startsWith('Arrow')) {
+                return;
+              }
+
+              event.preventDefault();
+              const step = event.shiftKey ? 10 : 1;
+              if (event.altKey) {
+                const widthDelta = event.key === 'ArrowRight' ? step : event.key === 'ArrowLeft' ? -step : 0;
+                const heightDelta = event.key === 'ArrowDown' ? step : event.key === 'ArrowUp' ? -step : 0;
+                onEditCropPreview({
+                  ...safeEditCrop,
+                  w: Math.max(1, safeEditCrop.w + widthDelta),
+                  h: Math.max(1, safeEditCrop.h + heightDelta),
+                });
+                return;
+              }
+
+              const xDelta = event.key === 'ArrowRight' ? step : event.key === 'ArrowLeft' ? -step : 0;
+              const yDelta = event.key === 'ArrowDown' ? step : event.key === 'ArrowUp' ? -step : 0;
+              onEditCropPreview({
+                ...safeEditCrop,
+                x: safeEditCrop.x + xDelta,
+                y: safeEditCrop.y + yDelta,
+              });
+            }}
           />
           <div className={`pointer-events-none absolute inset-x-0 top-1/2 h-px -translate-y-1/2 ${lineClassName}`} />
           <div className={`pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 ${lineClassName}`} />

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import {
   clampCropToVideo,
@@ -8,12 +8,20 @@ import {
 } from '../appUtils';
 import type { CropRect, SliceModel, VideoMeta } from '../../types/editor';
 
-function formatCropRect(crop: CropRect | null) {
-  if (!crop) {
-    return null;
-  }
+interface CropEditSession {
+  videoObjectUrl: string | undefined;
+  mode: 'idle' | 'crop' | 'scene';
+  draft: CropRect | null;
+  sceneTargetSliceId: string | null;
+}
 
-  return `x=${crop.x}, y=${crop.y}, w=${crop.w}, h=${crop.h}`;
+function createIdleCropEditSession(videoObjectUrl: string | undefined): CropEditSession {
+  return {
+    videoObjectUrl,
+    mode: 'idle',
+    draft: null,
+    sceneTargetSliceId: null,
+  };
 }
 
 interface UseCropEditHandlersArgs {
@@ -45,9 +53,13 @@ export function useCropEditHandlers({
   setGlobalCropCommit,
   setSliceCropCommit,
 }: UseCropEditHandlersArgs) {
-  const [cropEditMode, setCropEditMode] = useState<'idle' | 'crop' | 'scene'>('idle');
-  const [cropEditDraft, setCropEditDraft] = useState<CropRect | null>(null);
-  const [sceneCropTargetSliceId, setSceneCropTargetSliceId] = useState<string | null>(null);
+  const [cropEditSession, setCropEditSession] = useState<CropEditSession>(() =>
+    createIdleCropEditSession(videoObjectUrl),
+  );
+  const isCurrentVideoSession = cropEditSession.videoObjectUrl === videoObjectUrl;
+  const cropEditMode = isCurrentVideoSession ? cropEditSession.mode : 'idle';
+  const cropEditDraft = isCurrentVideoSession ? cropEditSession.draft : null;
+  const sceneCropTargetSliceId = isCurrentVideoSession ? cropEditSession.sceneTargetSliceId : null;
 
   const isCropEditing = cropEditMode !== 'idle';
 
@@ -60,10 +72,8 @@ export function useCropEditHandlers({
   }, [cropEditDraft, fullCrop, isCropEditing, video]);
 
   const closeCropEditor = useCallback(() => {
-    setCropEditMode('idle');
-    setCropEditDraft(null);
-    setSceneCropTargetSliceId(null);
-  }, []);
+    setCropEditSession(createIdleCropEditSession(videoObjectUrl));
+  }, [videoObjectUrl]);
 
   const handleStartCropEdit = useCallback(() => {
     if (!video || !fullCrop) {
@@ -72,10 +82,13 @@ export function useCropEditHandlers({
 
     const initial = globalCrop ? clampCropToVideo(globalCrop, video) : fullCrop;
     setSelectedAnnotationId(null);
-    setCropEditMode('crop');
-    setSceneCropTargetSliceId(null);
-    setCropEditDraft(initial);
-  }, [fullCrop, globalCrop, setSelectedAnnotationId, video]);
+    setCropEditSession({
+      videoObjectUrl,
+      mode: 'crop',
+      draft: initial,
+      sceneTargetSliceId: null,
+    });
+  }, [fullCrop, globalCrop, setSelectedAnnotationId, video, videoObjectUrl]);
 
   const handleStartSceneCropEdit = useCallback(() => {
     if (!video || !slices.length || !baseCrop) {
@@ -94,15 +107,16 @@ export function useCropEditHandlers({
 
     setSelectedAnnotationId(null);
     setSelectedSliceId(targetSliceId);
-    setCropEditMode('scene');
-    setSceneCropTargetSliceId(targetSliceId);
     const referenceAspectRatio = baseCrop.w / Math.max(1, baseCrop.h);
-    setCropEditDraft(
-      targetSlice.crop
+    setCropEditSession({
+      videoObjectUrl,
+      mode: 'scene',
+      sceneTargetSliceId: targetSliceId,
+      draft: targetSlice.crop
         ? clampCropToVideo(targetSlice.crop, video)
         : getDefaultSceneCrop(video, referenceAspectRatio),
-    );
-  }, [baseCrop, currentTime, selectedSliceId, setSelectedAnnotationId, setSelectedSliceId, slices, video]);
+    });
+  }, [baseCrop, currentTime, selectedSliceId, setSelectedAnnotationId, setSelectedSliceId, slices, video, videoObjectUrl]);
 
   const handleEditCropPreview = useCallback(
     (crop: CropRect) => {
@@ -110,9 +124,13 @@ export function useCropEditHandlers({
         return;
       }
 
-      setCropEditDraft(clampCropToVideo(crop, video));
+      setCropEditSession((current) => ({
+        ...current,
+        videoObjectUrl,
+        draft: clampCropToVideo(crop, video),
+      }));
     },
-    [video],
+    [video, videoObjectUrl],
   );
 
   const handleConfirmCropEdit = useCallback(() => {
@@ -122,17 +140,6 @@ export function useCropEditHandlers({
     }
 
     const nextCrop = normalizeCropForStorage(effectiveEditCrop, video);
-
-    console.debug('[crop-debug] confirm requested', {
-      mode: cropEditMode,
-      sceneCropTargetSliceId,
-      videoSize: `${video.width}x${video.height}`,
-      globalCrop: formatCropRect(globalCrop),
-      baseCrop: formatCropRect(baseCrop),
-      fullCrop: formatCropRect(fullCrop),
-      effectiveEditCrop: formatCropRect(effectiveEditCrop),
-      nextCrop: formatCropRect(nextCrop),
-    });
 
     if (cropEditMode === 'crop') {
       setGlobalCropCommit(nextCrop);
@@ -164,14 +171,12 @@ export function useCropEditHandlers({
       return;
     }
 
-    setCropEditDraft(fullCrop);
-  }, [fullCrop]);
-
-  useEffect(() => {
-    setCropEditMode('idle');
-    setCropEditDraft(null);
-    setSceneCropTargetSliceId(null);
-  }, [videoObjectUrl]);
+    setCropEditSession((current) => ({
+      ...current,
+      videoObjectUrl,
+      draft: fullCrop,
+    }));
+  }, [fullCrop, videoObjectUrl]);
 
   return {
     cropEditMode,
@@ -179,9 +184,6 @@ export function useCropEditHandlers({
     sceneCropTargetSliceId,
     isCropEditing,
     effectiveEditCrop,
-    setCropEditMode,
-    setCropEditDraft,
-    setSceneCropTargetSliceId,
     closeCropEditor,
     handleStartCropEdit,
     handleStartSceneCropEdit,

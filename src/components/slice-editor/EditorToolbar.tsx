@@ -281,6 +281,7 @@ export default function EditorToolbar({
           <div className="flex h-8 items-center gap-1.5 rounded-md border border-slate-800 bg-slate-950 px-2 sm:gap-2 sm:px-3">
             <ZoomIn size={14} className="text-slate-400" />
             <Slider.Root
+              aria-label={t('sliceEditor.timelineZoom', { zoom: zoom.toFixed(2) })}
               min={-6}
               max={3}
               step={0.1}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type RefObject } from 'react';
+import { useMemo, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Rnd } from 'react-rnd';
 
@@ -96,22 +96,6 @@ export default function PreviewOverlay({
         width: `${overlayWidth}px`,
         height: `${overlayHeight}px`,
       };
-
-  useEffect(() => {
-    if (!hasActiveVideoSlice) {
-      return;
-    }
-
-    console.debug('[crop-debug] preview video placement', {
-      baseCrop: `x=${baseCrop.x}, y=${baseCrop.y}, w=${baseCrop.w}, h=${baseCrop.h}`,
-      contentCrop: `x=${displayLayout.contentCrop.x}, y=${displayLayout.contentCrop.y}, w=${displayLayout.contentCrop.w}, h=${displayLayout.contentCrop.h}`,
-      padBox: displayLayout.padBox,
-      videoStyle,
-      previewScale,
-      overlayOffsetX,
-      overlayOffsetY,
-    });
-  }, [baseCrop, displayLayout.contentCrop, displayLayout.padBox, hasActiveVideoSlice, overlayOffsetX, overlayOffsetY, previewScale, videoStyle]);
 
   return (
     <>

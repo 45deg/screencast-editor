@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import ImageStyleToolbar from './annotation/ImageStyleToolbar';
 import CanvasPreviewHeader from './canvas-preview/CanvasPreviewHeader';
@@ -68,14 +68,6 @@ function resolveToolbarPlacement(
 
   const targetCenterY = targetRect.y + targetRect.height / 2;
   return targetCenterY >= viewportSize.height / 2 ? 'top' : 'bottom';
-}
-
-function formatCropRect(crop: CropRect | null) {
-  if (!crop) {
-    return null;
-  }
-
-  return `x=${crop.x}, y=${crop.y}, w=${crop.w}, h=${crop.h}`;
 }
 
 interface CanvasPreviewProps {
@@ -182,40 +174,6 @@ export default function CanvasPreview({
     return outputHeight / Math.max(1, baseCrop.h);
   }, [baseCrop.h, outputHeight]);
 
-  useEffect(() => {
-    if (editMode !== 'idle') {
-      return;
-    }
-
-    const sceneRelativeToBase = activeSceneCrop
-      ? {
-          x: activeSceneCrop.x - baseCrop.x,
-          y: activeSceneCrop.y - baseCrop.y,
-          w: activeSceneCrop.w,
-          h: activeSceneCrop.h,
-        }
-      : null;
-    const sceneWithinBase = activeSceneCrop
-      ? activeSceneCrop.x >= baseCrop.x &&
-        activeSceneCrop.y >= baseCrop.y &&
-        activeSceneCrop.x + activeSceneCrop.w <= baseCrop.x + baseCrop.w &&
-        activeSceneCrop.y + activeSceneCrop.h <= baseCrop.y + baseCrop.h
-      : null;
-
-    console.debug('[crop-debug] preview layout input', {
-      currentTime,
-      sourceTime,
-      videoSize: `${video.width}x${video.height}`,
-      baseCrop: formatCropRect(baseCrop),
-      activeSceneCrop: formatCropRect(activeSceneCrop),
-      sceneRelativeToBase: formatCropRect(sceneRelativeToBase),
-      sceneWithinBase,
-      frameCrop: formatCropRect(displayLayout.frameCrop),
-      contentCrop: formatCropRect(displayLayout.contentCrop),
-      padBox: displayLayout.padBox,
-    });
-  }, [activeSceneCrop, baseCrop, currentTime, displayLayout, editMode, sourceTime, video]);
-
   const safeEditCrop = useMemo(() => {
     const initial = editCrop ?? {
       x: 0,
@@ -226,15 +184,6 @@ export default function CanvasPreview({
 
     return clampRectToVideo(initial, video);
   }, [editCrop, video]);
-
-  const displayCrop = useMemo(() => {
-    return {
-      x: safeEditCrop.x * viewport.scale,
-      y: safeEditCrop.y * viewport.scale,
-      width: safeEditCrop.w * viewport.scale,
-      height: safeEditCrop.h * viewport.scale,
-    };
-  }, [safeEditCrop, viewport]);
 
   const {
     inlineEditorRef,
@@ -321,6 +270,8 @@ export default function CanvasPreview({
       return;
     }
 
+    // DOM measurement is the external system synchronized by this layout effect.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setToolbarPlacements((current) => {
       let changed = false;
       const next = { ...current };
@@ -372,34 +323,6 @@ export default function CanvasPreview({
     },
     [toolbarPlacements],
   );
-
-  useEffect(() => {
-    console.debug('[crop-debug] canvas frame metrics', {
-      editMode,
-      videoSize: `${video.width}x${video.height}`,
-      baseCrop: formatCropRect(baseCrop),
-      frameSize,
-      viewport,
-      previewScale,
-      overlayWidth,
-      overlayHeight,
-      overlayOffsetX,
-      overlayOffsetY,
-      displayCrop,
-    });
-  }, [
-    baseCrop,
-    displayCrop,
-    editMode,
-    frameSize,
-    overlayHeight,
-    overlayOffsetX,
-    overlayOffsetY,
-    overlayWidth,
-    previewScale,
-    video,
-    viewport,
-  ]);
 
   return (
     <section

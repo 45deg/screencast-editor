@@ -86,7 +86,7 @@ export default function App() {
   });
 
   const { isMobileSettingsDrawerOpen, setIsMobileSettingsDrawerOpen, isDesktopViewport } =
-    useResponsiveSettingsDrawer({ hasVideo });
+    useResponsiveSettingsDrawer({ hasVideo, videoSessionId: sources[0]?.id });
 
   const {
     resetPendingAnnotationPreview,
@@ -139,10 +139,6 @@ export default function App() {
   useEffect(() => {
     syncExportRuntimeStatusRef(exportRuntimeStatus);
   }, [exportRuntimeStatus, syncExportRuntimeStatusRef]);
-
-  useEffect(() => {
-    void ensureExportRuntimeReady();
-  }, [ensureExportRuntimeReady]);
 
   const {
     cropEditMode,

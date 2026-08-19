@@ -60,39 +60,42 @@ export function useScreenCapture({
     });
     setScreenCaptureState('processing');
 
-    const file = await new Promise<File>((resolve, reject) => {
-      const mimeType = recorder.mimeType || getScreenRecordingMimeType() || 'video/webm';
-      const extension = getScreenRecordingExtension(mimeType);
+    let file: File;
+    try {
+      file = await new Promise<File>((resolve, reject) => {
+        const mimeType = recorder.mimeType || getScreenRecordingMimeType() || 'video/webm';
+        const extension = getScreenRecordingExtension(mimeType);
 
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          captureChunksRef.current.push(event.data);
-        }
-      };
+        recorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            captureChunksRef.current.push(event.data);
+          }
+        };
 
-      recorder.onerror = () => {
-        reject(new Error(t('dropzone.captureFailed')));
-      };
+        recorder.onerror = () => {
+          reject(new Error(t('dropzone.captureFailed')));
+        };
 
-      recorder.onstop = () => {
-        const blob = new Blob(captureChunksRef.current, { type: mimeType });
-        captureChunksRef.current = [];
+        recorder.onstop = () => {
+          const blob = new Blob(captureChunksRef.current, { type: mimeType });
 
-        if (!blob.size) {
-          reject(new Error(t('dropzone.emptyCapture')));
-          return;
-        }
+          if (!blob.size) {
+            reject(new Error(t('dropzone.emptyCapture')));
+            return;
+          }
 
-        const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-        resolve(new File([blob], `screen-capture-${stamp}.${extension}`, { type: blob.type || mimeType }));
-      };
+          const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+          resolve(new File([blob], `screen-capture-${stamp}.${extension}`, { type: blob.type || mimeType }));
+        };
 
-      recorder.stop();
-    });
-
-    captureRecorderRef.current = null;
-    captureStreamRef.current?.getTracks().forEach((track) => track.stop());
-    captureStreamRef.current = null;
+        recorder.stop();
+      });
+    } finally {
+      captureRecorderRef.current = null;
+      captureStreamRef.current?.getTracks().forEach((track) => track.stop());
+      captureStreamRef.current = null;
+      captureChunksRef.current = [];
+    }
 
     await onImportVideo(file);
     setScreenCaptureState('idle');

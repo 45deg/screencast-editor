@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useExportHandler } from './app/hooks/useExportHandler';
 import { revokeVideoObjectUrl, readVideoMetadata } from './lib/video';
@@ -75,7 +75,6 @@ export default function ExportSanityPage() {
   const [inputDelayMs, setInputDelayMs] = useState(0);
   const [inputCreatedCount, setInputCreatedCount] = useState(0);
   const [inputDestroyedCount, setInputDestroyedCount] = useState(0);
-  const lastBlobSizeRef = useRef<number | null>(null);
 
   const slices = useMemo(() => createSlices(video), [video]);
   const annotations = useMemo(() => createAnnotations(video), [video]);
@@ -98,9 +97,14 @@ export default function ExportSanityPage() {
     }
 
     await new Promise<void>((resolve, reject) => {
-      const timer = window.setTimeout(resolve, delayMs);
+      const finishDelay = () => {
+        signal?.removeEventListener('abort', abortHandler);
+        resolve();
+      };
+      const timer = window.setTimeout(finishDelay, delayMs);
       const abortHandler = () => {
         window.clearTimeout(timer);
+        signal?.removeEventListener('abort', abortHandler);
         reject(new DOMException('Export was cancelled', 'AbortError'));
       };
 
@@ -115,8 +119,6 @@ export default function ExportSanityPage() {
 
   const exportVideo = useCallback(
     async (input: Parameters<typeof exportVideoToMp4>[0]) => {
-      lastBlobSizeRef.current = null;
-
       const diagnostics: BrowserExportDiagnostics = {
         beforeRuntimeReady: async (signal) => delayStage(runtimeDelayMs, signal),
         beforeInputLoad: async (signal) => delayStage(inputDelayMs, signal),
@@ -124,20 +126,24 @@ export default function ExportSanityPage() {
         onInputDestroyed: () => setInputDestroyedCount((count) => count + 1),
       };
 
-      const blob = await exportVideoToMp4({
-        ...input,
-        diagnostics,
-      });
-
-      lastBlobSizeRef.current = blob.size;
-      return blob;
+      setResultText('Export in progress...');
+      try {
+        const blob = await exportVideoToMp4({
+          ...input,
+          diagnostics,
+        });
+        setResultText(`Exported MP4 (${blob.size} bytes).`);
+        return blob;
+      } catch (error) {
+        setResultText(error instanceof DOMException && error.name === 'AbortError' ? 'Export cancelled.' : 'Export failed.');
+        throw error;
+      }
     },
     [delayStage, inputDelayMs, runtimeDelayMs],
   );
 
   const {
     isExporting,
-    isCancelling,
     exportProgress,
     exportProgressLabel,
     exportError,
@@ -161,27 +167,6 @@ export default function ExportSanityPage() {
     syncExportRuntimeStatusRef(runtimeStatus);
   }, [runtimeStatus, syncExportRuntimeStatusRef]);
 
-  useEffect(() => {
-    if (isExporting) {
-      setResultText('Export in progress...');
-      return;
-    }
-
-    if (exportError) {
-      setResultText('Export failed.');
-      return;
-    }
-
-    if (lastBlobSizeRef.current) {
-      setResultText(`Exported MP4 (${lastBlobSizeRef.current} bytes).`);
-      return;
-    }
-
-    if (isCancelling) {
-      setResultText('Cancelling export...');
-    }
-  }, [exportError, isCancelling, isExporting]);
-
   const handleFileChange = useCallback(async (file: File | null) => {
     if (!file) {
       return;
@@ -195,7 +180,6 @@ export default function ExportSanityPage() {
     setRuntimeStatus('idle');
     setRuntimeError(null);
     setResultText('Video loaded.');
-    lastBlobSizeRef.current = null;
     setExportSettings({
       ...DEFAULT_EXPORT_SETTINGS,
       width: nextVideo.width,
@@ -262,8 +246,7 @@ export default function ExportSanityPage() {
               disabled={!video || isExporting}
               className="rounded-lg border border-emerald-300/30 bg-emerald-400/10 px-4 py-2 text-sm font-semibold text-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
               onClick={() => {
-                lastBlobSizeRef.current = null;
-                setResultText('Export requested.');
+                setResultText('Export in progress...');
                 void handleExport();
               }}
             >
@@ -275,7 +258,10 @@ export default function ExportSanityPage() {
               type="button"
               disabled={!isExporting}
               className="rounded-lg border border-rose-300/30 bg-rose-400/10 px-4 py-2 text-sm font-semibold text-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
-              onClick={cancelExport}
+              onClick={() => {
+                setResultText('Cancelling export...');
+                cancelExport();
+              }}
             >
               Cancel export
             </button>

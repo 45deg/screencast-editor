@@ -38,6 +38,7 @@ export default function OutputSizeSection({
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
           <input
             type="number"
+            aria-label={t('propertyPanel.outputWidth')}
             min={INPUT_SIZE_MIN}
             max={INPUT_SIZE_MAX}
             value={exportSettings.width}
@@ -59,6 +60,7 @@ export default function OutputSizeSection({
           <span className="text-center font-mono text-xs text-slate-500">x</span>
           <input
             type="number"
+            aria-label={t('propertyPanel.outputHeight')}
             min={INPUT_SIZE_MIN}
             max={INPUT_SIZE_MAX}
             value={exportSettings.height}
@@ -89,6 +91,7 @@ export default function OutputSizeSection({
           </div>
           <input
             type="range"
+            aria-label={t('propertyPanel.scale')}
             min={scaleMin}
             max={scaleMax}
             step={0.01}

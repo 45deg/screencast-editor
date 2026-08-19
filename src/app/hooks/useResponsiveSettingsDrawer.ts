@@ -1,24 +1,38 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 interface UseResponsiveSettingsDrawerArgs {
   hasVideo: boolean;
+  videoSessionId: string | undefined;
 }
 
-export function useResponsiveSettingsDrawer({ hasVideo }: UseResponsiveSettingsDrawerArgs) {
-  const [isMobileSettingsDrawerOpen, setIsMobileSettingsDrawerOpen] = useState(false);
-  const [isDesktopViewport, setIsDesktopViewport] = useState(false);
+interface MobileDrawerState {
+  videoSessionId: string | undefined;
+  open: boolean;
+}
 
-  useEffect(() => {
-    if (!hasVideo) {
-      setIsMobileSettingsDrawerOpen(false);
-    }
-  }, [hasVideo]);
+export function useResponsiveSettingsDrawer({ hasVideo, videoSessionId }: UseResponsiveSettingsDrawerArgs) {
+  const [mobileDrawerState, setMobileDrawerState] = useState<MobileDrawerState>({
+    videoSessionId,
+    open: false,
+  });
+  const [isDesktopViewport, setIsDesktopViewport] = useState(false);
+  const isMobileSettingsDrawerOpen =
+    hasVideo && mobileDrawerState.videoSessionId === videoSessionId && mobileDrawerState.open;
+  const setIsMobileSettingsDrawerOpen = useCallback(
+    (open: boolean) => {
+      setMobileDrawerState({ videoSessionId, open });
+    },
+    [videoSessionId],
+  );
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(min-width: 1024px)');
 
     const handleChange = () => {
       setIsDesktopViewport(mediaQuery.matches);
+      if (mediaQuery.matches) {
+        setMobileDrawerState((current) => (current.open ? { ...current, open: false } : current));
+      }
     };
 
     handleChange();
@@ -27,12 +41,6 @@ export function useResponsiveSettingsDrawer({ hasVideo }: UseResponsiveSettingsD
       mediaQuery.removeEventListener('change', handleChange);
     };
   }, []);
-
-  useEffect(() => {
-    if (isDesktopViewport && isMobileSettingsDrawerOpen) {
-      setIsMobileSettingsDrawerOpen(false);
-    }
-  }, [isDesktopViewport, isMobileSettingsDrawerOpen]);
 
   return {
     isMobileSettingsDrawerOpen,

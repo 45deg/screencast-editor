@@ -492,7 +492,7 @@ export default function TextStyleToolbar({
           <AnnotationToolbarSeparator />
           <ToolbarTooltip label={t('canvas.deleteTextLayerTooltip')}>
             <Toolbar.Button
-              aria-label={t('sliceEditor.deleteSelected')}
+              aria-label={t('sliceEditor.deleteSelection')}
               onClick={onDelete}
               className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-rose-300/40 bg-rose-400/10 text-rose-100 transition hover:bg-rose-400/20"
             >

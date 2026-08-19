@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { motion, type PanInfo } from 'framer-motion';
 import { ChevronDown, ChevronUp, Image as ImageIcon, Type } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import type { LayerMoveDirection } from '../../lib/annotationTimeline';
 import type { DerivedAnnotation } from '../../types/editor';
@@ -56,6 +57,7 @@ export default function AnnotationLayerBlock({
   onDragStart,
   onDragEnd,
 }: AnnotationLayerBlockProps) {
+  const { t } = useTranslation();
   const initialStartRef = useRef(annotation.start);
   const initialResizeStartRef = useRef(annotation.start);
   const initialDurationRef = useRef(annotation.duration);
@@ -96,6 +98,24 @@ export default function AnnotationLayerBlock({
           }
           onSelect();
         }}
+        onKeyDown={(event) => {
+          if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+            return;
+          }
+
+          event.preventDefault();
+          const delta = (event.key === 'ArrowRight' ? 1 : -1) * (event.shiftKey ? 1 : 0.1);
+          onSelect();
+          if (event.altKey) {
+            onResize(annotation.duration + delta);
+            onResizeEnd();
+            return;
+          }
+
+          onMove(Math.max(0, annotation.start + delta));
+          onMoveEnd();
+        }}
+        aria-description={t('sliceEditor.timelineItemKeyboardHint')}
         onPanStart={() => {
           initialStartRef.current = annotation.start;
           onDragStart();

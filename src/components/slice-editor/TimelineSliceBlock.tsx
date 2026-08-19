@@ -71,8 +71,24 @@ export default function TimelineSliceBlock({
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
             onSelect(slice.start);
+            return;
+          }
+
+          if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+            event.preventDefault();
+            const delta = (event.key === 'ArrowRight' ? 1 : -1) * (event.shiftKey ? 1 : 0.1);
+            onSelect(slice.start);
+            if (event.altKey) {
+              onResizeSlice(slice.id, slice.duration + delta);
+              onResizeSliceEnd();
+              return;
+            }
+
+            onMoveSlice(slice.id, Math.max(0, slice.start + delta));
+            onMoveSliceEnd();
           }
         }}
+        aria-description={t('sliceEditor.timelineItemKeyboardHint')}
         onPanStart={() => {
           initialStartRef.current = slice.start;
         }}

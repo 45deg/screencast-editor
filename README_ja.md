@@ -1,8 +1,8 @@
 # Screencast Editor
 
-Screencast Editor は、短い画面録画やプロダクト紹介動画の編集を想定したブラウザベースの動画エディタです。スクリーンキャストでよく使う編集操作に絞り、録画の分割、タイミング調整、クロップ、テキストや画像のオーバーレイ追加、`GIF` / `MP4` への書き出しを行えます。
+Screencast Editor は、短い画面録画やプロダクト紹介動画の編集を想定したブラウザベースの動画エディタです。スクリーンキャストでよく使う編集操作に絞り、録画の分割、タイミング調整、クロップ、テキストや画像のオーバーレイ追加、`MP4` への書き出しを行えます。
 
-アプリケーションはブラウザ内で完結します。素材はローカルから読み込まれ、UI 上でプレビューされ、書き出しは WebAssembly 版 FFmpeg を使って実行されます。
+アプリケーションはブラウザ内で完結します。素材はローカルから読み込まれ、UI 上でプレビューされ、書き出しは `mediabunny` と `WebCodecs` を使って実行されます。
 
 ## 機能
 
@@ -15,7 +15,7 @@ Screencast Editor は、短い画面録画やプロダクト紹介動画の編�
 - テキストオーバーレイの追加
 - 画像オーバーレイの追加
 - ブラウザ上でのプレビュー再生
-- `GIF` / `MP4` への書き出し
+- `MP4` への書き出し
 - Undo / Redo
 - 英語・日本語 UI
 
@@ -27,7 +27,7 @@ Screencast Editor は、短い画面録画やプロダクト紹介動画の編�
 - 編集状態管理に Zustand
 - スタイリングに Tailwind CSS 4
 - タイムラインと UI アニメーションに Framer Motion
-- ブラウザ内書き出しに `@ffmpeg/ffmpeg` と `@ffmpeg/util`
+- ブラウザ内書き出しに `mediabunny` と `WebCodecs`
 - 多言語対応に `i18next` と `react-i18next`
 - テストに Vitest
 
@@ -38,8 +38,8 @@ Screencast Editor は、短い画面録画やプロダクト紹介動画の編�
 - 以下に対応したモダンブラウザ
   - `MediaRecorder`
   - `getDisplayMedia`
-  - `WebAssembly`
-- 実行時に jsDelivr から FFmpeg コアを取得するためのネットワーク接続
+  - `VideoDecoder`
+  - `VideoEncoder`
 
 ## 開発
 
@@ -70,27 +70,24 @@ pnpm build
 pnpm preview
 pnpm lint
 pnpm test
-pnpm test:ffmpeg
+pnpm test:e2e
 pnpm -s tsc -p tsconfig.app.json --noEmit
 ```
 
-`pnpm test:ffmpeg` の実行にはシステム `ffmpeg` バイナリが必要です。通常のアプリ利用時にはシステム FFmpeg は不要で、必要なランタイムはブラウザ側で遅延読み込みされます。
-
 ## 書き出し
 
-書き出し処理は、ブラウザ内で生成される FFmpeg フィルタグラフをベースにしています。
+書き出し処理はソース動画をブラウザ内で demux し、`WebCodecs` でフレームをデコードします。編集済みのタイムラインをキャンバスへ再描画し、H.264 へエンコードして `MP4` に mux します。
 
 サポートしている主な出力設定:
 
-- 形式: `GIF` または `MP4`
+- 形式: `MP4`
 - 出力サイズ
-- GIF の FPS
-- GIF のパレットモード
-- GIF のディザリング方式
 - MP4 の FPS
 - MP4 のエンコードプリセット
 
 タイムライン上の空白部分は、書き出し結果では黒フレームとして扱われます。
+
+現時点の画面録画と MP4 書き出しは映像のみで、音声トラックには対応していません。
 
 ## 主なファイル構成
 
@@ -100,7 +97,7 @@ src/app/hooks/useScreenCapture.ts    ブラウザ画面録画フロー
 src/components/SliceEditor.tsx       タイムラインエディタ本体
 src/components/PropertyPanel.tsx     書き出し設定 UI
 src/store/editorStore.ts             Zustand の編集状態
-src/lib/ffmpegCommand.ts             FFmpeg コマンド/フィルタ生成
+src/lib/browserExport.ts             ブラウザネイティブの書き出し処理
 src/i18n.ts                          i18n 初期化
 src/i18n/resources/*                 翻訳辞書
 ```
@@ -122,10 +119,10 @@ pnpm -s tsc -p tsconfig.app.json --noEmit
 pnpm test
 ```
 
-書き出し処理に影響する変更では、次も有用です。
+書き出し処理や画面操作に影響する変更では、次も実行してください。
 
 ```bash
-pnpm test:ffmpeg
+pnpm test:e2e
 ```
 
 ## License

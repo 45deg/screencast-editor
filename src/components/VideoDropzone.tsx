@@ -181,7 +181,10 @@ export default function VideoDropzone({
           type="file"
           className="hidden"
           accept="video/*"
-          onChange={(event) => handleFiles(event.target.files)}
+          onChange={(event) => {
+            handleFiles(event.currentTarget.files);
+            event.currentTarget.value = '';
+          }}
         />
       </div>
     </section>

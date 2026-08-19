@@ -87,6 +87,8 @@ Supported output settings include:
 
 Blank regions on the timeline are rendered as black frames in the exported output.
 
+Screen capture and MP4 export are currently video-only; audio tracks are not recorded or exported.
+
 ## Project Structure
 
 ```text

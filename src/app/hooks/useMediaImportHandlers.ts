@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { nanoid } from 'nanoid';
 
 import { readImageMetaFromObjectUrl } from '../../lib/image';
@@ -53,9 +53,15 @@ export function useMediaImportHandlers({
 }: UseMediaImportHandlersArgs) {
   const [importError, setImportError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const isImportingRef = useRef(false);
 
   const handleImportVideo = useCallback(
     async (file: File) => {
+      if (isImportingRef.current) {
+        return;
+      }
+
+      isImportingRef.current = true;
       setIsImporting(true);
       setImportError(null);
       resetExportState();
@@ -70,6 +76,7 @@ export function useMediaImportHandlers({
       } catch (error) {
         setImportError(toErrorMessage(error));
       } finally {
+        isImportingRef.current = false;
         setIsImporting(false);
       }
     },
@@ -78,6 +85,11 @@ export function useMediaImportHandlers({
 
   const handleAddVideoSource = useCallback(
     async (file: File) => {
+      if (isImportingRef.current) {
+        return;
+      }
+
+      isImportingRef.current = true;
       setIsImporting(true);
       setImportError(null);
       resetExportState();
@@ -89,6 +101,7 @@ export function useMediaImportHandlers({
       } catch (error) {
         setImportError(toErrorMessage(error));
       } finally {
+        isImportingRef.current = false;
         setIsImporting(false);
       }
     },
