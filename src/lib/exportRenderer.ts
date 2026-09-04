@@ -8,6 +8,7 @@ interface PreparedAnnotationAssets {
 interface RenderFrameArgs {
   context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
   frame: VideoFrame | null;
+  sourceSize: { width: number; height: number } | null;
   baseCrop: CropRect;
   sceneCrop: CropRect;
   outputWidth: number;
@@ -115,6 +116,7 @@ export function releaseAnnotationAssets(assets: PreparedAnnotationAssets) {
 export function renderFrameToCanvas({
   context,
   frame,
+  sourceSize,
   baseCrop,
   sceneCrop,
   outputWidth,
@@ -128,6 +130,11 @@ export function renderFrameToCanvas({
   context.fillRect(0, 0, outputWidth, outputHeight);
 
   if (frame) {
+    // Crops use the imported metadata's coordinate space. Tab recordings can
+    // change resolution mid-stream (e.g. Retina capture), so map the crop to
+    // each decoded frame instead of cutting out its initial-size top-left area.
+    const sourceScaleX = sourceSize ? frame.displayWidth / Math.max(1, sourceSize.width) : 1;
+    const sourceScaleY = sourceSize ? frame.displayHeight / Math.max(1, sourceSize.height) : 1;
     const outputScaleX = outputWidth / Math.max(1, baseCrop.w);
     const outputScaleY = outputHeight / Math.max(1, baseCrop.h);
     const containScale = Math.min(baseCrop.w / sceneCrop.w, baseCrop.h / sceneCrop.h);
@@ -140,10 +147,10 @@ export function renderFrameToCanvas({
     context.imageSmoothingQuality = 'high';
     context.drawImage(
       frame,
-      sceneCrop.x,
-      sceneCrop.y,
-      sceneCrop.w,
-      sceneCrop.h,
+      sceneCrop.x * sourceScaleX,
+      sceneCrop.y * sourceScaleY,
+      sceneCrop.w * sourceScaleX,
+      sceneCrop.h * sourceScaleY,
       targetX,
       targetY,
       targetWidth,

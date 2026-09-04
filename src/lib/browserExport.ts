@@ -304,11 +304,13 @@ export async function exportVideoToMp4({
       baseCrop: CropRect,
       sceneCrop: CropRect,
       outputTimeSec: number,
+      sourceSize: { width: number; height: number } | null = null,
     ) => {
       throwIfAborted(signal);
       renderFrameToCanvas({
         context,
         frame,
+        sourceSize,
         baseCrop,
         sceneCrop,
         outputWidth,
@@ -369,7 +371,7 @@ export async function exportVideoToMp4({
               }
 
               while (targetIndex < targets.length && targets[targetIndex].sourceTimeUs < frame.timestamp) {
-                await emitFrame(heldFrame, baseCrop, sceneCrop, targets[targetIndex].outputTimeSec);
+                await emitFrame(heldFrame, baseCrop, sceneCrop, targets[targetIndex].outputTimeSec, source);
                 targetIndex += 1;
               }
 
@@ -423,7 +425,7 @@ export async function exportVideoToMp4({
         }
 
         while (targetIndex < targets.length) {
-          await emitFrame(heldFrame, baseCrop, sceneCrop, targets[targetIndex].outputTimeSec);
+          await emitFrame(heldFrame, baseCrop, sceneCrop, targets[targetIndex].outputTimeSec, source);
           targetIndex += 1;
         }
       } finally {
