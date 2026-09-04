@@ -1,8 +1,9 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { nanoid } from 'nanoid';
 
 import { readImageMetaFromObjectUrl } from '../../lib/image';
 import { readVideoMetadata } from '../../lib/video';
+import { useEditorStore } from '../../store/editorStore';
 import {
   DEFAULT_TEXT_ANNOTATION_STYLE,
   type AnnotationModel,
@@ -54,6 +55,11 @@ export function useMediaImportHandlers({
   const [importError, setImportError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const isImportingRef = useRef(false);
+  const imageImportGenerationRef = useRef(0);
+
+  useEffect(() => () => {
+    imageImportGenerationRef.current += 1;
+  }, []);
 
   const handleImportVideo = useCallback(
     async (file: File) => {
@@ -68,6 +74,7 @@ export function useMediaImportHandlers({
 
       try {
         const nextVideo = await readVideoMetadata(file);
+        imageImportGenerationRef.current += 1;
         revokeVideoSourceUrls(sources);
         revokeAnnotationImageUrls(annotations);
 
@@ -109,6 +116,7 @@ export function useMediaImportHandlers({
   );
 
   const handleReturnToLanding = useCallback(() => {
+    imageImportGenerationRef.current += 1;
     revokeVideoSourceUrls(sources);
     revokeAnnotationImageUrls(annotations);
 
@@ -165,10 +173,19 @@ export function useMediaImportHandlers({
       }
 
       let imageUrl = '';
+      const generation = imageImportGenerationRef.current;
+      const sourceId = sources[0]?.id;
+      const isCurrentProject = () =>
+        generation === imageImportGenerationRef.current &&
+        sourceId !== undefined && useEditorStore.getState().sources[0]?.id === sourceId;
 
       try {
         imageUrl = URL.createObjectURL(file);
         const meta = await readImageMetaFromObjectUrl(imageUrl);
+        if (!isCurrentProject()) {
+          URL.revokeObjectURL(imageUrl);
+          return;
+        }
         const maxWidth = Math.max(72, Math.round(baseCrop.w * 0.35));
         const scale = Math.min(1, maxWidth / Math.max(1, meta.width));
         const width = Math.max(24, Math.round(meta.width * scale));
@@ -191,7 +208,8 @@ export function useMediaImportHandlers({
           opacity: 1,
         };
 
-        const nextAnnotations = [...annotations, nextAnnotation];
+        // Read after loading so concurrent edits and image imports are preserved.
+        const nextAnnotations = [...useEditorStore.getState().annotations, nextAnnotation];
         replaceAnnotationsCommit(nextAnnotations, annotationId);
         setSelectedSliceId(null);
         setSelectedAnnotationId(annotationId);
@@ -199,11 +217,13 @@ export function useMediaImportHandlers({
         if (imageUrl) {
           URL.revokeObjectURL(imageUrl);
         }
-        setImportError(toErrorMessage(error));
+        if (isCurrentProject()) {
+          setImportError(toErrorMessage(error));
+        }
       }
     },
     [
-      annotations,
+      sources,
       baseCrop,
       currentTime,
       replaceAnnotationsCommit,

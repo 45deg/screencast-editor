@@ -96,12 +96,17 @@ function drawImageOverlay(
 export async function prepareAnnotationAssets(annotations: AnnotationModel[]): Promise<PreparedAnnotationAssets> {
   const imageBitmaps = new Map<string, ImageBitmap>();
 
-  for (const annotation of annotations) {
-    if (annotation.kind !== 'image') {
-      continue;
-    }
+  try {
+    for (const annotation of annotations) {
+      if (annotation.kind !== 'image') {
+        continue;
+      }
 
-    imageBitmaps.set(annotation.id, await createImageBitmap(annotation.file));
+      imageBitmaps.set(annotation.id, await createImageBitmap(annotation.file));
+    }
+  } catch (error) {
+    releaseAnnotationAssets({ imageBitmaps });
+    throw error;
   }
 
   return { imageBitmaps };

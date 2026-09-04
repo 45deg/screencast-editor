@@ -127,6 +127,7 @@ export function useScreenCapture({
         });
       }
 
+      captureStreamRef.current = stream;
       const [videoTrack] = stream.getVideoTracks();
       if (videoTrack && typeof videoTrack.applyConstraints === 'function') {
         try {
@@ -140,7 +141,6 @@ export function useScreenCapture({
       const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
 
       captureChunksRef.current = [];
-      captureStreamRef.current = stream;
       captureRecorderRef.current = recorder;
 
       if (videoTrack) {
